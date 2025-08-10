@@ -129,7 +129,10 @@ const RequestPage = () => {
     setApprovingRequestId(null);
     setSelectedDeadline("");
   };
-
+  const handleChangeSchoolDepartment = () => {
+    sessionStorage.removeItem("adminContext");
+    window.location.reload(); 
+  };
   const handleSubmitApproval = async () => {
     if (!approvingRequestId || !selectedDeadline) return;
 
@@ -266,7 +269,7 @@ const RequestPage = () => {
                     </div>
                   </div>
                   <button
-                    onClick={clearContext}
+                    onClick={handleChangeSchoolDepartment}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg"
                   >
                     Change Context

@@ -12,6 +12,10 @@ function Schedule() {
   const { school, department, getDisplayString, clearContext, loading: contextLoading, error: contextError } = useAdminContext();
 
   // State for each review's from/to dates
+    const handleChangeSchoolDepartment = () => {
+    sessionStorage.removeItem("adminContext");
+    window.location.reload(); 
+  };
   const defaultDate = setHours(setMinutes(new Date(), 30), 16);
   const navigate = useNavigate();
   
@@ -366,7 +370,7 @@ function Schedule() {
                   </span>
                 </div>
                 <button
-                  onClick={clearContext}
+                  onClick={handleChangeSchoolDepartment}
                   className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
                 >
                   Change School/Department

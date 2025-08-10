@@ -12,7 +12,10 @@ const ProjectCreationPage = () => {
   
   // Tab state
   const [activeTab, setActiveTab] = useState('single');
-  
+    const handleChangeSchoolDepartment = () => {
+    sessionStorage.removeItem("adminContext");
+    window.location.reload(); 
+  };
   // Common states
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -596,7 +599,7 @@ const ProjectCreationPage = () => {
                   </span>
                 </div>
                 <button
-                  onClick={clearContext}
+                  onClick={handleChangeSchoolDepartment}
                   className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
                   >
                   Change School/Department

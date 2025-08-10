@@ -58,7 +58,7 @@ const FacultyManagement = () => {
   // ✅ FIX: Add the change context handler like in Panel Management
   const handleChangeSchoolDepartment = () => {
     sessionStorage.removeItem("adminContext");
-    navigate("/admin/school-selection");
+    window.location.reload(); 
   };
 
   const handleInputChange = (e) => {
