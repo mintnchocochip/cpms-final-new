@@ -55,7 +55,6 @@ const FacultyLogin = () => {
 
       console.log('Login response:', response.data);
 
-      // Store both token AND faculty data
       sessionStorage.setItem("token", response.data.token);
       sessionStorage.setItem("faculty", JSON.stringify(response.data.faculty));
       
@@ -65,7 +64,6 @@ const FacultyLogin = () => {
       
       setMessage("Login Successful!");
       
-      // Redirect based on role
       if (response.data.faculty.role === 'admin') {
         window.location.href = '/admin';
       } else {
@@ -86,7 +84,8 @@ const FacultyLogin = () => {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-900 relative overflow-hidden">
+      {/* ✅ FIXED: Added proper spacing for navbar */}
+      <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-900 relative overflow-hidden pt-20">
         {/* Animated Background Elements */}
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse"></div>
@@ -97,7 +96,8 @@ const FacultyLogin = () => {
         {/* Grid Pattern Overlay */}
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwgMjU1LCAyNTUsIDAuMDMpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-30"></div>
 
-        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-8">
+        {/* ✅ UPDATED: Better centering with navbar consideration */}
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-5rem)] px-4 py-8">
           {/* Header Section */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-3 mb-4">
