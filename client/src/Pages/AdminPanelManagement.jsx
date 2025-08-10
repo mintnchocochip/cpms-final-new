@@ -25,6 +25,7 @@ import {
   Bot,
   Building2,
   GraduationCap,
+  AlertTriangle,
 } from "lucide-react";
 
 const AdminPanelManagement = () => {
@@ -38,6 +39,14 @@ const AdminPanelManagement = () => {
     panelId: null,
     teamId: null,
   });
+  // ✅ NEW: Auto operation confirmation states
+  const [autoConfirmation, setAutoConfirmation] = useState({
+    type: "", // "create" or "assign"
+    isOpen: false,
+    message: "",
+    existingCount: 0,
+  });
+  
   const [expandedPanel, setExpandedPanel] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -250,7 +259,42 @@ const AdminPanelManagement = () => {
     }
   };
 
+  // ✅ NEW: Enhanced Auto Assign with confirmation
   const handleAutoAssign = async () => {
+    const assignedTeamsCount = panels.reduce((sum, panel) => sum + panel.teams.length, 0);
+    
+    if (assignedTeamsCount > 0) {
+      setAutoConfirmation({
+        type: "assign",
+        isOpen: true,
+        message: `There are already ${assignedTeamsCount} teams assigned to panels. Auto-assignment may reassign existing teams. Do you want to continue?`,
+        existingCount: assignedTeamsCount,
+      });
+      return;
+    }
+    
+    // If no existing assignments, proceed directly
+    await executeAutoAssign();
+  };
+
+  // ✅ NEW: Enhanced Auto Create with confirmation
+  const handleAutoCreatePanel = async () => {
+    if (panels.length > 0) {
+      setAutoConfirmation({
+        type: "create",
+        isOpen: true,
+        message: `There are already ${panels.length} panels created. Auto-creation will create additional panels if needed. Do you want to continue?`,
+        existingCount: panels.length,
+      });
+      return;
+    }
+    
+    // If no existing panels, proceed directly
+    await executeAutoCreate();
+  };
+
+  // ✅ NEW: Execute auto assign after confirmation
+  const executeAutoAssign = async () => {
     try {
       setIsAutoAssigning(true);
       await autoAssignPanelsToProjects();
@@ -264,7 +308,8 @@ const AdminPanelManagement = () => {
     }
   };
 
-  const handleAutoCreatePanel = async () => {
+  // ✅ NEW: Execute auto create after confirmation
+  const executeAutoCreate = async () => {
     try {
       setIsAutoCreating(true);
       await autoCreatePanelManual();
@@ -276,6 +321,32 @@ const AdminPanelManagement = () => {
     } finally {
       setIsAutoCreating(false);
     }
+  };
+
+  // ✅ NEW: Handle auto operation confirmation
+  const handleAutoConfirm = async () => {
+    if (autoConfirmation.type === "assign") {
+      await executeAutoAssign();
+    } else if (autoConfirmation.type === "create") {
+      await executeAutoCreate();
+    }
+    
+    setAutoConfirmation({
+      type: "",
+      isOpen: false,
+      message: "",
+      existingCount: 0,
+    });
+  };
+
+  // ✅ NEW: Handle auto operation cancellation
+  const handleAutoCancel = () => {
+    setAutoConfirmation({
+      type: "",
+      isOpen: false,
+      message: "",
+      existingCount: 0,
+    });
   };
 
   const handleManualAssign = async (panelIndex, projectId) => {
@@ -518,6 +589,7 @@ const AdminPanelManagement = () => {
                   onClick={handleAutoCreatePanel}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg"
                   disabled={isAutoCreating}
+                  title={panels.length > 0 ? `${panels.length} panels already exist` : "Create panels automatically"}
                 >
                   {isAutoCreating ? (
                     <>
@@ -528,6 +600,11 @@ const AdminPanelManagement = () => {
                     <>
                       <Bot className="h-5 w-5" />
                       Auto Create
+                      {panels.length > 0 && (
+                        <span className="ml-1 bg-yellow-500 text-white text-xs rounded-full px-2 py-1">
+                          {panels.length}
+                        </span>
+                      )}
                     </>
                   )}
                 </button>
@@ -535,6 +612,11 @@ const AdminPanelManagement = () => {
                   onClick={handleAutoAssign}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg"
                   disabled={isAutoAssigning}
+                  title={
+                    panels.reduce((sum, panel) => sum + panel.teams.length, 0) > 0 
+                      ? `${panels.reduce((sum, panel) => sum + panel.teams.length, 0)} teams already assigned` 
+                      : "Assign teams automatically"
+                  }
                 >
                   {isAutoAssigning ? (
                     <>
@@ -545,21 +627,16 @@ const AdminPanelManagement = () => {
                     <>
                       <Zap className="h-5 w-5" />
                       Auto Assign
+                      {panels.reduce((sum, panel) => sum + panel.teams.length, 0) > 0 && (
+                        <span className="ml-1 bg-yellow-500 text-white text-xs rounded-full px-2 py-1">
+                          {panels.reduce((sum, panel) => sum + panel.teams.length, 0)}
+                        </span>
+                      )}
                     </>
                   )}
                 </button>
               </div>
             </div>
-
-            {/* Debug Info
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <h4 className="font-semibold text-yellow-800">Debug Info:</h4>
-                <p className="text-sm text-yellow-700">
-                  Faculty: {facultyList.length} | Panels: {panels.length} | Available Faculty: {availableFaculty.length} | Unassigned Teams: {unassignedTeams.length}
-                </p>
-              </div>
-            )} */}
 
             {/* Panels List */}
             {panels.length === 0 ? (
@@ -778,6 +855,70 @@ const AdminPanelManagement = () => {
               onConfirm={handleConfirmRemove}
               type={confirmRemove.type}
             />
+
+            {/* ✅ NEW: Auto Operation Confirmation Dialog */}
+            {autoConfirmation.isOpen && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">
+                  <div className="p-6">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                        <AlertTriangle className="h-6 w-6 text-yellow-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {autoConfirmation.type === "create" ? "Confirm Auto Panel Creation" : "Confirm Auto Assignment"}
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          This action will modify existing data
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="mb-6">
+                      <p className="text-gray-700 leading-relaxed">
+                        {autoConfirmation.message}
+                      </p>
+                      
+                      {autoConfirmation.type === "assign" && (
+                        <div className="mt-3 p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-300">
+                          <p className="text-sm text-yellow-800">
+                            <strong>Note:</strong> This may reassign teams that are already assigned to panels.
+                          </p>
+                        </div>
+                      )}
+                      
+                      {autoConfirmation.type === "create" && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-300">
+                          <p className="text-sm text-blue-800">
+                            <strong>Note:</strong> Additional panels will be created only if needed based on available faculty.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleAutoCancel}
+                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleAutoConfirm}
+                        className={`flex-1 px-4 py-2 text-white rounded-lg font-medium transition-colors ${
+                          autoConfirmation.type === "create"
+                            ? "bg-blue-600 hover:bg-blue-700"
+                            : "bg-purple-600 hover:bg-purple-700"
+                        }`}
+                      >
+                        {autoConfirmation.type === "create" ? "Create Panels" : "Assign Teams"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
