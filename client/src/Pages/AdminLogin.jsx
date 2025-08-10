@@ -15,10 +15,9 @@ const AdminLogin = () => {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  // ✨ Mascot Animation States
-  const [emailCaretPos, setEmailCaretPos] = useState(0);
-  const [passwordCaretPos, setPasswordCaretPos] = useState(0);
+  // ✨ Enhanced Mascot Animation States
   const [activeField, setActiveField] = useState(null);
+  const [typingProgress, setTypingProgress] = useState(0);
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
 
@@ -26,55 +25,59 @@ const AdminLogin = () => {
     setShowPassword(!showPassword);
   };
 
-  // ✨ Track caret position for mascot animation
-  const updateCaretPosition = (field, ref) => {
+  // ✨ Track typing progress for mascot animation
+  const updateTypingProgress = (field, ref) => {
     if (!ref.current) return;
     
-    const caretPos = ref.current.selectionStart || 0;
-    const fieldWidth = ref.current.offsetWidth;
-    const textLength = ref.current.value.length || 1;
-    const position = (caretPos / textLength) * fieldWidth;
-    
-    if (field === 'email') {
-      setEmailCaretPos(position);
-    } else if (field === 'password') {
-      setPasswordCaretPos(position);
-    }
+    const textLength = ref.current.value.length;
+    const maxLength = 25; // Reasonable max length for progress calculation
+    const progress = Math.min((textLength / maxLength) * 100, 100);
+    setTypingProgress(progress);
   };
 
   useEffect(() => {
     const emailInput = emailRef.current;
     const passwordInput = passwordRef.current;
 
-    const handleEmailEvents = () => updateCaretPosition('email', emailRef);
-    const handlePasswordEvents = () => updateCaretPosition('password', passwordRef);
+    const handleEmailEvents = () => {
+      updateTypingProgress('email', emailRef);
+      setActiveField('email');
+    };
+    
+    const handlePasswordEvents = () => {
+      updateTypingProgress('password', passwordRef);
+      setActiveField('password');
+    };
+
+    const handleBlur = () => {
+      setTimeout(() => {
+        setActiveField(null);
+        setTypingProgress(0);
+      }, 200);
+    };
 
     if (emailInput) {
-      emailInput.addEventListener('keyup', handleEmailEvents);
-      emailInput.addEventListener('click', handleEmailEvents);
+      emailInput.addEventListener('input', handleEmailEvents);
       emailInput.addEventListener('focus', () => setActiveField('email'));
-      emailInput.addEventListener('blur', () => setActiveField(null));
+      emailInput.addEventListener('blur', handleBlur);
     }
 
     if (passwordInput) {
-      passwordInput.addEventListener('keyup', handlePasswordEvents);
-      passwordInput.addEventListener('click', handlePasswordEvents);
+      passwordInput.addEventListener('input', handlePasswordEvents);
       passwordInput.addEventListener('focus', () => setActiveField('password'));
-      passwordInput.addEventListener('blur', () => setActiveField(null));
+      passwordInput.addEventListener('blur', handleBlur);
     }
 
     return () => {
       if (emailInput) {
-        emailInput.removeEventListener('keyup', handleEmailEvents);
-        emailInput.removeEventListener('click', handleEmailEvents);
+        emailInput.removeEventListener('input', handleEmailEvents);
         emailInput.removeEventListener('focus', () => setActiveField('email'));
-        emailInput.removeEventListener('blur', () => setActiveField(null));
+        emailInput.removeEventListener('blur', handleBlur);
       }
       if (passwordInput) {
-        passwordInput.removeEventListener('keyup', handlePasswordEvents);
-        passwordInput.removeEventListener('click', handlePasswordEvents);
+        passwordInput.removeEventListener('input', handlePasswordEvents);
         passwordInput.removeEventListener('focus', () => setActiveField('password'));
-        passwordInput.removeEventListener('blur', () => setActiveField(null));
+        passwordInput.removeEventListener('blur', handleBlur);
       }
     };
   }, []);
@@ -107,20 +110,80 @@ const AdminLogin = () => {
     }
   };
 
-  // ✨ Mascot position calculation
-  const getMascotPosition = () => {
-    if (activeField === 'email') {
-      return emailCaretPos;
-    } else if (activeField === 'password') {
-      return passwordCaretPos;
-    }
-    return 150; // Default center position
-  };
-
-  const getMascotEmoji = () => {
-    if (activeField === 'password') return '🙈'; // See no evil monkey for password
-    if (activeField === 'email') return '👀'; // Eyes for email
-    return '🤖'; // Robot for admin
+  // ✨ Cool Animated Robot Mascot
+  const AnimatedRobotMascot = ({ progress, isActive, fieldType }) => {
+    const eyeLeftX = 20 + (progress / 100) * 8; // Eyes move based on typing progress
+    const eyeRightX = 45 + (progress / 100) * 8;
+    const antennaOffset = isActive ? -2 : 0; // Antenna bobs when active
+    
+    return (
+      <div className="flex flex-col items-center">
+        <svg width="80" height="70" viewBox="0 0 80 70" className="drop-shadow-lg">
+          {/* Robot Body */}
+          <rect 
+            x="10" y="25" width="60" height="35" rx="8" ry="8" 
+            fill={isActive ? "#3b82f6" : "#6b7280"} 
+            className="transition-colors duration-300"
+          />
+          
+          {/* Robot Head */}
+          <rect 
+            x="15" y="10" width="50" height="30" rx="15" ry="15" 
+            fill={isActive ? "#1d4ed8" : "#4b5563"} 
+            className="transition-colors duration-300"
+          />
+          
+          {/* Animated Antenna */}
+          <rect 
+            x="38" y={5 + antennaOffset} width="4" height="10" rx="2" ry="2" 
+            fill={isActive ? "#fbbf24" : "#9ca3af"} 
+            className="transition-all duration-300"
+          />
+          <circle 
+            cx="40" cy={5 + antennaOffset} r="3" 
+            fill={isActive ? "#f59e0b" : "#6b7280"} 
+            className="transition-all duration-300"
+          />
+          
+          {/* Eye Sockets */}
+          <circle cx="25" cy="25" r="6" fill="#e5e7eb" />
+          <circle cx="55" cy="25" r="6" fill="#e5e7eb" />
+          
+          {/* Animated Eyes that follow typing */}
+          <circle 
+            cx={eyeLeftX} cy="25" r="4" 
+            fill={fieldType === 'password' ? "#ef4444" : "#10b981"} 
+            className="transition-all duration-200"
+          />
+          <circle 
+            cx={eyeRightX} cy="25" r="4" 
+            fill={fieldType === 'password' ? "#ef4444" : "#10b981"} 
+            className="transition-all duration-200"
+          />
+          
+          {/* Eye Pupils */}
+          <circle cx={eyeLeftX} cy="25" r="2" fill="#1f2937" />
+          <circle cx={eyeRightX} cy="25" r="2" fill="#1f2937" />
+          
+          {/* Mouth */}
+          <rect 
+            x="30" y="45" width="20" height="6" rx="3" ry="3" 
+            fill={isActive ? "#34d399" : "#9ca3af"} 
+            className="transition-colors duration-300"
+          />
+        </svg>
+        
+        {/* Progress Bar */}
+        {isActive && (
+          <div className="w-full h-1 bg-gray-200 rounded-full mt-2 overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-blue-400 to-purple-500 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -136,26 +199,6 @@ const AdminLogin = () => {
 
         <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-5rem)] px-4">
           <div className="w-full max-w-md">
-            {/* ✨ Animated Mascot */}
-            <div 
-              className="relative mb-4 h-16 flex justify-center items-end"
-              style={{
-                transition: 'all 0.3s ease-out'
-              }}
-            >
-              <div
-                className="text-4xl transform transition-all duration-300 ease-out"
-                style={{
-                  position: 'absolute',
-                  left: `${getMascotPosition()}px`,
-                  transform: `translateX(-50%) ${activeField ? 'scale(1.2) translateY(-5px)' : 'scale(1)'}`,
-                  filter: activeField ? 'drop-shadow(0 0 10px rgba(59, 130, 246, 0.5))' : 'none'
-                }}
-              >
-                {getMascotEmoji()}
-              </div>
-            </div>
-
             {/* Main Card */}
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-2xl blur-xl"></div>
@@ -184,9 +227,21 @@ const AdminLogin = () => {
 
                 {/* Login Form */}
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Email Field */}
+                  {/* Email Field with Mascot */}
                   <div className="space-y-2 relative">
                     <label htmlFor="email" className="block text-sm font-semibold text-gray-700">Email Address</label>
+                    
+                    {/* ✨ Cool Robot Mascot Above Email */}
+                    {(activeField === 'email' || (!activeField && email)) && (
+                      <div className="mb-4">
+                        <AnimatedRobotMascot 
+                          progress={typingProgress} 
+                          isActive={activeField === 'email'} 
+                          fieldType="email"
+                        />
+                      </div>
+                    )}
+                    
                     <div className="relative group">
                       <input
                         ref={emailRef}
@@ -202,9 +257,21 @@ const AdminLogin = () => {
                     </div>
                   </div>
 
-                  {/* Password Field */}
+                  {/* Password Field with Mascot */}
                   <div className="space-y-2 relative">
                     <label htmlFor="password" className="block text-sm font-semibold text-gray-700">Password</label>
+                    
+                    {/* ✨ Cool Robot Mascot Above Password */}
+                    {(activeField === 'password' || (!activeField && password)) && (
+                      <div className="mb-4">
+                        <AnimatedRobotMascot 
+                          progress={typingProgress} 
+                          isActive={activeField === 'password'} 
+                          fieldType="password"
+                        />
+                      </div>
+                    )}
+                    
                     <div className="relative group">
                       <input
                         ref={passwordRef}
@@ -231,9 +298,8 @@ const AdminLogin = () => {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full relative overflow-hidden bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 active:scale-95 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 active:scale-95 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                     {isLoading ? (
                       <div className="flex items-center justify-center space-x-2">
                         <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -243,12 +309,12 @@ const AdminLogin = () => {
                         <span className="font-semibold">Signing in...</span>
                       </div>
                     ) : (
-                      <span className="relative z-10 font-semibold tracking-wide">ACCESS DASHBOARD</span>
+                      <span className="font-semibold tracking-wide">ACCESS DASHBOARD</span>
                     )}
                   </button>
                 </form>
 
-                {/* ✅ Faculty Login Link - Enhanced Styling */}
+                {/* Faculty Login Link */}
                 <div className="mt-6 text-center">
                   <button
                     type="button"
@@ -260,7 +326,7 @@ const AdminLogin = () => {
                   </button>
                 </div>
 
-                {/* ✅ VTOP Link - Moved Below and Enhanced */}
+                {/* ✅ VTOP Link - Removed White Animation */}
                 <div className="mt-4 text-center">
                   <a
                     href="https://vtopcc.vit.ac.in/vtop/login"
@@ -268,9 +334,8 @@ const AdminLogin = () => {
                     rel="noopener noreferrer"
                     className="group relative inline-flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                    <span className="relative z-10">VTOP CHENNAI</span>
-                    <ExternalLink size={18} className="relative z-10" />
+                    <span>VTOP CHENNAI</span>
+                    <ExternalLink size={18} />
                   </a>
                 </div>
               </div>
@@ -278,7 +343,6 @@ const AdminLogin = () => {
           </div>
         </div>
         
-        {/* Custom Animations */}
         <style jsx>{`
           @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-10px); }
