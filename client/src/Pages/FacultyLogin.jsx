@@ -65,11 +65,11 @@ const FacultyLogin = () => {
             {/* Main Card */}
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/20 to-teal-600/20 rounded-2xl blur-xl"></div>
-              <div className="relative bg-white/95 backdrop-blur-xl p-8 rounded-2xl shadow-2xl border border-white/20 transform hover:scale-105 transition-transform duration-300">
+              <div className="relative bg-white/95 backdrop-blur-xl p-8 rounded-2xl shadow-2xl border border-white/20">
                 
-                {/* Header */}
+                {/* Header - Removed bounce animation */}
                 <div className="text-center mb-8">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl mb-4 shadow-lg animate-bounce">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl mb-4 shadow-lg">
                     <GraduationCap className="h-8 w-8 text-white" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">Faculty Portal</h2>
@@ -143,49 +143,40 @@ const FacultyLogin = () => {
                     </div>
                   </div>
 
-                  {/* Submit Button */}
+                  {/* Enhanced Submit Button */}
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
+                    className="w-full relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold py-4 px-6 rounded-xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 active:scale-95 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
                   >
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                     {loading ? (
                       <div className="flex items-center justify-center space-x-2">
                         <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Signing in...</span>
+                        <span className="font-semibold">Signing in...</span>
                       </div>
                     ) : (
-                      "Access Portal"
+                      <span className="relative z-10 font-semibold tracking-wide">ACCESS PORTAL</span>
                     )}
                   </button>
                 </form>
 
-                {/* VTOP Links */}
+                {/* VTOP Link - Only Chennai */}
                 <div className="mt-6 pt-6 border-t border-gray-200">
-                  <p className="text-center text-sm text-gray-600 mb-4">Quick Access to VIT Portals</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <a
-                      href="https://vtopcc.vit.ac.in/vtop/login"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium rounded-lg transition-all duration-200 border border-emerald-200 hover:border-emerald-300 hover:scale-105"
-                    >
-                      <span className="text-sm">VTOP Chennai</span>
-                      <ExternalLink size={16} />
-                    </a>
-                    <a
-                      href="https://vtop.vit.ac.in"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 py-3 px-4 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium rounded-lg transition-all duration-200 border border-blue-200 hover:border-blue-300 hover:scale-105"
-                    >
-                      <span className="text-sm">VTOP Vellore</span>
-                      <ExternalLink size={16} />
-                    </a>
-                  </div>
+                  <p className="text-center text-sm text-gray-600 mb-4">Need access to VTOP?</p>
+                  <a
+                    href="https://vtopcc.vit.ac.in/vtop/login"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative w-full flex items-center justify-center gap-3 py-4 px-6 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold rounded-xl transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl active:scale-95"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                    <span className="relative z-10 text-lg">VTOP CHENNAI</span>
+                    <ExternalLink size={20} className="relative z-10" />
+                  </a>
                 </div>
 
                 {/* Admin Login Link */}
@@ -193,9 +184,10 @@ const FacultyLogin = () => {
                   <button
                     type="button"
                     onClick={() => handleNavigate("/admin/login")}
-                    className="text-emerald-600 hover:text-emerald-800 font-semibold underline underline-offset-4 transition-colors"
+                    className="group relative inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-800 font-semibold transition-all duration-200 hover:scale-105"
                   >
-                    Administrator Portal →
+                    <span>Administrator Portal</span>
+                    <span className="transform group-hover:translate-x-1 transition-transform duration-200">→</span>
                   </button>
                 </div>
               </div>
