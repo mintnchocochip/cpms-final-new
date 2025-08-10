@@ -26,6 +26,9 @@ import {
   Building2,
   GraduationCap,
   AlertTriangle,
+  CheckCircle,
+  XCircle,
+  X,
 } from "lucide-react";
 
 const AdminPanelManagement = () => {
@@ -39,12 +42,22 @@ const AdminPanelManagement = () => {
     panelId: null,
     teamId: null,
   });
-  // ✅ NEW: Auto operation confirmation states
+  
+  // Auto operation confirmation states
   const [autoConfirmation, setAutoConfirmation] = useState({
     type: "", // "create" or "assign"
     isOpen: false,
     message: "",
     existingCount: 0,
+  });
+
+  // ✅ NEW: Notification state for animated success/error messages
+  const [notification, setNotification] = useState({
+    isVisible: false,
+    type: "", // "success" or "error"
+    title: "",
+    message: "",
+    icon: null,
   });
   
   const [expandedPanel, setExpandedPanel] = useState(null);
@@ -55,6 +68,27 @@ const AdminPanelManagement = () => {
   const [adminContext, setAdminContext] = useState(null);
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
   const [isAutoCreating, setIsAutoCreating] = useState(false);
+
+  // ✅ NEW: Show notification function
+  const showNotification = (type, title, message, duration = 4000) => {
+    setNotification({
+      isVisible: true,
+      type,
+      title,
+      message,
+      icon: type === "success" ? <CheckCircle className="h-6 w-6" /> : <XCircle className="h-6 w-6" />,
+    });
+
+    // Auto-dismiss after specified duration
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, isVisible: false }));
+    }, duration);
+  };
+
+  // ✅ NEW: Hide notification function
+  const hideNotification = () => {
+    setNotification(prev => ({ ...prev, isVisible: false }));
+  };
 
   // Check for admin context on component mount
   useEffect(() => {
@@ -240,26 +274,31 @@ const AdminPanelManagement = () => {
 
   const handleAddPanel = async () => {
     const { f1, f2 } = selectedPair;
-    if (!f1 || !f2 || f1 === f2)
-      return alert("Select two different faculty members");
+    if (!f1 || !f2 || f1 === f2) {
+      showNotification("error", "Invalid Selection", "Please select two different faculty members");
+      return;
+    }
     
     const exists = panels.find(
       (p) => p.facultyIds.includes(f1) && p.facultyIds.includes(f2)
     );
-    if (exists) return alert("Panel already exists");
+    if (exists) {
+      showNotification("error", "Panel Exists", "This panel combination already exists");
+      return;
+    }
     
     try {
       await createPanelManual({ faculty1Id: f1, faculty2Id: f2 });
       setSelectedPair({ f1: "", f2: "" });
       await fetchData();
-      alert("Panel created successfully!");
+      showNotification("success", "Panel Created!", "New panel has been created successfully");
     } catch (error) {
       console.error("Panel creation error:", error);
-      alert("Panel creation failed.");
+      showNotification("error", "Creation Failed", "Failed to create panel. Please try again.");
     }
   };
 
-  // ✅ NEW: Enhanced Auto Assign with confirmation
+  // Enhanced Auto Assign with confirmation
   const handleAutoAssign = async () => {
     const assignedTeamsCount = panels.reduce((sum, panel) => sum + panel.teams.length, 0);
     
@@ -277,7 +316,7 @@ const AdminPanelManagement = () => {
     await executeAutoAssign();
   };
 
-  // ✅ NEW: Enhanced Auto Create with confirmation
+  // Enhanced Auto Create with confirmation
   const handleAutoCreatePanel = async () => {
     if (panels.length > 0) {
       setAutoConfirmation({
@@ -293,53 +332,55 @@ const AdminPanelManagement = () => {
     await executeAutoCreate();
   };
 
-  // ✅ NEW: Execute auto assign after confirmation
+  // ✅ UPDATED: Execute auto assign with notification instead of alert
   const executeAutoAssign = async () => {
     try {
       setIsAutoAssigning(true);
       await autoAssignPanelsToProjects();
       await fetchData();
-      alert("Auto-assignment completed!");
+      showNotification("success", "Auto-Assignment Complete!", "Teams have been automatically assigned to panels");
     } catch (error) {
       console.error("Auto assign error:", error);
-      alert("Auto assignment failed.");
+      showNotification("error", "Assignment Failed", "Auto-assignment failed. Please try again.");
     } finally {
       setIsAutoAssigning(false);
     }
   };
 
-  // ✅ NEW: Execute auto create after confirmation
+  // ✅ UPDATED: Execute auto create with notification instead of alert
   const executeAutoCreate = async () => {
     try {
       setIsAutoCreating(true);
       await autoCreatePanelManual();
       await fetchData();
-      alert("Auto Panel Creation completed!");
+      showNotification("success", "Auto-Creation Complete!", "Panels have been automatically created");
     } catch (error) {
       console.error("Auto create panel error:", error);
-      alert("Auto Panel Creation failed.");
+      showNotification("error", "Creation Failed", "Auto panel creation failed. Please try again.");
     } finally {
       setIsAutoCreating(false);
     }
   };
 
-  // ✅ NEW: Handle auto operation confirmation
+  // Handle auto operation confirmation
   const handleAutoConfirm = async () => {
-    if (autoConfirmation.type === "assign") {
-      await executeAutoAssign();
-    } else if (autoConfirmation.type === "create") {
-      await executeAutoCreate();
-    }
-    
+    // Close the popup immediately when user confirms
     setAutoConfirmation({
       type: "",
       isOpen: false,
       message: "",
       existingCount: 0,
     });
+
+    // Then execute the operation
+    if (autoConfirmation.type === "assign") {
+      await executeAutoAssign();
+    } else if (autoConfirmation.type === "create") {
+      await executeAutoCreate();
+    }
   };
 
-  // ✅ NEW: Handle auto operation cancellation
+  // Handle auto operation cancellation
   const handleAutoCancel = () => {
     setAutoConfirmation({
       type: "",
@@ -356,16 +397,16 @@ const AdminPanelManagement = () => {
 
       const conflictCheck = canAssignProjectToPanel(projectId, panel.facultyIds);
       if (!conflictCheck.canAssign) {
-        alert(conflictCheck.reason);
+        showNotification("error", "Assignment Conflict", conflictCheck.reason);
         return;
       }
 
       await assignPanelToProject({ panelId: panel.panelId, projectId });
       await fetchData();
-      alert("Team assigned successfully!");
+      showNotification("success", "Team Assigned!", "Team has been successfully assigned to the panel");
     } catch (error) {
       console.error("Assignment error:", error);
-      alert("Assignment failed.");
+      showNotification("error", "Assignment Failed", "Failed to assign team. Please try again.");
     }
   };
 
@@ -374,20 +415,20 @@ const AdminPanelManagement = () => {
     try {
       if (type === "panel") {
         await deletePanel(panelId);
-        alert("Panel deleted successfully!");
+        showNotification("success", "Panel Deleted!", "Panel has been successfully removed");
       } else if (type === "team") {
         await assignPanelToProject({ panelId: null, projectId: teamId });
-        alert("Team removed successfully!");
+        showNotification("success", "Team Removed!", "Team has been successfully unassigned");
       }
       await fetchData();
     } catch (error) {
       console.error("Delete operation error:", error);
-      alert("Delete failed.");
+      showNotification("error", "Operation Failed", "Failed to complete the operation. Please try again.");
     }
     setConfirmRemove({ type: "", panelId: null, teamId: null });
   };
 
-  // FIXED: Calculate used faculty IDs from actual panels
+  // Calculate used faculty IDs from actual panels
   const usedFacultyIds = React.useMemo(
     () => panels.flatMap((p) => p.facultyIds || []),
     [panels]
@@ -856,7 +897,7 @@ const AdminPanelManagement = () => {
               type={confirmRemove.type}
             />
 
-            {/* ✅ NEW: Auto Operation Confirmation Dialog */}
+            {/* Auto Operation Confirmation Dialog */}
             {autoConfirmation.isOpen && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                 <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">
@@ -913,6 +954,60 @@ const AdminPanelManagement = () => {
                         }`}
                       >
                         {autoConfirmation.type === "create" ? "Create Panels" : "Assign Teams"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ✅ NEW: Animated Success/Error Notification */}
+            {notification.isVisible && (
+              <div className="fixed top-4 right-4 z-50 max-w-sm w-full">
+                <div 
+                  className={`transform transition-all duration-500 ease-out ${
+                    notification.isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+                  }`}
+                >
+                  <div className={`rounded-xl shadow-2xl border-l-4 p-4 ${
+                    notification.type === "success" 
+                      ? "bg-green-50 border-green-400" 
+                      : "bg-red-50 border-red-400"
+                  }`}>
+                    <div className="flex items-start">
+                      <div className={`flex-shrink-0 ${
+                        notification.type === "success" ? "text-green-500" : "text-red-500"
+                      }`}>
+                        {notification.type === "success" ? (
+                          <div className="relative">
+                            <div className="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-green-400 opacity-75"></div>
+                            <CheckCircle className="relative inline-flex h-6 w-6" />
+                          </div>
+                        ) : (
+                          <XCircle className="h-6 w-6" />
+                        )}
+                      </div>
+                      <div className="ml-3 flex-1">
+                        <h3 className={`text-sm font-semibold ${
+                          notification.type === "success" ? "text-green-800" : "text-red-800"
+                        }`}>
+                          {notification.title}
+                        </h3>
+                        <p className={`mt-1 text-sm ${
+                          notification.type === "success" ? "text-green-700" : "text-red-700"
+                        }`}>
+                          {notification.message}
+                        </p>
+                      </div>
+                      <button
+                        onClick={hideNotification}
+                        className={`flex-shrink-0 ml-3 ${
+                          notification.type === "success" 
+                            ? "text-green-400 hover:text-green-600" 
+                            : "text-red-400 hover:text-red-600"
+                        }`}
+                      >
+                        <X className="h-5 w-5" />
                       </button>
                     </div>
                   </div>
