@@ -4,7 +4,7 @@ import { setHours, setMinutes } from "date-fns";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { getDefaultDeadline, createOrUpdateMarkingSchema } from "../api";
-import { Plus, Minus, Building2, GraduationCap, CheckCircle } from "lucide-react";
+import { Plus, Minus, Building2, GraduationCap, CheckCircle, AlertCircle } from "lucide-react";
 import { useAdminContext } from '../hooks/useAdminContext';
 import { useNavigate } from "react-router-dom";
 
@@ -12,10 +12,11 @@ function Schedule() {
   const { school, department, getDisplayString, clearContext, loading: contextLoading, error: contextError } = useAdminContext();
 
   // State for each review's from/to dates
-    const handleChangeSchoolDepartment = () => {
+  const handleChangeSchoolDepartment = () => {
     sessionStorage.removeItem("adminContext");
     window.location.reload(); 
   };
+  
   const defaultDate = setHours(setMinutes(new Date(), 30), 16);
   const navigate = useNavigate();
   
@@ -31,6 +32,7 @@ function Schedule() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [validationErrors, setValidationErrors] = useState({}); // ✅ NEW: For validation errors
 
   const [components, setComponents] = useState({
     draftReview: [{ name: "", points: "" }],
@@ -56,9 +58,19 @@ function Schedule() {
       ...prev,
       [task]: [...prev[task], { name: "", points: "" }],
     }));
+    
+    // Clear validation error when adding component
+    setValidationErrors(prev => ({ ...prev, [task]: false }));
   };
 
+  // ✅ UPDATED: Prevent removing the last component
   const removeComponent = (task, index) => {
+    if (components[task].length <= 1) {
+      setMessage("Each review must have at least one component.");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+
     setComponents((prev) => ({
       ...prev,
       [task]: prev[task].filter((_, i) => i !== index),
@@ -66,16 +78,21 @@ function Schedule() {
   };
 
   const updateComponent = (task, index, field, value) => {
-    console.log(`Updating ${task}[${index}].${field} = ${value}`); // Debug log
+    console.log(`Updating ${task}[${index}].${field} = ${value}`);
     
     setComponents((prev) => {
       const updatedComponents = [...prev[task]];
       updatedComponents[index] = { ...updatedComponents[index], [field]: value };
       
-      console.log(`Updated ${task} components:`, updatedComponents); // Debug log
+      console.log(`Updated ${task} components:`, updatedComponents);
       
       return { ...prev, [task]: updatedComponents };
     });
+
+    // Clear validation error when updating component name
+    if (field === 'name' && value.trim()) {
+      setValidationErrors(prev => ({ ...prev, [task]: false }));
+    }
   };
 
   // Handle PPT requirement changes
@@ -100,7 +117,7 @@ function Schedule() {
     }
   }, [school, department]);
 
-  // ✅ FIXED: Completely updated data fetching function
+  // Data fetching function
   const fetchDeadlines = async () => {
     setLoading(true);
     try {
@@ -113,17 +130,14 @@ function Schedule() {
         const data = res.data.data;
         console.log('Processing data:', data);
 
-        // ✅ Initialize with current state as base
         const newReviewData = { ...reviewData };
         const newComponents = {};
         const newPptRequirements = { ...pptRequirements };
 
-        // ✅ Initialize all review types with default empty component first
         Object.keys(components).forEach(reviewType => {
           newComponents[reviewType] = [{ name: "", points: "" }];
         });
 
-        // ✅ Process reviews array if available
         if (data.reviews && Array.isArray(data.reviews)) {
           console.log("Processing full marking schema with components:", data.reviews);
           
@@ -131,9 +145,7 @@ function Schedule() {
             const reviewName = review.reviewName;
             console.log(`Processing review: ${reviewName}`, review);
             
-            // Only process if it's one of our defined review types
             if (newReviewData.hasOwnProperty(reviewName)) {
-              // ✅ Update deadlines if they exist
               if (review.deadline) {
                 newReviewData[reviewName] = {
                   from: new Date(review.deadline.from),
@@ -142,14 +154,12 @@ function Schedule() {
                 console.log(`Updated deadline for ${reviewName}:`, newReviewData[reviewName]);
               }
 
-              // ✅ Update components with comprehensive handling
               if (review.components && Array.isArray(review.components) && review.components.length > 0) {
                 console.log(`Processing ${review.components.length} components for ${reviewName}:`, review.components);
                 
                 newComponents[reviewName] = review.components.map((comp, index) => {
                   console.log(`Component ${index}:`, comp);
                   
-                  // Handle both 'weight' and 'points' fields
                   let points = "";
                   if (comp.weight !== undefined && comp.weight !== null) {
                     points = comp.weight.toString();
@@ -171,7 +181,6 @@ function Schedule() {
                 newComponents[reviewName] = [{ name: "", points: "" }];
               }
 
-              // ✅ Update PPT requirements
               if (review.hasOwnProperty('requiresPPT')) {
                 newPptRequirements[reviewName] = Boolean(review.requiresPPT);
                 console.log(`PPT requirement for ${reviewName}: ${newPptRequirements[reviewName]}`);
@@ -183,7 +192,6 @@ function Schedule() {
           
           setMessage("Existing marking schema loaded successfully!");
         } 
-        // ✅ Handle deadlines-only response (backward compatibility)
         else if (data.deadlines && Array.isArray(data.deadlines)) {
           console.log("Processing deadlines-only data:", data.deadlines);
           
@@ -204,7 +212,6 @@ function Schedule() {
         console.log('Components:', newComponents);
         console.log('PPT Requirements:', newPptRequirements);
 
-        // ✅ Apply all updates at once
         setReviewData(newReviewData);
         setComponents(newComponents);
         setPptRequirements(newPptRequirements);
@@ -228,84 +235,101 @@ function Schedule() {
     }
   };
 
-
- const handleSaveDeadlines = async () => {
-  if (!school || !department) {
-    setMessage("Admin context is required. Please select school and department.");
-    return;
-  }
-
-  setSaving(true);
-  setMessage("");
-
-  // Validate all intervals
-  const allValid = Object.entries(reviewData).every(([reviewName, dates]) => {
-    return dates.to > dates.from;
-  });
-
-  if (!allValid) {
-    setMessage("Please ensure all 'To' dates are after their corresponding 'From' dates.");
-    setSaving(false);
-    return;
-  }
-
-  try {
-    console.log("=== SAVING COMPLETE MARKING SCHEMA ===");
-
-    // ✅ SINGLE API CALL: Build complete reviews array with everything
-    const reviews = Object.entries(reviewData).map(([reviewName, dates]) => {
-      const reviewComponents = components[reviewName] || [];
-      
-      const processedComponents = reviewComponents
-        .filter(comp => comp.name && comp.name.trim())
-        .map(comp => {
-          const weight = parseInt(comp.points) || 0;
-          console.log(`Component: "${comp.name.trim()}" -> Weight: ${weight}`);
-          return {
-            name: comp.name.trim(),
-            weight: weight
-          };
-        });
-
-      return {
-        reviewName,
-        components: processedComponents,
-        deadline: {
-          from: dates.from.toISOString(),
-          to: dates.to.toISOString(),
-        },
-        requiresPPT: pptRequirements[reviewName] || false,
-      };
-    });
-
-    console.log("Final reviews payload:", JSON.stringify(reviews, null, 2));
-
-    // ✅ ONLY use createOrUpdateMarkingSchema (remove setDefaultDeadline call)
-    const response = await createOrUpdateMarkingSchema({ 
-      school, 
-      department, 
-      reviews 
-    });
-
-    if (response.data?.success) {
-      setMessage(`Complete marking schema saved successfully for ${getDisplayString()}!`);
-      
-      // Refresh data to verify save worked
-      setTimeout(() => {
-        fetchDeadlines();
-      }, 1000);
-    } else {
-      throw new Error(response.data?.message || "Failed to save");
+  // ✅ UPDATED: Enhanced validation for components
+  const handleSaveDeadlines = async () => {
+    if (!school || !department) {
+      setMessage("Admin context is required. Please select school and department.");
+      return;
     }
 
-  } catch (error) {
-    console.error("Save error:", error);
-    setMessage(error.response?.data?.message || "Failed to save marking schema. Please try again.");
-  }
+    setSaving(true);
+    setMessage("");
+    setValidationErrors({}); // Clear previous validation errors
 
-  setSaving(false);
-};
+    // Validate dates
+    const dateValidation = Object.entries(reviewData).every(([reviewName, dates]) => {
+      return dates.to > dates.from;
+    });
 
+    if (!dateValidation) {
+      setMessage("Please ensure all 'To' dates are after their corresponding 'From' dates.");
+      setSaving(false);
+      return;
+    }
+
+    // ✅ NEW: Validate that each review has at least one component with a name
+    const componentValidation = {};
+    let hasValidationErrors = false;
+
+    Object.entries(components).forEach(([reviewName, reviewComponents]) => {
+      const validComponents = reviewComponents.filter(comp => comp.name && comp.name.trim());
+      
+      if (validComponents.length === 0) {
+        componentValidation[reviewName] = true;
+        hasValidationErrors = true;
+      }
+    });
+
+    if (hasValidationErrors) {
+      setValidationErrors(componentValidation);
+      setMessage("Each review must have at least one component with a name. Please check the highlighted reviews.");
+      setSaving(false);
+      return;
+    }
+
+    try {
+      console.log("=== SAVING COMPLETE MARKING SCHEMA ===");
+
+      const reviews = Object.entries(reviewData).map(([reviewName, dates]) => {
+        const reviewComponents = components[reviewName] || [];
+        
+        const processedComponents = reviewComponents
+          .filter(comp => comp.name && comp.name.trim())
+          .map(comp => {
+            const weight = parseInt(comp.points) || 0;
+            console.log(`Component: "${comp.name.trim()}" -> Weight: ${weight}`);
+            return {
+              name: comp.name.trim(),
+              weight: weight
+            };
+          });
+
+        return {
+          reviewName,
+          components: processedComponents,
+          deadline: {
+            from: dates.from.toISOString(),
+            to: dates.to.toISOString(),
+          },
+          requiresPPT: pptRequirements[reviewName] || false,
+        };
+      });
+
+      console.log("Final reviews payload:", JSON.stringify(reviews, null, 2));
+
+      const response = await createOrUpdateMarkingSchema({ 
+        school, 
+        department, 
+        reviews 
+      });
+
+      if (response.data?.success) {
+        setMessage(`Complete marking schema saved successfully for ${getDisplayString()}!`);
+        
+        setTimeout(() => {
+          fetchDeadlines();
+        }, 1000);
+      } else {
+        throw new Error(response.data?.message || "Failed to save");
+      }
+
+    } catch (error) {
+      console.error("Save error:", error);
+      setMessage(error.response?.data?.message || "Failed to save marking schema. Please try again.");
+    }
+
+    setSaving(false);
+  };
 
   // Update review date handler
   const updateReviewDate = (reviewName, field, value) => {
@@ -356,27 +380,26 @@ function Schedule() {
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-8 max-w-7xl">
           {/* Header with Admin Context */}
-          <div className="mb-8 pt-10 ">
-            <div className="flex justify-stretch items-center gap-96 " >
-            <h1 className="text-3xl font-bold text-gray-900 mb-4 ">Schedule Management</h1>
-            
-            {/* Admin Context Display */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-between gap-5 ">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-blue-600" />
-                  <span className="font-medium text-blue-900 ">
-                    {getDisplayString()}
-                  </span>
+          <div className="mb-8 pt-10">
+            <div className="flex justify-stretch items-center gap-96">
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">Schedule Management</h1>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between gap-5">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium text-blue-900">
+                      {getDisplayString()}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleChangeSchoolDepartment}
+                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                  >
+                    Change School/Department
+                  </button>
                 </div>
-                <button
-                  onClick={handleChangeSchoolDepartment}
-                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-                >
-                  Change School/Department
-                </button>
               </div>
-            </div>
             </div>
 
             {/* Loading State */}
@@ -392,19 +415,15 @@ function Schedule() {
               <div className={`p-4 rounded-lg mb-6 border ${
                 message.includes('successfully') 
                   ? 'bg-green-50 text-green-700 border-green-200' 
-                  : message.includes('Error') || message.includes('Failed')
+                  : message.includes('Error') || message.includes('Failed') || message.includes('must have at least one')
                   ? 'bg-red-50 text-red-700 border-red-200'
                   : 'bg-blue-50 text-blue-700 border-blue-200'
               }`}>
                 <div className="flex items-center">
                   {message.includes('successfully') ? (
-                    <svg className="h-5 w-5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  ) : message.includes('Error') || message.includes('Failed') ? (
-                    <svg className="h-5 w-5 mr-3 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
+                    <CheckCircle className="h-5 w-5 mr-3 flex-shrink-0 text-green-600" />
+                  ) : message.includes('Error') || message.includes('Failed') || message.includes('must have at least one') ? (
+                    <AlertCircle className="h-5 w-5 mr-3 flex-shrink-0 text-red-600" />
                   ) : (
                     <CheckCircle className="h-5 w-5 mr-3 flex-shrink-0 text-blue-600" />
                   )}
@@ -438,9 +457,16 @@ function Schedule() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {reviewTypes.map((review) => (
-                    <tr key={review.key} className="hover:bg-gray-50">
+                    <tr key={review.key} className={`hover:bg-gray-50 ${
+                      validationErrors[review.key] ? 'bg-red-50 border-l-4 border-red-400' : ''
+                    }`}>
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {review.label}
+                        <div className="flex items-center gap-2">
+                          {validationErrors[review.key] && (
+                            <AlertCircle className="h-4 w-4 text-red-500" />
+                          )}
+                          {review.label}
+                        </div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <DatePicker
@@ -471,7 +497,11 @@ function Schedule() {
                                 value={comp.name}
                                 onChange={(e) => updateComponent(review.key, index, "name", e.target.value)}
                                 placeholder="Component Name"
-                                className="flex-1 border-2 border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                className={`flex-1 border-2 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm ${
+                                  validationErrors[review.key] && !comp.name.trim() 
+                                    ? 'border-red-300 focus:border-red-500' 
+                                    : 'border-gray-300 focus:border-blue-500'
+                                }`}
                               />
                               <input
                                 type="number"
@@ -485,13 +515,24 @@ function Schedule() {
                               />
                               <button
                                 onClick={() => removeComponent(review.key, index)}
-                                className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                                className={`p-2 rounded-lg transition-colors ${
+                                  components[review.key].length === 1
+                                    ? 'text-gray-300 cursor-not-allowed'
+                                    : 'text-red-600 hover:text-red-800 hover:bg-red-50'
+                                }`}
                                 disabled={components[review.key].length === 1}
+                                title={components[review.key].length === 1 ? 'Cannot remove the last component' : 'Remove component'}
                               >
                                 <Minus size={16} />
                               </button>
                             </div>
                           ))}
+                          {validationErrors[review.key] && (
+                            <div className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                              <AlertCircle size={12} />
+                              At least one component with a name is required
+                            </div>
+                          )}
                         </div>
                       </td>
                       {/* PPT Requirement Column */}
@@ -546,6 +587,10 @@ function Schedule() {
                     <CheckCircle size={16} className="text-green-600" />
                     <span>PPT Required: Reviews marked will show PPT approval section in Guide interface</span>
                   </p>
+                  <p className="flex items-center gap-2 mt-1">
+                    <AlertCircle size={16} className="text-orange-600" />
+                    <span>Each review must have at least one component with a name</span>
+                  </p>
                 </div>
                 <button
                   onClick={handleSaveDeadlines}
@@ -575,6 +620,7 @@ function Schedule() {
                 <li><strong>Points:</strong> Set the maximum points for each component</li>
                 <li><strong>PPT Required:</strong> Enable PPT approval section for specific reviews</li>
                 <li><strong>Deadlines:</strong> Set when each review period is active</li>
+                <li><strong>Validation:</strong> Each review must have at least one component with a name</li>
                 <li><strong>Auto-refresh:</strong> Data is reloaded after successful save to verify changes</li>
               </ul>
             </div>
