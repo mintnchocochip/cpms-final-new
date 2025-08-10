@@ -160,10 +160,17 @@ export const useAdminContext = () => {
     }
   }, [validateContext]);
 
-  // REMOVED ALL CLEARING FUNCTIONS AS REQUESTED
+  // ✅ FIX: Enable clearContext function
   const clearContext = useCallback(() => {
-    console.log('Clear context called - but clearing disabled as requested');
-    // All clearing logic removed as per user request
+    try {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      setContextState(null);
+      setError(null);
+      console.log('Admin context cleared successfully');
+    } catch (error) {
+      console.error('Error clearing admin context:', error);
+      setError('Failed to clear admin context');
+    }
   }, []);
 
   const redirectToSelection = useCallback(() => {
@@ -248,7 +255,7 @@ export const useAdminContext = () => {
     // Methods
     getContext,
     setContext,
-    clearContext, // Now does nothing but kept for compatibility
+    clearContext, // ✅ Now works properly
     refreshContext,
     updateContext,
     redirectToSelection,
