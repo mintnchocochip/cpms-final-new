@@ -44,6 +44,8 @@ const AdminPanelManagement = () => {
   const [unassignedTeams, setUnassignedTeams] = useState([]);
   const [allGuideProjects, setAllGuideProjects] = useState([]);
   const [adminContext, setAdminContext] = useState(null);
+  const [isAutoAssigning, setIsAutoAssigning] = useState(false);
+  const [isAutoCreating, setIsAutoCreating] = useState(false);
 
   // Check for admin context on component mount
   useEffect(() => {
@@ -250,23 +252,29 @@ const AdminPanelManagement = () => {
 
   const handleAutoAssign = async () => {
     try {
+      setIsAutoAssigning(true);
       await autoAssignPanelsToProjects();
       await fetchData();
       alert("Auto-assignment completed!");
     } catch (error) {
       console.error("Auto assign error:", error);
       alert("Auto assignment failed.");
+    } finally {
+      setIsAutoAssigning(false);
     }
   };
 
   const handleAutoCreatePanel = async () => {
     try {
+      setIsAutoCreating(true);
       await autoCreatePanelManual();
       await fetchData();
       alert("Auto Panel Creation completed!");
     } catch (error) {
       console.error("Auto create panel error:", error);
       alert("Auto Panel Creation failed.");
+    } finally {
+      setIsAutoCreating(false);
     }
   };
 
@@ -508,17 +516,37 @@ const AdminPanelManagement = () => {
                 </button>
                 <button
                   onClick={handleAutoCreatePanel}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg"
+                  disabled={isAutoCreating}
                 >
-                  <Bot className="h-5 w-5" />
-                  Auto Create
+                  {isAutoCreating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Bot className="h-5 w-5" />
+                      Auto Create
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={handleAutoAssign}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg"
+                  disabled={isAutoAssigning}
                 >
-                  <Zap className="h-5 w-5" />
-                  Auto Assign
+                  {isAutoAssigning ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Assigning...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-5 w-5" />
+                      Auto Assign
+                    </>
+                  )}
                 </button>
               </div>
             </div>
