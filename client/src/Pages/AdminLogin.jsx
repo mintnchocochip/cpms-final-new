@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../App";
 import Navbar from "../Components/UniversalNavbar";
@@ -15,9 +15,69 @@ const AdminLogin = () => {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
+  // ✨ Mascot Animation States
+  const [emailCaretPos, setEmailCaretPos] = useState(0);
+  const [passwordCaretPos, setPasswordCaretPos] = useState(0);
+  const [activeField, setActiveField] = useState(null);
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
+
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
+
+  // ✨ Track caret position for mascot animation
+  const updateCaretPosition = (field, ref) => {
+    if (!ref.current) return;
+    
+    const caretPos = ref.current.selectionStart || 0;
+    const fieldWidth = ref.current.offsetWidth;
+    const textLength = ref.current.value.length || 1;
+    const position = (caretPos / textLength) * fieldWidth;
+    
+    if (field === 'email') {
+      setEmailCaretPos(position);
+    } else if (field === 'password') {
+      setPasswordCaretPos(position);
+    }
+  };
+
+  useEffect(() => {
+    const emailInput = emailRef.current;
+    const passwordInput = passwordRef.current;
+
+    const handleEmailEvents = () => updateCaretPosition('email', emailRef);
+    const handlePasswordEvents = () => updateCaretPosition('password', passwordRef);
+
+    if (emailInput) {
+      emailInput.addEventListener('keyup', handleEmailEvents);
+      emailInput.addEventListener('click', handleEmailEvents);
+      emailInput.addEventListener('focus', () => setActiveField('email'));
+      emailInput.addEventListener('blur', () => setActiveField(null));
+    }
+
+    if (passwordInput) {
+      passwordInput.addEventListener('keyup', handlePasswordEvents);
+      passwordInput.addEventListener('click', handlePasswordEvents);
+      passwordInput.addEventListener('focus', () => setActiveField('password'));
+      passwordInput.addEventListener('blur', () => setActiveField(null));
+    }
+
+    return () => {
+      if (emailInput) {
+        emailInput.removeEventListener('keyup', handleEmailEvents);
+        emailInput.removeEventListener('click', handleEmailEvents);
+        emailInput.removeEventListener('focus', () => setActiveField('email'));
+        emailInput.removeEventListener('blur', () => setActiveField(null));
+      }
+      if (passwordInput) {
+        passwordInput.removeEventListener('keyup', handlePasswordEvents);
+        passwordInput.removeEventListener('click', handlePasswordEvents);
+        passwordInput.removeEventListener('focus', () => setActiveField('password'));
+        passwordInput.removeEventListener('blur', () => setActiveField(null));
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,6 +107,22 @@ const AdminLogin = () => {
     }
   };
 
+  // ✨ Mascot position calculation
+  const getMascotPosition = () => {
+    if (activeField === 'email') {
+      return emailCaretPos;
+    } else if (activeField === 'password') {
+      return passwordCaretPos;
+    }
+    return 150; // Default center position
+  };
+
+  const getMascotEmoji = () => {
+    if (activeField === 'password') return '🙈'; // See no evil monkey for password
+    if (activeField === 'email') return '👀'; // Eyes for email
+    return '🤖'; // Robot for admin
+  };
+
   return (
     <>
       <Navbar />
@@ -60,12 +136,32 @@ const AdminLogin = () => {
 
         <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-5rem)] px-4">
           <div className="w-full max-w-md">
+            {/* ✨ Animated Mascot */}
+            <div 
+              className="relative mb-4 h-16 flex justify-center items-end"
+              style={{
+                transition: 'all 0.3s ease-out'
+              }}
+            >
+              <div
+                className="text-4xl transform transition-all duration-300 ease-out"
+                style={{
+                  position: 'absolute',
+                  left: `${getMascotPosition()}px`,
+                  transform: `translateX(-50%) ${activeField ? 'scale(1.2) translateY(-5px)' : 'scale(1)'}`,
+                  filter: activeField ? 'drop-shadow(0 0 10px rgba(59, 130, 246, 0.5))' : 'none'
+                }}
+              >
+                {getMascotEmoji()}
+              </div>
+            </div>
+
             {/* Main Card */}
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-2xl blur-xl"></div>
               <div className="relative bg-white/95 backdrop-blur-xl p-8 rounded-2xl shadow-2xl border border-white/20">
                 
-                {/* Header - Removed bounce animation */}
+                {/* Header */}
                 <div className="text-center mb-8">
                   <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl mb-4 shadow-lg">
                     <Shield className="h-8 w-8 text-white" />
@@ -89,10 +185,11 @@ const AdminLogin = () => {
                 {/* Login Form */}
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Email Field */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative">
                     <label htmlFor="email" className="block text-sm font-semibold text-gray-700">Email Address</label>
                     <div className="relative group">
                       <input
+                        ref={emailRef}
                         id="email"
                         type="email"
                         placeholder="admin@vit.edu"
@@ -106,10 +203,11 @@ const AdminLogin = () => {
                   </div>
 
                   {/* Password Field */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative">
                     <label htmlFor="password" className="block text-sm font-semibold text-gray-700">Password</label>
                     <div className="relative group">
                       <input
+                        ref={passwordRef}
                         id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="••••••••••"
@@ -129,7 +227,7 @@ const AdminLogin = () => {
                     </div>
                   </div>
 
-                  {/* Enhanced Submit Button */}
+                  {/* Submit Button */}
                   <button
                     type="submit"
                     disabled={isLoading}
@@ -150,31 +248,30 @@ const AdminLogin = () => {
                   </button>
                 </form>
 
-                {/* VTOP Link - Only Chennai */}
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <p className="text-center text-sm text-gray-600 mb-4">Need access to VTOP?</p>
-                  <a
-                    href="https://vtopcc.vit.ac.in/vtop/login"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group relative w-full flex items-center justify-center gap-3 py-4 px-6 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold rounded-xl transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl active:scale-95"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                    <span className="relative z-10 text-lg">VTOP CHENNAI</span>
-                    <ExternalLink size={20} className="relative z-10" />
-                  </a>
-                </div>
-
-                {/* Faculty Login Link */}
+                {/* ✅ Faculty Login Link - Enhanced Styling */}
                 <div className="mt-6 text-center">
                   <button
                     type="button"
                     onClick={() => navigate("/login")}
-                    className="group relative inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-semibold transition-all duration-200 hover:scale-105"
+                    className="group relative inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-blue-50 hover:to-purple-50 text-gray-700 hover:text-blue-700 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg border-2 border-gray-200 hover:border-blue-300"
                   >
                     <span>Faculty Login Portal</span>
                     <span className="transform group-hover:translate-x-1 transition-transform duration-200">→</span>
                   </button>
+                </div>
+
+                {/* ✅ VTOP Link - Moved Below and Enhanced */}
+                <div className="mt-4 text-center">
+                  <a
+                    href="https://vtopcc.vit.ac.in/vtop/login"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative inline-flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                    <span className="relative z-10">VTOP CHENNAI</span>
+                    <ExternalLink size={18} className="relative z-10" />
+                  </a>
                 </div>
               </div>
             </div>
