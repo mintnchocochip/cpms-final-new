@@ -51,7 +51,7 @@ const AdminPanelManagement = () => {
     existingCount: 0,
   });
 
-  // ✅ NEW: Notification state for animated success/error messages
+  // Notification state for animated success/error messages
   const [notification, setNotification] = useState({
     isVisible: false,
     type: "", // "success" or "error"
@@ -69,7 +69,7 @@ const AdminPanelManagement = () => {
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
   const [isAutoCreating, setIsAutoCreating] = useState(false);
 
-  // ✅ NEW: Show notification function
+  // Show notification function
   const showNotification = (type, title, message, duration = 4000) => {
     setNotification({
       isVisible: true,
@@ -85,7 +85,7 @@ const AdminPanelManagement = () => {
     }, duration);
   };
 
-  // ✅ NEW: Hide notification function
+  // Hide notification function
   const hideNotification = () => {
     setNotification(prev => ({ ...prev, isVisible: false }));
   };
@@ -298,8 +298,14 @@ const AdminPanelManagement = () => {
     }
   };
 
-  // Enhanced Auto Assign with confirmation
+  // ✅ UPDATED: Enhanced Auto Assign with mutual exclusion
   const handleAutoAssign = async () => {
+    // Prevent auto assign when auto create is running
+    if (isAutoCreating) {
+      showNotification("error", "Operation in Progress", "Cannot start auto assignment while auto panel creation is running. Please wait for it to complete.");
+      return;
+    }
+
     const assignedTeamsCount = panels.reduce((sum, panel) => sum + panel.teams.length, 0);
     
     if (assignedTeamsCount > 0) {
@@ -316,8 +322,14 @@ const AdminPanelManagement = () => {
     await executeAutoAssign();
   };
 
-  // Enhanced Auto Create with confirmation
+  // ✅ UPDATED: Enhanced Auto Create with mutual exclusion
   const handleAutoCreatePanel = async () => {
+    // Prevent auto create when auto assign is running
+    if (isAutoAssigning) {
+      showNotification("error", "Operation in Progress", "Cannot start auto panel creation while auto assignment is running. Please wait for it to complete.");
+      return;
+    }
+
     if (panels.length > 0) {
       setAutoConfirmation({
         type: "create",
@@ -332,7 +344,7 @@ const AdminPanelManagement = () => {
     await executeAutoCreate();
   };
 
-  // ✅ UPDATED: Execute auto assign with notification instead of alert
+  // Execute auto assign with notification instead of alert
   const executeAutoAssign = async () => {
     try {
       setIsAutoAssigning(true);
@@ -347,7 +359,7 @@ const AdminPanelManagement = () => {
     }
   };
 
-  // ✅ UPDATED: Execute auto create with notification instead of alert
+  // Execute auto create with notification instead of alert
   const executeAutoCreate = async () => {
     try {
       setIsAutoCreating(true);
@@ -626,16 +638,29 @@ const AdminPanelManagement = () => {
                   <Plus className="h-5 w-5" />
                   Add Panel
                 </button>
+
+                {/* ✅ UPDATED: Auto Create Button with Mutual Exclusion */}
                 <button
                   onClick={handleAutoCreatePanel}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg"
-                  disabled={isAutoCreating}
-                  title={panels.length > 0 ? `${panels.length} panels already exist` : "Create panels automatically"}
+                  disabled={isAutoCreating || isAutoAssigning}
+                  title={
+                    isAutoAssigning 
+                      ? "Cannot create panels while auto assignment is running"
+                      : panels.length > 0 
+                        ? `${panels.length} panels already exist` 
+                        : "Create panels automatically"
+                  }
                 >
                   {isAutoCreating ? (
                     <>
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                       Creating...
+                    </>
+                  ) : isAutoAssigning ? (
+                    <>
+                      <div className="animate-pulse h-5 w-5 rounded-full bg-gray-300"></div>
+                      Waiting...
                     </>
                   ) : (
                     <>
@@ -649,20 +674,29 @@ const AdminPanelManagement = () => {
                     </>
                   )}
                 </button>
+
+                {/* ✅ UPDATED: Auto Assign Button with Mutual Exclusion */}
                 <button
                   onClick={handleAutoAssign}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg"
-                  disabled={isAutoAssigning}
+                  disabled={isAutoAssigning || isAutoCreating}
                   title={
-                    panels.reduce((sum, panel) => sum + panel.teams.length, 0) > 0 
-                      ? `${panels.reduce((sum, panel) => sum + panel.teams.length, 0)} teams already assigned` 
-                      : "Assign teams automatically"
+                    isAutoCreating
+                      ? "Cannot assign teams while auto panel creation is running"
+                      : panels.reduce((sum, panel) => sum + panel.teams.length, 0) > 0 
+                        ? `${panels.reduce((sum, panel) => sum + panel.teams.length, 0)} teams already assigned` 
+                        : "Assign teams automatically"
                   }
                 >
                   {isAutoAssigning ? (
                     <>
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                       Assigning...
+                    </>
+                  ) : isAutoCreating ? (
+                    <>
+                      <div className="animate-pulse h-5 w-5 rounded-full bg-gray-300"></div>
+                      Waiting...
                     </>
                   ) : (
                     <>
@@ -961,7 +995,7 @@ const AdminPanelManagement = () => {
               </div>
             )}
 
-            {/* ✅ NEW: Animated Success/Error Notification */}
+            {/* Animated Success/Error Notification */}
             {notification.isVisible && (
               <div className="fixed top-4 right-4 z-50 max-w-sm w-full">
                 <div 
