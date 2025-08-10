@@ -172,7 +172,7 @@ const ProjectCreationPage = () => {
 
     // Check email validation
     for (const student of validStudents) {
-      if (!student.emailId.endsWith('@vit.ac.in')) {
+      if (!student.emailId.endsWith('@vitstudent.ac.in')) {
         setError(`Student email ${student.emailId} must end with @vit.ac.in`);
         return;
       }
