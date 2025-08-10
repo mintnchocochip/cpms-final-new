@@ -85,7 +85,7 @@ const FacultyLogin = () => {
     <>
       <Navbar />
       {/* ✅ FIXED: Added proper spacing for navbar */}
-      <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-900 relative overflow-hidden pt-20">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-900 relative overflow-hidden pt-10">
         {/* Animated Background Elements */}
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse"></div>
@@ -308,21 +308,7 @@ const FacultyLogin = () => {
             </div>
           </div>
 
-          {/* Bottom Features */}
-          <div className="mt-8 grid grid-cols-3 gap-4 w-full max-w-md text-center">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-              <GraduationCap className="h-6 w-6 text-emerald-300 mx-auto mb-1" />
-              <p className="text-xs text-emerald-200 font-medium">Course Management</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-              <Users className="h-6 w-6 text-teal-300 mx-auto mb-1" />
-              <p className="text-xs text-teal-200 font-medium">Student Guidance</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-              <Award className="h-6 w-6 text-cyan-300 mx-auto mb-1" />
-              <p className="text-xs text-cyan-200 font-medium">Evaluation Tools</p>
-            </div>
-          </div>
+ 
         </div>
       </div>
     </>
