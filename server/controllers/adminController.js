@@ -1202,8 +1202,7 @@ export async function autoCreatePanels(req, res) {
     if (existingPanelsCount > 0 && !force) {
       return res.status(400).json({
         success: false,
-        message:
-          "Panels already exist. Use force=true parameter to recreate panels.",
+        message: "Panels already exist. Use force=true parameter to recreate panels.",
         existingPanels: existingPanelsCount,
       });
     }
@@ -1214,9 +1213,7 @@ export async function autoCreatePanels(req, res) {
         { $set: { panel: null } }
       );
       await Panel.deleteMany({});
-      console.log(
-        `Deleted ${existingPanelsCount} existing panels due to force=${force}`
-      );
+      console.log(`Deleted ${existingPanelsCount} existing panels due to force=${force}`);
     }
 
     const faculties = await Faculty.find({ role: "faculty" });
@@ -1236,63 +1233,93 @@ export async function autoCreatePanels(req, res) {
     }
 
     const createdPanels = [];
-    // To track which faculty have already been paired
+
+    // ✅ Process each department separately (no cross-department panels)
     for (const groupKey in groupedFaculties) {
       const groupFaculties = groupedFaculties[groupKey];
       const [school, department] = groupKey.split("||");
-      // Keep track of which faculty are already used in panels for possible pairing of the last odd one
-      const usedIndexes = new Set();
+      
+      console.log(`Processing department: ${school} - ${department} with ${groupFaculties.length} faculties`);
+
       const n = groupFaculties.length;
-      // Pair off sequentially
-      for (let i = 0; i + 1 < n; i += 2) {
-        const faculty1 = groupFaculties[i];
-        const faculty2 = groupFaculties[i + 1];
-        usedIndexes.add(i);
-        usedIndexes.add(i + 1);
+
+      if (n < 2) {
+        console.log(`⚠️ Department ${department} has only ${n} faculty - skipping panel creation`);
+        continue;
+      }
+
+      // ✅ SORT BY EMPLOYEE ID (lower empId = more experienced)
+      groupFaculties.sort((a, b) => {
+        const empIdA = parseInt(a.employeeId) || 999999;
+        const empIdB = parseInt(b.employeeId) || 999999;
+        return empIdA - empIdB; // Ascending order (lower empId first)
+      });
+
+      console.log('Sorted faculties by experience (empId):', 
+        groupFaculties.map(f => `${f.name} (${f.employeeId})`).join(', ')
+      );
+
+      // ✅ EXPERIENCE-BASED PAIRING: Most experienced + Least experienced (excluding odd faculty)
+      const pairsToCreate = Math.floor(n / 2);
+      
+      for (let i = 0; i < pairsToCreate; i++) {
+        const experiencedFaculty = groupFaculties[i]; // Most experienced available
+        const lessExperiencedFaculty = groupFaculties[n - 1 - i]; // Least experienced available
+        
+        // Skip if they're the same person (happens when n=2)
+        if (experiencedFaculty._id.equals(lessExperiencedFaculty._id)) {
+          continue;
+        }
+        
+        console.log(`Creating panel ${i + 1}: ${experiencedFaculty.name} (${experiencedFaculty.employeeId}) + ${lessExperiencedFaculty.name} (${lessExperiencedFaculty.employeeId})`);
+        
         const panel = new Panel({
-          faculty1: faculty1._id,
-          faculty2: faculty2._id,
+          faculty1: experiencedFaculty._id,
+          faculty2: lessExperiencedFaculty._id,
           school,
           department,
         });
+        
         await panel.save();
         createdPanels.push(panel);
       }
-      // ODD: assign the last one with a previous faculty (not always the first for fairness)
+
+      // ✅ HANDLE ODD FACULTY: Pair with MOST EXPERIENCED faculty (empId 101)
       if (n % 2 !== 0) {
-        const leftoverIndex = n - 1;
-        let partnerIndex = (leftoverIndex - 1 + n) % n; // partner with just before (but not self!)
-        if (partnerIndex === leftoverIndex) partnerIndex = 0; // just in case only one left (min n=1 shouldn’t happen)
-        const faculty1 = groupFaculties[leftoverIndex];
-        const faculty2 = groupFaculties[partnerIndex];
-        // Avoid duplicating an existing pair
-        const alreadyExists = createdPanels.some(
-          (p) =>
-            (p.faculty1.equals(faculty1._id) &&
-              p.faculty2.equals(faculty2._id)) ||
-            (p.faculty1.equals(faculty2._id) && p.faculty2.equals(faculty1._id))
-        );
-        if (!alreadyExists) {
-          const panel = new Panel({
-            faculty1: faculty1._id,
-            faculty2: faculty2._id,
-            school,
-            department,
-          });
-          await panel.save();
-          createdPanels.push(panel);
-        }
+        const oddFaculty = groupFaculties[Math.floor(n / 2)]; // Middle faculty (unpaired)
+        const mostExperiencedFaculty = groupFaculties[0]; // First faculty (lowest empId)
+        
+        console.log(`Handling odd faculty: ${oddFaculty.name} (${oddFaculty.employeeId})`);
+        console.log(`Pairing with most experienced: ${mostExperiencedFaculty.name} (${mostExperiencedFaculty.employeeId})`);
+        
+        const oddPanel = new Panel({
+          faculty1: mostExperiencedFaculty._id, // Most experienced first
+          faculty2: oddFaculty._id, // Odd faculty second
+          school,
+          department,
+        });
+        
+        await oddPanel.save();
+        createdPanels.push(oddPanel);
+        
+        console.log(`✅ Most experienced faculty ${mostExperiencedFaculty.name} now appears in 2 panels`);
       }
+
+      console.log(`✅ Department ${department} processing completed`);
     }
+
+    console.log(`🎉 Panel creation completed. Created ${createdPanels.length} panels total.`);
 
     return res.status(200).json({
       success: true,
-      message:
-        existingPanelsCount > 0
-          ? "Existing panels replaced successfully."
-          : "Panels created successfully.",
+      message: existingPanelsCount > 0 
+        ? "Existing panels replaced successfully." 
+        : "Panels created successfully.",
       panelsCreated: createdPanels.length,
+      departmentWise: true,
+      experienceBased: true,
     });
+
   } catch (error) {
     console.error("Error in autoCreatePanels:", error);
     return res.status(500).json({
@@ -1302,6 +1329,7 @@ export async function autoCreatePanels(req, res) {
     });
   }
 }
+
 
 export async function getAllFacultyWithProjects(req, res) {
   try {

@@ -7,25 +7,95 @@ const SchoolDeptSelector = ({ isVisible, onSubmit, onRechoose }) => {
   const [showSchoolDropdown, setShowSchoolDropdown] = useState(false);
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
 
-  // School options
-  const schools = [
-    'School of Computing',
-    'School of Electrical'
-  ];
-
-  // Department options based on selected school
-  const departmentsBySchool = {
-    'School of Computing': ['CSE'],
-    'School of Electrical': ['EEE']
+  const schoolsData = {
+    'SCOPE': {
+      fullName: 'School of Computer Science and Engineering',
+      code: 'SCOPE'
+    },
+    'SELECT': {
+      fullName: 'School of Electrical Engineering',
+      code: 'SELECT'
+    },
+    'SENSE': {
+      fullName: 'School of Electronics Engineering',
+      code: 'SENSE'
+    },
+    'SSL': {
+      fullName: 'School of Business',
+      code: 'SSL'
+    },
+    'SAS': {
+      fullName: 'School of Advanced Sciences',
+      code: 'SAS'
+    },
+    'SMEC': {
+      fullName: 'School of Mechanical Engineering',
+      code: 'SMEC'
+    },
+    'SCE': {
+      fullName: 'School of Civil Engineering',
+      code: 'SCE'
+    }
   };
 
-  // Get filtered departments based on selected school
+  const schools = Object.keys(schoolsData);
+
+  const departmentsBySchool = {
+    'SCOPE': [
+      'B.Tech. Computer Science and Engineering',
+      'B.Tech. Computer Science and Engineering (Artificial Intelligence and Machine Learning)',
+      'B.Tech. Computer Science and Engineering (Cyber Physical Systems)',
+      'B.Tech. Computer Science and Engineering (Artificial Intelligence and Robotics)',
+      'B.Tech. Computer Science and Engineering (Data Science)',
+      'B.Tech. Computer Science and Engineering (Cyber Security)',
+      'B.Sc. Computer Science',
+    ],
+    'SELECT': [
+      'B.Tech. Electrical and Electronics Engineering',
+      'B.Tech. Electrical and Computer Science Engineering',
+    ],
+    'SENSE': [
+      'B. Tech in Electronics and Communication Engineering',
+      'B. Tech in Electronics and Computer Engineering',
+      'B. Tech in Electronics Engineering (VLSI Design and Technology)',
+    ],
+    'SSL': [
+      'BBA',
+      'MBA',
+      'MBA with Business Analytics',
+      'MBA with Digital Marketing',
+      'BBA with Digital Marketing',
+      'BBA with International Business'
+    ],
+    'SAS': [
+      'BSc Mathematics',
+      'BSc Physics',
+      'BSc Chemistry',
+      'BSc Statistics',
+      'MSc Mathematics',
+      'MSc Physics',
+      'MSc Applied Mathematics'
+    ],
+    'SMEC': [
+      'B.Tech. Mechanical Engineering',
+      'B.Tech. Mechatronics and Automation',
+      'B.Tech. Mechanical Engineering (Electric Vehicles)',
+    ],
+    'SCE': [
+      'B.Tech Civil Engineering',
+      'B.Tech Civil Engineering(In Collaboration with L & T)',
+    ]
+  };
+
   const availableDepartments = selectedSchool ? departmentsBySchool[selectedSchool] || [] : [];
 
-  // Reset department when school changes
+  // Reset department when school changes - NO CLEARING
   useEffect(() => {
-    setSelectedDepartment('');
-    setShowDepartmentDropdown(false);
+    if (selectedSchool) {
+      setSelectedDepartment('');
+      setShowDepartmentDropdown(false);
+      // Removed all context clearing as requested
+    }
   }, [selectedSchool]);
 
   // Close dropdowns when clicking outside
@@ -41,12 +111,14 @@ const SchoolDeptSelector = ({ isVisible, onSubmit, onRechoose }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSchoolSelect = (school) => {
-    setSelectedSchool(school);
+  const handleSchoolSelect = (schoolCode) => {
+    console.log('School selected:', schoolCode);
+    setSelectedSchool(schoolCode);
     setShowSchoolDropdown(false);
   };
 
   const handleDepartmentSelect = (department) => {
+    console.log('Department selected:', department);
     setSelectedDepartment(department);
     setShowDepartmentDropdown(false);
   };
@@ -55,10 +127,13 @@ const SchoolDeptSelector = ({ isVisible, onSubmit, onRechoose }) => {
     if (selectedSchool && selectedDepartment) {
       const selection = {
         school: selectedSchool,
+        schoolName: schoolsData[selectedSchool].fullName,
         department: selectedDepartment
       };
       
-      // Store in sessionStorage with key "adminContext"
+      console.log('Submitting selection:', selection);
+      
+      // Store in sessionStorage but don't clear anything
       sessionStorage.setItem('adminContext', JSON.stringify(selection));
       
       onSubmit(selection);
@@ -66,14 +141,15 @@ const SchoolDeptSelector = ({ isVisible, onSubmit, onRechoose }) => {
   };
 
   const handleRechoose = () => {
+    console.log('Rechoosing - resetting form only');
+    
+    // Only reset form state, no clearing of session storage
     setSelectedSchool('');
     setSelectedDepartment('');
     setShowSchoolDropdown(false);
     setShowDepartmentDropdown(false);
     
-    // Clear from sessionStorage
-    sessionStorage.removeItem('adminContext');
-    
+    // Removed all session storage clearing as requested
     onRechoose();
   };
 
@@ -83,8 +159,19 @@ const SchoolDeptSelector = ({ isVisible, onSubmit, onRechoose }) => {
     if (savedContext) {
       try {
         const parsed = JSON.parse(savedContext);
-        setSelectedSchool(parsed.school || '');
-        setSelectedDepartment(parsed.department || '');
+        console.log('Loaded saved context:', parsed);
+        
+        if (parsed.school && parsed.department) {
+          const isValidSchool = schools.includes(parsed.school);
+          const isValidDept = departmentsBySchool[parsed.school]?.includes(parsed.department);
+          
+          if (isValidSchool && isValidDept) {
+            setSelectedSchool(parsed.school);
+            setSelectedDepartment(parsed.department);
+          } else {
+            console.log('Invalid saved context format');
+          }
+        }
       } catch (error) {
         console.error('Failed to parse adminContext from sessionStorage:', error);
       }
@@ -94,10 +181,9 @@ const SchoolDeptSelector = ({ isVisible, onSubmit, onRechoose }) => {
   if (!isVisible) return null;
 
   return (
-    <div className=" pt-10 fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-        {/* Header */}
-        <div className=" bg-[linear-gradient(130deg,_rgba(36,85,163,1)_23%,_rgba(52,151,219,1)_52%,_rgba(52,142,219,1)_58%,_rgba(52,131,219,1)_65%,_rgba(40,116,166,1)_74%)] p-6 text-white">
+    <div className="pt-10 fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        <div className="bg-[linear-gradient(130deg,_rgba(36,85,163,1)_23%,_rgba(52,151,219,1)_52%,_rgba(52,142,219,1)_58%,_rgba(52,131,219,1)_65%,_rgba(40,116,166,1)_74%)] p-6 text-white">
           <h2 className="text-2xl font-bold text-center">
             Select School & Department
           </h2>
@@ -106,7 +192,6 @@ const SchoolDeptSelector = ({ isVisible, onSubmit, onRechoose }) => {
           </p>
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-6">
           {/* School Selection */}
           <div className="space-y-3">
@@ -121,22 +206,23 @@ const SchoolDeptSelector = ({ isVisible, onSubmit, onRechoose }) => {
                 className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-left flex items-center justify-between bg-white hover:bg-gray-50"
               >
                 <span className={selectedSchool ? 'text-gray-700' : 'text-gray-400'}>
-                  {selectedSchool || 'Choose a school...'}
+                  {selectedSchool ? `${selectedSchool} - ${schoolsData[selectedSchool].fullName}` : 'Choose a school...'}
                 </span>
                 <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showSchoolDropdown ? 'rotate-180' : ''}`} />
               </button>
               
               {showSchoolDropdown && (
-                <div className="absolute z-20 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl">
-                  {schools.map((school) => (
+                <div className="absolute z-20 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                  {schools.map((schoolCode) => (
                     <button
-                      key={school}
-                      onClick={() => handleSchoolSelect(school)}
+                      key={schoolCode}
+                      onClick={() => handleSchoolSelect(schoolCode)}
                       className={`w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0 ${
-                        selectedSchool === school ? 'bg-blue-100 text-blue-800 font-semibold' : 'text-gray-700'
+                        selectedSchool === schoolCode ? 'bg-blue-100 text-blue-800 font-semibold' : 'text-gray-700'
                       }`}
                     >
-                      {school}
+                      <div className="font-semibold">{schoolCode}</div>
+                      <div className="text-sm text-gray-600">{schoolsData[schoolCode].fullName}</div>
                     </button>
                   ))}
                 </div>
@@ -171,7 +257,7 @@ const SchoolDeptSelector = ({ isVisible, onSubmit, onRechoose }) => {
               </button>
               
               {showDepartmentDropdown && selectedSchool && (
-                <div className="absolute z-20 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl">
+                <div className="absolute z-20 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
                   {availableDepartments.map((department) => (
                     <button
                       key={department}
@@ -194,15 +280,21 @@ const SchoolDeptSelector = ({ isVisible, onSubmit, onRechoose }) => {
               <h4 className="font-semibold text-gray-800 mb-3">Current Selection:</h4>
               <div className="space-y-2">
                 {selectedSchool && (
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-blue-600" />
-                    <span className="text-gray-700">School: <strong>{selectedSchool}</strong></span>
+                  <div className="flex items-start gap-2">
+                    <Building2 className="h-4 w-4 text-blue-600 mt-0.5" />
+                    <div>
+                      <span className="text-gray-700">School: <strong>{selectedSchool}</strong></span>
+                      <div className="text-xs text-gray-600">{schoolsData[selectedSchool].fullName}</div>
+                    </div>
                   </div>
                 )}
                 {selectedDepartment && (
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-purple-600" />
-                    <span className="text-gray-700">Department: <strong>{selectedDepartment}</strong></span>
+                  <div className="flex items-start gap-2">
+                    <BookOpen className="h-4 w-4 text-purple-600 mt-0.5" />
+                    <div>
+                      <span className="text-gray-700">Department:</span>
+                      <div className="text-sm font-semibold text-gray-800">{selectedDepartment}</div>
+                    </div>
                   </div>
                 )}
               </div>

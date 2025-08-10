@@ -17,15 +17,7 @@ const SchoolProgramSelector = ({
   const [showProgramDropdown, setShowProgramDropdown] = useState(false);
 
   // School options
-  const schools = [
-    'SCOPE',
-    'SELECT', 
-    'SENSE',
-    'SSL',
-    'SAS',
-    'SMEC',
-    'SCE'
-  ];
+  const schools = 
 
   // Program options based on selected school
   const programsBySchool = {

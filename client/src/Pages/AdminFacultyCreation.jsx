@@ -167,55 +167,166 @@ const FacultyManagement = () => {
       setIsLoading(false);
     }
   };
+const handleFileUpload = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  setFileName(file.name);
+  setError(''); // Clear previous errors when new file is uploaded
+  setSuccess('');
 
-    setFileName(file.name);
-    setError('');
-    setSuccess('');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(sheet);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet);
+      const formattedData = [];
+      const errorDetails = [];
+      
+      // Helper function to safely extract and clean text
+      const cleanText = (value) => {
+        if (value === null || value === undefined) return '';
+        return String(value)
+          .trim()
+          .replace(/[\r\n\t]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, '')
+          .trim();
+      };
+      
+      jsonData.forEach((row, index) => {
+        try {
+          // Extract and clean the basic required fields
+          const name = cleanText(row.name);
+          const employeeId = cleanText(row.employeeId);
+          const emailId = cleanText(row.emailId).toLowerCase();
+          const password = row.password ? String(row.password).trim() : '';
+          const role = cleanText(row.role);
 
-        const formattedData = [];
-        jsonData.forEach((row, index) => {
-          if (!row.name || !row.employeeId || !row.emailId || !row.password) {
-            throw new Error(`Row ${index + 2}: Missing required fields (name, employeeId, emailId, password)`);
+          // Track errors for this row
+          const rowErrors = [];
+
+          // Validation with specific error messages
+          if (!name) rowErrors.push('Missing or empty name field');
+          if (!employeeId) rowErrors.push('Missing or empty employeeId field');
+          if (!emailId) rowErrors.push('Missing or empty emailId field');
+          if (!password || password === '0') rowErrors.push('Missing or empty password field');
+
+          // Clean and validate employee ID
+          const cleanEmployeeId = employeeId.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+          if (employeeId && !cleanEmployeeId) {
+            rowErrors.push('Employee ID contains no valid characters');
           }
 
-          if (!row.emailId.endsWith('@vit.ac.in')) {
-            throw new Error(`Row ${index + 2}: Email must end with @vit.ac.in`);
+          // Validate email format and domain
+          if (emailId) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(emailId)) {
+              rowErrors.push('Invalid email format');
+            } else if (!emailId.endsWith('@vit.ac.in')) {
+              rowErrors.push('Email must end with @vit.ac.in');
+            }
           }
 
+          // Clean and validate role
+          const cleanRole = role.toLowerCase();
+          const validRole = cleanRole === 'admin' ? 'admin' : 'faculty';
+
+          // Clean password
+          let cleanPassword = password;
+          if (password && (password.includes('\n') || password.includes('\r') || password.includes('\t'))) {
+            cleanPassword = password.replace(/[\r\n\t]/g, '').trim();
+          }
+
+          // If there are errors for this row, record them
+          if (rowErrors.length > 0) {
+            errorDetails.push({
+              row: index + 2,
+              name: name || 'N/A',
+              employeeId: employeeId || 'N/A',
+              emailId: emailId || 'N/A',
+              errors: rowErrors
+            });
+          }
+
+          // Add to formatted data regardless of errors (for display purposes)
           formattedData.push({
-            name: String(row.name).trim(),
-            employeeId: String(row.employeeId).trim().toUpperCase(),
-            emailId: String(row.emailId).trim().toLowerCase(),
-            password: String(row.password),
-            role: row.role?.toLowerCase() === 'admin' ? 'admin' : 'faculty',
+            name: name || '',
+            employeeId: cleanEmployeeId || employeeId || '',
+            emailId: emailId || '',
+            password: cleanPassword || '',
+            role: validRole,
             school: school,
-            department: department
+            department: department,
+            originalRow: index + 2,
+            hasErrors: rowErrors.length > 0,
+            errors: rowErrors
           });
-        });
 
-        setBulkData(formattedData);
-        setSuccess(`${formattedData.length} faculty records loaded from Excel file.`);
-      } catch (err) {
-        setError(`Error processing file: ${err.message}`);
-        setBulkData([]);
+        } catch (rowError) {
+          errorDetails.push({
+            row: index + 2,
+            name: 'Error processing row',
+            employeeId: 'N/A',
+            emailId: 'N/A',
+            errors: [`Error processing row - ${rowError.message}`]
+          });
+          
+          formattedData.push({
+            name: 'ERROR',
+            employeeId: 'ERROR',
+            emailId: 'ERROR',
+            password: '',
+            role: 'faculty',
+            school: school,
+            department: department,
+            originalRow: index + 2,
+            hasErrors: true,
+            errors: [`Error processing row - ${rowError.message}`]
+          });
+        }
+      });
+
+      // Always set the data (including problematic entries)
+      setBulkData(formattedData);
+
+      // Report results
+      const validEntries = formattedData.filter(entry => !entry.hasErrors);
+      const invalidEntries = formattedData.filter(entry => entry.hasErrors);
+
+      if (invalidEntries.length > 0) {
+        const errorSummary = errorDetails
+          .slice(0, 10)
+          .map(detail => 
+            `Row ${detail.row} (${detail.name}): ${detail.errors.join(', ')}`
+          ).join('\n');
+        
+        setError(`Found ${invalidEntries.length} problematic entries:\n\n${errorSummary}${invalidEntries.length > 10 ? `\n... and ${invalidEntries.length - 10} more errors` : ''}\n\nProblematic entries are included but marked. Fix issues before submitting.`);
       }
-    };
 
-    reader.readAsArrayBuffer(file);
+      if (validEntries.length > 0) {
+        setSuccess(`${formattedData.length} faculty records loaded from Excel file. ${validEntries.length} are valid, ${invalidEntries.length} have issues.`);
+      } else {
+        setSuccess(`${formattedData.length} faculty records loaded, but all have issues that need to be fixed.`);
+      }
+
+    } catch (err) {
+      console.error('File processing error:', err);
+      setError(`Error processing file: ${err.message}. Please ensure the file format is correct and try again.`);
+      setBulkData([]);
+    }
   };
+
+  reader.onerror = () => {
+    setError('Error reading file. Please try again.');
+  };
+
+  reader.readAsArrayBuffer(file);
+};
 
   const handleBulkSubmit = async () => {
     if (!school || !department) {
@@ -672,66 +783,107 @@ const FacultyManagement = () => {
                       <p className="mt-2 text-sm text-green-600">✅ Selected file: {fileName}</p>
                     )}
                   </div>
+{/* Preview Table */}
+{bulkData.length > 0 && (
+  <div className="mb-8">
+    {/* Submit Buttons at Top */}
+    <div className="flex justify-between items-center mb-4">
+      <h3 className="font-semibold text-lg text-gray-800">
+        Faculty Details ({bulkData.length} records)
+        {bulkData.filter(f => f.hasErrors).length > 0 && (
+          <span className="text-red-600 text-sm ml-2">
+            ({bulkData.filter(f => f.hasErrors).length} with errors)
+          </span>
+        )}
+      </h3>
+      <div className="flex gap-4">
+        <button
+          onClick={handleBulkSubmit}
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
+          disabled={isLoading || bulkData.filter(f => !f.hasErrors).length === 0}
+        >
+          <Save className="h-5 w-5" />
+          {isLoading ? 'Creating...' : `Create ${bulkData.filter(f => !f.hasErrors).length} Valid Faculty Accounts`}
+        </button>
+        <button
+          onClick={resetBulkData}
+          disabled={isLoading}
+          className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
 
-                  {/* Preview Table */}
-                  {bulkData.length > 0 && (
-                    <div className="mb-8">
-                      <h3 className="font-semibold text-lg mb-4 text-gray-800">
-                        Faculty Details ({bulkData.length} records)
-                      </h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse bg-white rounded-lg overflow-hidden shadow">
-                          <thead>
-                            <tr className="bg-gray-100">
-                              <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Name</th>
-                              <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Employee ID</th>
-                              <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Email</th>
-                              <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Role</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {bulkData.map((faculty, index) => (
-                              <tr key={index} className="hover:bg-gray-50">
-                                <td className="border border-gray-200 p-4 text-gray-700 font-medium">{faculty.name}</td>
-                                <td className="border border-gray-200 p-4">
-                                  <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-sm font-medium">
-                                    {faculty.employeeId}
-                                  </span>
-                                </td>
-                                <td className="border border-gray-200 p-4 text-gray-700">{faculty.emailId}</td>
-                                <td className="border border-gray-200 p-4 text-center">
-                                  <span className={`bg-${faculty.role === 'admin' ? 'purple' : 'green'}-100 text-${faculty.role === 'admin' ? 'purple' : 'green'}-800 px-2 py-1 rounded-full text-sm font-medium`}>
-                                    {faculty.role}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse bg-white rounded-lg overflow-hidden shadow">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Status</th>
+            <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Name</th>
+            <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Employee ID</th>
+            <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Email</th>
+            <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Role</th>
+            <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Issues</th>
+          </tr>
+        </thead>
+        <tbody>
+          {bulkData.map((faculty, index) => (
+            <tr key={index} className={`hover:bg-gray-50 ${faculty.hasErrors ? 'bg-red-50' : ''}`}>
+              <td className="border border-gray-200 p-4 text-center">
+                {faculty.hasErrors ? (
+                  <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium">
+                    ❌ Error
+                  </span>
+                ) : (
+                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                    ✅ Valid
+                  </span>
+                )}
+              </td>
+              <td className="border border-gray-200 p-4 text-gray-700 font-medium">
+                {faculty.name || <span className="text-red-500">Missing</span>}
+              </td>
+              <td className="border border-gray-200 p-4">
+                <span className={`px-2 py-1 rounded text-sm font-medium ${
+                  faculty.hasErrors ? 'bg-red-100 text-red-800' : 'bg-purple-100 text-purple-800'
+                }`}>
+                  {faculty.employeeId || <span className="text-red-500">Missing</span>}
+                </span>
+              </td>
+              <td className="border border-gray-200 p-4 text-gray-700">
+                {faculty.emailId || <span className="text-red-500">Missing</span>}
+              </td>
+              <td className="border border-gray-200 p-4 text-center">
+                <span className={`px-2 py-1 rounded-full text-sm font-medium ${
+                  faculty.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
+                }`}>
+                  {faculty.role}
+                </span>
+              </td>
+              <td className="border border-gray-200 p-4">
+                {faculty.hasErrors ? (
+                  <div className="text-xs text-red-600">
+                    <div className="font-medium">Row {faculty.originalRow}:</div>
+                    <ul className="list-disc list-inside mt-1">
+                      {faculty.errors.map((error, idx) => (
+                        <li key={idx}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <span className="text-green-600 text-xs">✅ No issues</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+)}
 
-                  {/* Submit Button */}
-                  {bulkData.length > 0 && (
-                    <div className="flex justify-end gap-4">
-                      <button
-                        onClick={handleBulkSubmit}
-                        className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        disabled={isLoading}
-                      >
-                        <Save className="h-5 w-5" />
-                        {isLoading ? 'Creating...' : `Create ${bulkData.length} Faculty Accounts`}
-                      </button>
-                      <button
-                        onClick={resetBulkData}
-                        disabled={isLoading}
-                        className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  )}
+
 
                   {/* Empty State */}
                   {bulkData.length === 0 && (

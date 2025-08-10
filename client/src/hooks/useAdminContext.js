@@ -1,10 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-/**
- * Custom hook for managing admin context (school and department selection)
- * Provides methods to get, set, and clear admin context with validation and error handling
- */
 export const useAdminContext = () => {
   const navigate = useNavigate();
   const [context, setContextState] = useState(null);
@@ -12,13 +8,85 @@ export const useAdminContext = () => {
   const [error, setError] = useState(null);
 
   const SESSION_STORAGE_KEY = 'adminContext';
-  const LOCAL_STORAGE_KEY = 'adminContext_backup';
 
-  /**
-   * Validates admin context structure
-   * @param {any} contextData - The context data to validate
-   * @returns {boolean} - True if valid, false otherwise
-   */
+  const schoolsData = {
+    'SCOPE': {
+      fullName: 'School of Computer Science and Engineering',
+      code: 'SCOPE'
+    },
+    'SELECT': {
+      fullName: 'School of Electrical Engineering',
+      code: 'SELECT'
+    },
+    'SENSE': {
+      fullName: 'School of Electronics Engineering',
+      code: 'SENSE'
+    },
+    'SSL': {
+      fullName: 'School of Business',
+      code: 'SSL'
+    },
+    'SAS': {
+      fullName: 'School of Advanced Sciences',
+      code: 'SAS'
+    },
+    'SMEC': {
+      fullName: 'School of Mechanical Engineering',
+      code: 'SMEC'
+    },
+    'SCE': {
+      fullName: 'School of Civil Engineering',
+      code: 'SCE'
+    }
+  };
+
+  const departmentsBySchool = {
+    'SCOPE': [
+      'B.Tech. Computer Science and Engineering',
+      'B.Tech. Computer Science and Engineering (Artificial Intelligence and Machine Learning)',
+      'B.Tech. Computer Science and Engineering (Cyber Physical Systems)',
+      'B.Tech. Computer Science and Engineering (Artificial Intelligence and Robotics)',
+      'B.Tech. Computer Science and Engineering (Data Science)',
+      'B.Tech. Computer Science and Engineering (Cyber Security)',
+      'B.Sc. Computer Science',
+    ],
+    'SELECT': [
+      'B.Tech. Electrical and Electronics Engineering',
+      'B.Tech. Electrical and Computer Science Engineering',
+    ],
+    'SENSE': [
+      'B. Tech in Electronics and Communication Engineering',
+      'B. Tech in Electronics and Computer Engineering',
+      'B. Tech in Electronics Engineering (VLSI Design and Technology)',
+    ],
+    'SSL': [
+      'BBA',
+      'MBA',
+      'MBA with Business Analytics',
+      'MBA with Digital Marketing',
+      'BBA with Digital Marketing',
+      'BBA with International Business'
+    ],
+    'SAS': [
+      'BSc Mathematics',
+      'BSc Physics',
+      'BSc Chemistry',
+      'BSc Statistics',
+      'MSc Mathematics',
+      'MSc Physics',
+      'MSc Applied Mathematics'
+    ],
+    'SMEC': [
+      'B.Tech. Mechanical Engineering',
+      'B.Tech. Mechatronics and Automation',
+      'B.Tech. Mechanical Engineering (Electric Vehicles)',
+    ],
+    'SCE': [
+      'B.Tech Civil Engineering',
+      'B.Tech Civil Engineering(In Collaboration with L & T)',
+    ]
+  };
+
   const validateContext = useCallback((contextData) => {
     if (!contextData || typeof contextData !== 'object') {
       return false;
@@ -26,7 +94,6 @@ export const useAdminContext = () => {
 
     const { school, department } = contextData;
     
-    // Check if required fields exist and are non-empty strings
     if (!school || typeof school !== 'string' || school.trim().length === 0) {
       return false;
     }
@@ -35,56 +102,33 @@ export const useAdminContext = () => {
       return false;
     }
 
-    // Validate against expected values
-    const validSchools = ['School of Computing', 'School of Electrical'];
-    const validDepartments = ['CSE', 'EEE'];
-
+    const validSchools = Object.keys(schoolsData);
+    
     if (!validSchools.includes(school)) {
+      console.log(`Invalid school: ${school}. Valid schools:`, validSchools);
       return false;
     }
 
+    const validDepartments = departmentsBySchool[school] || [];
     if (!validDepartments.includes(department)) {
-      return false;
-    }
-
-    // Validate school-department combinations
-    if (school === 'School of Computing' && department !== 'CSE') {
-      return false;
-    }
-
-    if (school === 'School of Electrical' && department !== 'EEE') {
+      console.log(`Invalid department: ${department} for school: ${school}. Valid departments:`, validDepartments);
       return false;
     }
 
     return true;
   }, []);
 
-  /**
-   * Gets admin context from storage with fallback mechanism
-   * @returns {object|null} - The admin context or null if not found/invalid
-   */
   const getContext = useCallback(() => {
     try {
-      // Try sessionStorage first
       const sessionData = sessionStorage.getItem(SESSION_STORAGE_KEY);
       if (sessionData) {
         const parsed = JSON.parse(sessionData);
         if (validateContext(parsed)) {
           return parsed;
+        } else {
+          console.log('Invalid context in sessionStorage:', parsed);
         }
       }
-
-      // Fallback to localStorage
-      const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (localData) {
-        const parsed = JSON.parse(localData);
-        if (validateContext(parsed)) {
-          // Restore to sessionStorage
-          sessionStorage.setItem(SESSION_STORAGE_KEY, localData);
-          return parsed;
-        }
-      }
-
       return null;
     } catch (error) {
       console.error('Error getting admin context:', error);
@@ -93,23 +137,16 @@ export const useAdminContext = () => {
     }
   }, [validateContext]);
 
-  /**
-   * Sets admin context in both session and local storage
-   * @param {object} newContext - The new context to set
-   * @returns {boolean} - True if successful, false otherwise
-   */
   const setContext = useCallback((newContext) => {
     try {
       if (!validateContext(newContext)) {
+        console.log('Failed to validate context:', newContext);
         setError('Invalid context data provided');
         return false;
       }
 
       const contextString = JSON.stringify(newContext);
-      
-      // Set in both storages
       sessionStorage.setItem(SESSION_STORAGE_KEY, contextString);
-      localStorage.setItem(LOCAL_STORAGE_KEY, contextString);
       
       setContextState(newContext);
       setError(null);
@@ -123,34 +160,16 @@ export const useAdminContext = () => {
     }
   }, [validateContext]);
 
-  /**
-   * Clears admin context from all storages
-   */
+  // REMOVED ALL CLEARING FUNCTIONS AS REQUESTED
   const clearContext = useCallback(() => {
-    try {
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-      setContextState(null);
-      setError(null);
-      
-      console.log('Admin context cleared');
-    } catch (error) {
-      console.error('Error clearing admin context:', error);
-      setError('Failed to clear admin context');
-    }
+    console.log('Clear context called - but clearing disabled as requested');
+    // All clearing logic removed as per user request
   }, []);
 
-  /**
-   * Redirects to school selection page
-   */
   const redirectToSelection = useCallback(() => {
     navigate('/admin/school-selection');
   }, [navigate]);
 
-  /**
-   * Checks if user has valid admin role
-   * @returns {boolean} - True if user is admin, false otherwise
-   */
   const isValidAdmin = useCallback(() => {
     const token = sessionStorage.getItem('token');
     const role = sessionStorage.getItem('role');
@@ -164,19 +183,18 @@ export const useAdminContext = () => {
         setLoading(true);
         setError(null);
 
-        // Check if user is valid admin
         if (!isValidAdmin()) {
           navigate('/admin/login');
           return;
         }
 
-        // Try to get existing context
         const existingContext = getContext();
         
         if (existingContext) {
+          console.log('Found existing valid context:', existingContext);
           setContextState(existingContext);
         } else {
-          // No valid context found, redirect to selection
+          console.log('No valid context found, redirecting to selection');
           redirectToSelection();
         }
       } catch (error) {
@@ -191,19 +209,11 @@ export const useAdminContext = () => {
     initializeContext();
   }, [getContext, isValidAdmin, navigate, redirectToSelection]);
 
-  /**
-   * Refreshes context from storage
-   */
   const refreshContext = useCallback(() => {
     const currentContext = getContext();
     setContextState(currentContext);
   }, [getContext]);
 
-  /**
-   * Updates context and optionally redirects
-   * @param {object} newContext - The new context to set
-   * @param {string} redirectPath - Optional path to redirect to after setting
-   */
   const updateContext = useCallback((newContext, redirectPath = null) => {
     const success = setContext(newContext);
     if (success && redirectPath) {
@@ -212,13 +222,21 @@ export const useAdminContext = () => {
     return success;
   }, [setContext, navigate]);
 
-  /**
-   * Gets formatted context display string
-   * @returns {string} - Formatted context string
-   */
   const getDisplayString = useCallback(() => {
     if (!context) return 'No context selected';
-    return `${context.school} - ${context.department}`;
+    
+    const schoolName = schoolsData[context.school]?.fullName || context.school;
+    return `${schoolName} - ${context.department}`;
+  }, [context]);
+
+  const getSchoolFullName = useCallback(() => {
+    if (!context?.school) return '';
+    return schoolsData[context.school]?.fullName || context.school;
+  }, [context]);
+
+  const getAvailableDepartments = useCallback(() => {
+    if (!context?.school) return [];
+    return departmentsBySchool[context.school] || [];
   }, [context]);
 
   return {
@@ -230,7 +248,7 @@ export const useAdminContext = () => {
     // Methods
     getContext,
     setContext,
-    clearContext,
+    clearContext, // Now does nothing but kept for compatibility
     refreshContext,
     updateContext,
     redirectToSelection,
@@ -239,12 +257,19 @@ export const useAdminContext = () => {
     validateContext,
     isValidAdmin,
     getDisplayString,
+    getSchoolFullName,
+    getAvailableDepartments,
     
     // Computed values
     isContextValid: !!context,
     hasContext: !!context,
     school: context?.school || null,
     department: context?.department || null,
+    schoolFullName: context?.school ? (schoolsData[context.school]?.fullName || context.school) : null,
+    
+    // Data references
+    schoolsData,
+    departmentsBySchool
   };
 };
 

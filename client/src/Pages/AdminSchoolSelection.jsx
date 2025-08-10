@@ -6,6 +6,7 @@ import SchoolDeptSelector from "../Components/SchoolDeptSelector";
 const AdminSchoolSelection = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [selectorVisible, setSelectorVisible] = useState(true);
   const navigate = useNavigate();
 
   // Authentication check on component mount
@@ -14,50 +15,76 @@ const AdminSchoolSelection = () => {
     const role = sessionStorage.getItem('role');
     
     if (!token || role !== 'admin') {
-      // Redirect to admin login if no valid admin token found
-      navigate('/admin-login');
+      navigate('/admin/login');
       return;
     }
   }, [navigate]);
 
   const handleSubmit = async (selection) => {
+    console.log('AdminSchoolSelection: Received selection:', selection);
     setIsLoading(true);
     setError("");
 
     try {
-      // Store selection in sessionStorage with key "adminContext"
+      // Validate selection before storing
+      if (!selection.school || !selection.department) {
+        throw new Error('Invalid selection: Missing school or department');
+      }
+
+      // Store selection in sessionStorage
       sessionStorage.setItem('adminContext', JSON.stringify(selection));
+      
+      console.log('AdminSchoolSelection: Stored context:', selection);
       
       // Add a small delay to show loading state
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Navigate to admin panel management
+      // Hide selector before navigation
+      setSelectorVisible(false);
+      
+      // Navigate to panel management as requested
       navigate("/admin/panel-management");
+      
     } catch (err) {
       console.error("Navigation error:", err);
-      setError("Failed to process selection. Please try again.");
+      setError(`Failed to process selection: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleRechoose = () => {
-    try {
-      // Clear sessionStorage "adminContext" key
-      sessionStorage.removeItem('adminContext');
-      setError("");
-      
-      // The SchoolDeptSelector component handles its own reset internally
-      console.log("Admin context cleared, selector reset");
-    } catch (err) {
-      console.error("Error clearing admin context:", err);
-      setError("Failed to reset selection. Please refresh the page.");
-    }
+    console.log('AdminSchoolSelection: Rechoose called - No clearing needed');
+    // Removed all clearing logic as requested
+    setError("");
+    setSelectorVisible(true);
   };
+
+  // Check if user already has a valid context and redirect
+  useEffect(() => {
+    const checkExistingContext = () => {
+      const existingContext = sessionStorage.getItem('adminContext');
+      if (existingContext) {
+        try {
+          const parsed = JSON.parse(existingContext);
+          if (parsed.school && parsed.department) {
+            console.log('Found existing context, redirecting to panel management...');
+            navigate("/admin/panel-management");
+            return;
+          }
+        } catch (error) {
+          console.log('Invalid existing context format');
+        }
+      }
+    };
+
+    const timer = setTimeout(checkExistingContext, 100);
+    return () => clearTimeout(timer);
+  }, [navigate]);
 
   return (
     <>
-      <Navbar />
+      <Navbar userType="admin" />
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
         {/* Background decoration */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -66,10 +93,8 @@ const AdminSchoolSelection = () => {
           <div className="absolute top-40 left-1/2 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000"></div>
         </div>
 
-        {/* Main content */}
         <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
           <div className="w-full max-w-2xl">
-            {/* Header section */}
             <div className="text-center mb-8">
               <h1 className="text-4xl font-bold text-gray-800 mb-4">
                 Administrative Setup
@@ -87,21 +112,18 @@ const AdminSchoolSelection = () => {
               <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <svg
-                      className="h-5 w-5 text-red-400"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                        clipRule="evenodd"
-                      />
+                    <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
                   </div>
                   <div className="ml-3">
                     <p className="text-sm text-red-700">{error}</p>
+                    <button 
+                      onClick={() => setError('')}
+                      className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 </div>
               </div>
@@ -117,9 +139,8 @@ const AdminSchoolSelection = () => {
               </div>
             )}
 
-            {/* School Department Selector */}
             <SchoolDeptSelector
-              isVisible={true}
+              isVisible={selectorVisible && !isLoading}
               onSubmit={handleSubmit}
               onRechoose={handleRechoose}
             />
@@ -127,31 +148,16 @@ const AdminSchoolSelection = () => {
         </div>
       </div>
 
-      {/* Add some custom animations */}
       <style jsx>{`
         @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
+          0% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+          100% { transform: translate(0px, 0px) scale(1); }
         }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
+        .animate-blob { animation: blob 7s infinite; }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
       `}</style>
     </>
   );

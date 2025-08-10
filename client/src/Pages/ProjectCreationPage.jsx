@@ -37,12 +37,12 @@ const ProjectCreationPage = () => {
     }
   }, [success]);
 
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(''), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [error]);
+  // useEffect(() => {
+  //   if (error) {
+  //     const timer = setTimeout(() => setError(''), 5000);
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [error]);
 
   useEffect(() => {
     if (!contextLoading && (!school || !department)) {
@@ -265,63 +265,160 @@ const ProjectCreationPage = () => {
   };
 
   const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  const file = event.target.files[0];
+  if (!file) return;
 
-    setFileName(file.name);
-    setError("");
-    setSuccess("");
+  setFileName(file.name);
+  setError(""); // Clear previous errors when new file is uploaded
+  setSuccess("");
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet);
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(sheet);
 
-        // Validate and group data by project
-        const formattedProjects = {};
-        jsonData.forEach((row, index) => {
-          if (!row["project name"] || !row["student name"] || !row["reg no."] || !row["email id"] || !row["guide faculty emp id"]) {
-            throw new Error(`Invalid data in row ${index + 2}: Missing required fields (project name, student name, reg no., email id, guide faculty emp id)`);
-          }
+      // Helper function to safely extract and clean text
+      const cleanText = (value) => {
+        if (value === null || value === undefined) return '';
+        return String(value)
+          .trim()
+          .replace(/[\r\n\t]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, '')
+          .trim();
+      };
 
-          if (!row["email id"].endsWith('@vit.ac.in')) {
-            throw new Error(`Row ${index + 2}: Email must end with @vit.ac.in`);
-          }
+      const formattedProjects = {};
+      const errorDetails = [];
+      let totalRowsProcessed = 0;
 
-          const projectKey = row["project name"];
-          if (!formattedProjects[projectKey]) {
-            formattedProjects[projectKey] = {
-              name: row["project name"],
-              guideFacultyEmpId: row["guide faculty emp id"],
-              students: [],
-            };
-          } else {
-            // Validate that all students in same project have same guide
-            if (formattedProjects[projectKey].guideFacultyEmpId !== row["guide faculty emp id"]) {
-              throw new Error(`Row ${index + 2}: All students in project "${row["project name"]}" must have the same guide faculty. Expected: ${formattedProjects[projectKey].guideFacultyEmpId}, Got: ${row["guide faculty emp id"]}`);
+      jsonData.forEach((row, index) => {
+        totalRowsProcessed++;
+        const rowErrors = [];
+        
+        try {
+          // Clean and extract fields
+          const projectName = cleanText(row["project name"]);
+          const studentName = cleanText(row["student name"]);
+          const regNo = cleanText(row["reg no."]);
+          const emailId = cleanText(row["email id"]).toLowerCase();
+          const guideFacultyEmpId = cleanText(row["guide faculty emp id"]);
+
+          // Validate required fields
+          if (!projectName) rowErrors.push("Missing project name");
+          if (!studentName) rowErrors.push("Missing student name");
+          if (!regNo) rowErrors.push("Missing registration number");
+          if (!emailId) rowErrors.push("Missing email ID");
+          if (!guideFacultyEmpId) rowErrors.push("Missing guide faculty emp ID");
+
+          // Validate email format and domain
+          if (emailId) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(emailId)) {
+              rowErrors.push("Invalid email format");
+            } else if (!emailId.endsWith('@vit.ac.in')) {
+              rowErrors.push("Email must end with @vit.ac.in");
             }
           }
 
-          formattedProjects[projectKey].students.push({
-            name: row["student name"],
-            regNo: row["reg no."],
-            emailId: row["email id"],
-          });
-        });
+          // Record errors but continue processing
+          if (rowErrors.length > 0) {
+            errorDetails.push({
+              row: index + 2,
+              projectName: projectName || 'N/A',
+              studentName: studentName || 'N/A',
+              errors: rowErrors
+            });
+          }
 
-        setProjects(Object.values(formattedProjects));
-        setSuccess(`${Object.keys(formattedProjects).length} projects loaded with ${jsonData.length} students total.`);
-      } catch (err) {
-        setError(`Error processing file: ${err.message}`);
-        setProjects([]);
+          // Process valid data (even if some fields have issues)
+          if (projectName && studentName && regNo && emailId && guideFacultyEmpId) {
+            const projectKey = projectName;
+            
+            if (!formattedProjects[projectKey]) {
+              formattedProjects[projectKey] = {
+                name: projectName,
+                guideFacultyEmpId: guideFacultyEmpId,
+                students: [],
+                hasErrors: false
+              };
+            } else {
+              // Check guide consistency
+              if (formattedProjects[projectKey].guideFacultyEmpId !== guideFacultyEmpId) {
+                rowErrors.push(`Guide faculty mismatch. Expected: ${formattedProjects[projectKey].guideFacultyEmpId}, Got: ${guideFacultyEmpId}`);
+                formattedProjects[projectKey].hasErrors = true;
+                errorDetails.push({
+                  row: index + 2,
+                  projectName: projectName,
+                  studentName: studentName,
+                  errors: [`Guide faculty mismatch in project "${projectName}"`]
+                });
+              }
+            }
+
+            formattedProjects[projectKey].students.push({
+              name: studentName,
+              regNo: regNo,
+              emailId: emailId,
+              originalRow: index + 2,
+              hasErrors: rowErrors.length > 0
+            });
+
+            if (rowErrors.length > 0) {
+              formattedProjects[projectKey].hasErrors = true;
+            }
+          }
+
+        } catch (rowError) {
+          errorDetails.push({
+            row: index + 2,
+            projectName: 'Error processing row',
+            studentName: 'N/A',
+            errors: [`Error processing row: ${rowError.message}`]
+          });
+        }
+      });
+
+      // Convert to array and set projects
+      const projectsArray = Object.values(formattedProjects);
+      setProjects(projectsArray);
+
+      // Report results
+      const validProjects = projectsArray.filter(p => !p.hasErrors);
+      const invalidCount = errorDetails.length;
+
+      if (invalidCount > 0) {
+        const errorSummary = errorDetails
+          .slice(0, 10)
+          .map(detail => `Row ${detail.row} (${detail.projectName} - ${detail.studentName}): ${detail.errors.join(', ')}`)
+          .join('\n');
+        
+        setError(`Found ${invalidCount} issues in uploaded data:\n\n${errorSummary}${invalidCount > 10 ? `\n... and ${invalidCount - 10} more errors` : ''}\n\nProblematic entries are included but marked. Fix issues before submitting.`);
       }
-    };
-    reader.readAsArrayBuffer(file);
+
+      if (projectsArray.length > 0) {
+        setSuccess(`${projectsArray.length} projects loaded with ${totalRowsProcessed} student records. ${validProjects.length} projects are valid, ${projectsArray.filter(p => p.hasErrors).length} have issues.`);
+      } else {
+        setError("No valid project data found in the uploaded file.");
+      }
+
+    } catch (err) {
+      setError(`Error processing file: ${err.message}. Please ensure the file format is correct and try again.`);
+      setProjects([]);
+    }
   };
+
+  reader.onerror = () => {
+    setError('Error reading file. Please try again.');
+  };
+
+  reader.readAsArrayBuffer(file);
+};
+
 
   const handleBulkSubmit = async () => {
     if (!school || !department) {
@@ -783,67 +880,94 @@ const ProjectCreationPage = () => {
                     )}
                   </div>
 
-                  {/* Projects Preview Table */}
-                  {projects.length > 0 && (
-                    <div className="mb-8">
-                      <h3 className="font-semibold text-lg mb-4 text-gray-800">
-                        Project Details ({projects.length} projects with individual guides)
-                      </h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse bg-white rounded-lg overflow-hidden shadow">
-                          <thead>
-                            <tr className="bg-gray-100">
-                              <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Project Name</th>
-                              <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Guide Faculty</th>
-                              <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Students</th>
-                              <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Count</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {projects.map((project, index) => (
-                              <tr key={index} className="hover:bg-gray-50">
-                                <td className="border border-gray-200 p-4 text-gray-700 font-medium">{project.name}</td>
-                                <td className="border border-gray-200 p-4">
-                                  <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-sm font-medium">
-                                    {project.guideFacultyEmpId}
-                                  </span>
-                                </td>
-                                <td className="border border-gray-200 p-4">
-                                  <div className="space-y-1">
-                                    {project.students.map((student, idx) => (
-                                      <div key={idx} className="bg-blue-50 border border-blue-200 rounded px-2 py-1 text-sm text-blue-800">
-                                        {student.name} ({student.regNo})
-                                      </div>
-                                    ))}
-                                  </div>
-                                </td>
-                                <td className="border border-gray-200 p-4 text-center">
-                                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-medium">
-                                    {project.students.length}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
+{/* Projects Preview Table */}
+{projects.length > 0 && (
+  <div className="mb-8">
+    {/* Submit Button at Top */}
+    <div className="flex justify-between items-center mb-4">
+      <h3 className="font-semibold text-lg text-gray-800">
+        Project Details ({projects.length} projects)
+        {projects.filter(p => p.hasErrors).length > 0 && (
+          <span className="text-red-600 text-sm ml-2">
+            ({projects.filter(p => p.hasErrors).length} with issues)
+          </span>
+        )}
+      </h3>
+      <button
+        onClick={handleBulkSubmit}
+        className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
+        disabled={loading || projects.filter(p => !p.hasErrors).length === 0}
+      >
+        <Save className="h-5 w-5" />
+        {loading ? 'Creating...' : `Create ${projects.filter(p => !p.hasErrors).length} Valid Projects`}
+      </button>
+    </div>
 
-                  {/* Submit Button */}
-                  {projects.length > 0 && (
-                    <div className="flex justify-end">
-                      <button
-                        onClick={handleBulkSubmit}
-                        className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        disabled={loading}
-                      >
-                        <Save className="h-5 w-5" />
-                        {loading ? 'Creating...' : `Create ${projects.length} Projects`}
-                      </button>
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse bg-white rounded-lg overflow-hidden shadow">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Status</th>
+            <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Project Name</th>
+            <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Guide Faculty</th>
+            <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Students</th>
+            <th className="border border-gray-200 p-4 text-left text-sm font-semibold text-gray-700">Issues</th>
+          </tr>
+        </thead>
+        <tbody>
+          {projects.map((project, index) => (
+            <tr key={index} className={`hover:bg-gray-50 ${project.hasErrors ? 'bg-red-50' : ''}`}>
+              <td className="border border-gray-200 p-4 text-center">
+                {project.hasErrors ? (
+                  <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium">
+                    ❌ Error
+                  </span>
+                ) : (
+                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                    ✅ Valid
+                  </span>
+                )}
+              </td>
+              <td className="border border-gray-200 p-4 text-gray-700 font-medium">{project.name}</td>
+              <td className="border border-gray-200 p-4">
+                <span className={`px-2 py-1 rounded text-sm font-medium ${
+                  project.hasErrors ? 'bg-red-100 text-red-800' : 'bg-purple-100 text-purple-800'
+                }`}>
+                  {project.guideFacultyEmpId}
+                </span>
+              </td>
+              <td className="border border-gray-200 p-4">
+                <div className="space-y-1">
+                  {project.students.map((student, idx) => (
+                    <div key={idx} className={`border rounded px-2 py-1 text-sm ${
+                      student.hasErrors ? 'bg-red-50 border-red-200 text-red-800' : 'bg-blue-50 border-blue-200 text-blue-800'
+                    }`}>
+                      {student.name} ({student.regNo})
+                      {student.hasErrors && <span className="ml-1">⚠️</span>}
                     </div>
-                  )}
+                  ))}
+                </div>
+              </td>
+              <td className="border border-gray-200 p-4">
+                {project.hasErrors ? (
+                  <div className="text-xs text-red-600">
+                    <div className="font-medium">Issues found:</div>
+                    <div className="mt-1">Check error details above</div>
+                  </div>
+                ) : (
+                  <span className="text-green-600 text-xs">✅ No issues</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+)}
 
+
+                  
                   {/* Empty State */}
                   {projects.length === 0 && (
                     <div className="text-center py-16 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
