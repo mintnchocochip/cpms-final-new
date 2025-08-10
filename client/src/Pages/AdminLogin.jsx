@@ -57,7 +57,7 @@ const AdminLogin = () => {
     <>
       <Navbar />
       {/* ✅ FIXED: Added proper spacing for navbar */}
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden pt-20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden pt-5">
         {/* Animated Background Elements */}
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
@@ -252,21 +252,7 @@ const AdminLogin = () => {
             </div>
           </div>
 
-          {/* Bottom Features */}
-          <div className="mt-8 grid grid-cols-3 gap-4 w-full max-w-md text-center">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-              <Shield className="h-6 w-6 text-blue-300 mx-auto mb-1" />
-              <p className="text-xs text-blue-200 font-medium">Secure Access</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-              <Users className="h-6 w-6 text-purple-300 mx-auto mb-1" />
-              <p className="text-xs text-purple-200 font-medium">User Management</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-              <Settings className="h-6 w-6 text-cyan-300 mx-auto mb-1" />
-              <p className="text-xs text-cyan-200 font-medium">System Control</p>
-            </div>
-          </div>
+         
         </div>
       </div>
     </>
