@@ -1,25 +1,51 @@
 import React, { useState } from 'react';
 import Navbar from '../Components/UniversalNavbar';
-import { Eye, EyeOff, GraduationCap, ExternalLink } from 'lucide-react';
+import axios from 'axios';
+import { Eye, EyeOff } from 'lucide-react';
 import { adminLogin } from '../api';
 
 const FacultyLogin = () => {
   const [loginEmail, setLoginEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
 
+  const validateEmail = (email) => {
+    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+    
+    if (!email) {
+      setEmailError('Email is required');
+      return false;
+    }
+    
+    if (!emailRegex.test(email)) {
+      setEmailError('Please enter a valid email address');
+      return false;
+    }
+    
+    setEmailError('');
+    return true;
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (!validateEmail(loginEmail)) return;
     
     try {
       setLoading(true);
       setMessage('');
+
+      const API_BASE_URL = 'https://cpms-latest.onerender.com/api';
+      const endpoint = "/auth/login";
 
       const response = await adminLogin({
         emailId: loginEmail,
@@ -27,11 +53,19 @@ const FacultyLogin = () => {
         expectedRole: "faculty"
       });
 
+      console.log('Login response:', response.data);
+
+      // FIX: Store both token AND faculty data
       sessionStorage.setItem("token", response.data.token);
-      sessionStorage.setItem("faculty", JSON.stringify(response.data.faculty));
+      sessionStorage.setItem("faculty", JSON.stringify(response.data.faculty)); // Add this line
+      
+      if (rememberMe) {
+        sessionStorage.setItem("faculty_email", loginEmail);
+      }
       
       setMessage("Login Successful!");
       
+      // Redirect based on role
       if (response.data.faculty.role === 'admin') {
         window.location.href = '/admin';
       } else {
@@ -50,163 +84,173 @@ const FacultyLogin = () => {
   };
 
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100">
       <Navbar />
-      <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-900 relative overflow-hidden pt-20">
-        {/* Animated Background */}
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwgMjU1LCAyNTUsIDAuMDMpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-20"></div>
-        </div>
+      
+      <div className="flex justify-center items-center pt-24 px-4">
+        <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md border border-gray-200">
+          <div className="flex flex-col items-center mb-6">
+            <div className="bg-blue-700 p-4 rounded-full mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800">Faculty Login</h2>
+            <p className="text-gray-500 text-sm mt-1">Access your VIT faculty portal</p>
+          </div>
 
-        <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-5rem)] px-4">
-          <div className="w-full max-w-md">
-            {/* Main Card */}
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/20 to-teal-600/20 rounded-2xl blur-xl"></div>
-              <div className="relative bg-white/95 backdrop-blur-xl p-8 rounded-2xl shadow-2xl border border-white/20">
-                
-                {/* Header - Removed bounce animation */}
-                <div className="text-center mb-8">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl mb-4 shadow-lg">
-                    <GraduationCap className="h-8 w-8 text-white" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Faculty Portal</h2>
-                  <p className="text-gray-600">VIT Academic System</p>
-                </div>
-
-                {/* Message Display */}
-                {message && (
-                  <div className={`p-4 mb-6 rounded-r-lg border-l-4 animate-fadeIn ${
-                    message.includes("Successful") 
-                      ? "bg-emerald-50 border-emerald-500" 
-                      : "bg-red-50 border-red-500"
-                  }`}>
-                    <div className="flex items-center">
-                      {message.includes("Successful") ? (
-                        <svg className="h-5 w-5 text-emerald-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                      ) : (
-                        <svg className="h-5 w-5 text-red-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                      <span className={`font-medium ${
-                        message.includes("Successful") ? "text-emerald-700" : "text-red-700"
-                      }`}>
-                        {message}
-                      </span>
-                    </div>
-                  </div>
+          {message && (
+            <div 
+              className={`px-4 py-3 rounded relative mb-4 ${
+                message.includes("Successful") 
+                  ? "bg-green-100 border-l-4 border-green-500 text-green-700"
+                  : "bg-red-50 border-l-4 border-red-500 text-red-700"
+              }`} 
+              role="alert"
+            >
+              <div className="flex">
+                {message.includes("Successful") ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
                 )}
-
-                {/* Login Form */}
-                <form onSubmit={handleLogin} className="space-y-6">
-                  {/* Email Field */}
-                  <div className="space-y-2">
-                    <label htmlFor="email" className="block text-sm font-semibold text-gray-700">Email Address</label>
-                    <div className="relative group">
-                      <input
-                        id="email"
-                        type="email"
-                        placeholder="faculty@vit.edu"
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all duration-200 bg-white/80 backdrop-blur-sm"
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Password Field */}
-                  <div className="space-y-2">
-                    <label htmlFor="password" className="block text-sm font-semibold text-gray-700">Password</label>
-                    <div className="relative group">
-                      <input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••••"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all duration-200 bg-white/80 backdrop-blur-sm"
-                        disabled={loading}
-                      />
-                      <button
-                        type="button"
-                        onClick={togglePasswordVisibility}
-                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Enhanced Submit Button */}
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full relative overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold py-4 px-6 rounded-xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 active:scale-95 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                    {loading ? (
-                      <div className="flex items-center justify-center space-x-2">
-                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span className="font-semibold">Signing in...</span>
-                      </div>
-                    ) : (
-                      <span className="relative z-10 font-semibold tracking-wide">ACCESS PORTAL</span>
-                    )}
-                  </button>
-                </form>
-
-                {/* VTOP Link - Only Chennai */}
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <p className="text-center text-sm text-gray-600 mb-4">Need access to VTOP?</p>
-                  <a
-                    href="https://vtopcc.vit.ac.in/vtop/login"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group relative w-full flex items-center justify-center gap-3 py-4 px-6 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold rounded-xl transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl active:scale-95"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                    <span className="relative z-10 text-lg">VTOP CHENNAI</span>
-                    <ExternalLink size={20} className="relative z-10" />
-                  </a>
+                <span className="block sm:inline">{message}</span>
+              </div>
+            </div>
+          )}
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                  </svg>
                 </div>
-
-                {/* Admin Login Link */}
-                <div className="mt-6 text-center">
+                <input 
+                  id="email"
+                  type="email" 
+                  placeholder="faculty@vit.edu"
+                  value={loginEmail}
+                  onChange={(e) => {
+                    setLoginEmail(e.target.value);
+                    if (emailError) validateEmail(e.target.value);
+                  }}
+                  onBlur={() => validateEmail(loginEmail)}
+                  className={`pl-10 w-full p-2 border rounded-md transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                    ${emailError ? 'border-red-500' : 'border-gray-300'}`}
+                  disabled={loading}
+                />
+              </div>
+              {emailError && (
+                <p className="text-red-500 text-sm mt-1">{emailError}</p>
+              )}
+            </div>
+            
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <input 
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="pl-10 pr-10 w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  disabled={loading}
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                   <button
                     type="button"
-                    onClick={() => handleNavigate("/admin/login")}
-                    className="group relative inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-800 font-semibold transition-all duration-200 hover:scale-105"
+                    onClick={togglePasswordVisibility}
+                    className="text-gray-500 hover:text-gray-700 focus:outline-none"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    <span>Administrator Portal</span>
-                    <span className="transform group-hover:translate-x-1 transition-transform duration-200">→</span>
+                    {showPassword ? (
+                      <EyeOff size={20} className="text-gray-500" />
+                    ) : (
+                      <Eye size={20} className="text-gray-500" />
+                    )}
                   </button>
                 </div>
               </div>
             </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  id="remember-me"
+                  name="remember-me"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={() => setRememberMe(!rememberMe)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                  Remember me
+                </label>
+              </div>
+              <div>
+                <button 
+                  type="button" 
+                  onClick={() => Navigatehandle('/forgot-password')}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-500"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              className="w-full flex justify-center items-center bg-blue-700 text-white py-2 px-4 rounded-md hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:opacity-75"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Logging in...
+                </>
+              ) : 'Sign In'}
+            </button>
+          </form>
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => handleNavigate("/admin/login")} // adjust path if different
+              className="w-full text-center text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              Are you an administrator? Login here
+            </button>
           </div>
+
+          <div className="relative mt-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">
+                VIT Faculty Portal
+              </span>
+            </div>
+          </div>
+
         </div>
-        
-        {/* Custom Animations */}
-        <style jsx>{`
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .animate-fadeIn {
-            animation: fadeIn 0.5s ease-out;
-          }
-        `}</style>
       </div>
-    </>
+    </div>
   );
 };
 
