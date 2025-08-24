@@ -463,28 +463,21 @@ export async function getAllGuideWithProjects(req, res) {
   try {
     const { school, department } = req.query;
 
-    if (!school || !department) {
-      return res.status(400).json({
-        success: false,
-        message: "school and department query parameters are required.",
-      });
-    }
+    // Build dynamic query for faculties by role and optional school and department
+    const facultyQuery = { role: "faculty" };
+    if (school) facultyQuery.schools = school;
+    if (department) facultyQuery.departments = department;
 
-    // Find faculties by role, school, and department
-    const faculties = await Faculty.find({
-      role: "faculty",
-      schools: school,
-      departments: department,
-    });
+    const faculties = await Faculty.find(facultyQuery);
 
     const result = await Promise.all(
       faculties.map(async (faculty) => {
-        // Find projects guided by this faculty that belong to the same school and department
-        const guidedProjects = await Project.find({
-          guideFaculty: faculty._id,
-          school,
-          department,
-        })
+        // Build dynamic query for projects by guideFaculty, and optional school and department
+        const projectQuery = { guideFaculty: faculty._id };
+        if (school) projectQuery.school = school;
+        if (department) projectQuery.department = department;
+
+        const guidedProjects = await Project.find(projectQuery)
           .populate("students", "regNo name")
           .lean();
 
@@ -494,8 +487,8 @@ export async function getAllGuideWithProjects(req, res) {
             employeeId: faculty.employeeId,
             name: faculty.name,
             emailId: faculty.emailId,
-            school: faculty.school,
-            department: faculty.department,
+            schools: faculty.schools,
+            departments: faculty.departments,
           },
           guidedProjects,
         };
@@ -513,36 +506,39 @@ export async function getAllPanelsWithProjects(req, res) {
   try {
     const { school, department } = req.query;
 
-    if (!school || !department) {
-      return res.status(400).json({
-        success: false,
-        message: "school and department query parameters are required.",
-      });
-    }
-
-    // Find panels where both faculties belong to the given school and department
+    // Find all panels with populated faculties
     const panels = await Panel.find()
-      .populate("faculty1", "employeeId name emailId school department")
-      .populate("faculty2", "employeeId name emailId school department")
+      .populate("faculty1", "employeeId name emailId schools departments")
+      .populate("faculty2", "employeeId name emailId schools departments")
       .lean();
 
-    // Filter panels where both faculty1 and faculty2 belong to the requested school and department
-    const filteredPanels = panels.filter(
-      (panel) =>
-        panel.faculty1?.school === school &&
-        panel.faculty1?.department === department &&
-        panel.faculty2?.school === school &&
-        panel.faculty2?.department === department
-    );
+    // Filter panels based on school and department if provided
+    const filteredPanels = panels.filter((panel) => {
+      if (!panel.faculty1 || !panel.faculty2) return false;
+      let schoolMatch = true;
+      let departmentMatch = true;
 
-    // For each panel, find projects in the same school and department linked to this panel
+      if (school) {
+        schoolMatch =
+          panel.faculty1.schools?.includes(school) &&
+          panel.faculty2.schools?.includes(school);
+      }
+      if (department) {
+        departmentMatch =
+          panel.faculty1.departments?.includes(department) &&
+          panel.faculty2.departments?.includes(department);
+      }
+      return schoolMatch && departmentMatch;
+    });
+
+    // For each filtered panel, find projects linked to it, optionally filtered by school and department
     const result = await Promise.all(
       filteredPanels.map(async (panel) => {
-        const projects = await Project.find({
-          panel: panel._id,
-          school: school,
-          department: department,
-        })
+        const projectQuery = { panel: panel._id };
+        if (school) projectQuery.school = school;
+        if (department) projectQuery.department = department;
+
+        const projects = await Project.find(projectQuery)
           .populate("students", "regNo name")
           .lean();
 
@@ -561,6 +557,7 @@ export async function getAllPanelsWithProjects(req, res) {
     res.status(500).json({ success: false, message: error.message });
   }
 }
+
 
 export async function deleteFacultyByEmployeeId(req, res) {
   const { employeeId } = req.params;
@@ -759,7 +756,6 @@ export async function setDefaultDeadline(req, res) {
 }
 
 // need to restructure this
-
 export async function updateRequestStatus(req, res) {
   try {
     const { requestId, status, newDeadline } = req.body;
