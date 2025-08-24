@@ -24,27 +24,30 @@ import MarkingSchema from "../models/markingSchema.js";
  * }
  */
 
-
-
 export async function createProject(req, res, next) {
-  // Start a session for transaction
   const session = await mongoose.startSession();
-  
+
   try {
-    // Start transaction
     session.startTransaction();
-    
-    const { name, students: studentDetails, guideFacultyEmpId } = req.body;
+
+    const {
+      name,
+      students: studentDetails,
+      guideFacultyEmpId,
+      specialization,
+    } = req.body;
 
     if (!Array.isArray(studentDetails) || studentDetails.length === 0) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: "Student details are required and should be a non-empty array.",
+        message:
+          "Student details are required and should be a non-empty array.",
       });
     }
 
     const { school, department } = studentDetails[0];
+
     if (!school || !department) {
       await session.abortTransaction();
       return res.status(400).json({
@@ -53,7 +56,19 @@ export async function createProject(req, res, next) {
       });
     }
 
-    const markingSchema = await MarkingSchema.findOne({ school, department }).session(session);
+    if (!specialization) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Specialization must be provided.",
+      });
+    }
+
+    // Find marking schema with session
+    const markingSchema = await MarkingSchema.findOne({
+      school,
+      department,
+    }).session(session);
     if (!markingSchema) {
       await session.abortTransaction();
       return res.status(400).json({
@@ -62,7 +77,7 @@ export async function createProject(req, res, next) {
       });
     }
 
-    // Check if guide faculty exists before creating students
+    // Validate guide faculty existence
     const guideFacultyDoc = await Faculty.findOne({
       employeeId: guideFacultyEmpId,
     }).session(session);
@@ -73,12 +88,9 @@ export async function createProject(req, res, next) {
       );
     }
 
-    // Extract review keys and their default deadlines from markingSchema
+    // Extract review keys and deadlines
     const reviewKeys = markingSchema.reviews.map((review) => review.reviewName);
-
-    // Build default deadline map from markingSchema reviews
     const defaultDeadlinesMap = new Map();
-
     markingSchema.reviews.forEach((review) => {
       if (review.deadline && review.deadline.from && review.deadline.to) {
         defaultDeadlinesMap.set(review.reviewName, {
@@ -90,7 +102,7 @@ export async function createProject(req, res, next) {
       }
     });
 
-    // Create all students within the transaction
+    // Create student documents within transaction
     const studentIds = await Promise.all(
       studentDetails.map(async (studentObj) => {
         const {
@@ -110,21 +122,20 @@ export async function createProject(req, res, next) {
           );
         }
 
-        // Check if student already exists (with session)
-        const existingStudent = await Student.findOne({ regNo }).session(session);
+        const existingStudent = await Student.findOne({ regNo }).session(
+          session
+        );
         if (existingStudent) {
           throw new Error(`Student already exists with regNo ${regNo}`);
         }
 
+        // Build reviews map with defaults
         const reviewsMap = new Map();
-
         for (const reviewKey of reviewKeys) {
           const reviewDef = markingSchema.reviews.find(
             (rev) => rev.reviewName === reviewKey
           );
-
           const inputReview = reviews?.[reviewKey] || {};
-
           let marks = {};
 
           if (reviewDef && Array.isArray(reviewDef.components)) {
@@ -135,33 +146,25 @@ export async function createProject(req, res, next) {
             marks = inputReview.marks || {};
           }
 
-          const attendance = inputReview.attendance || {
-            value: false,
-            locked: false,
-          };
-          const locked = inputReview.locked || false;
-          const comments = inputReview.comments || "";
-
           reviewsMap.set(reviewKey, {
             marks,
-            comments,
-            attendance,
-            locked,
+            comments: inputReview.comments || "",
+            attendance: inputReview.attendance || {
+              value: false,
+              locked: false,
+            },
+            locked: inputReview.locked || false,
           });
         }
 
+        // Determine deadlines for student (use custom or default)
         let studentDeadlineMap;
-
         if (
           deadline &&
           typeof deadline === "object" &&
           Object.keys(deadline).length > 0
         ) {
-          studentDeadlineMap = new Map();
-
-          for (const [key, value] of Object.entries(deadline)) {
-            studentDeadlineMap.set(key, value);
-          }
+          studentDeadlineMap = new Map(Object.entries(deadline));
         } else {
           studentDeadlineMap = new Map(defaultDeadlinesMap);
         }
@@ -177,13 +180,12 @@ export async function createProject(req, res, next) {
           department,
         });
 
-        // Save with session (part of transaction)
         await student.save({ session });
         return student._id;
       })
     );
 
-    // Create project within the same transaction
+    // Create project referencing saved students and guide faculty
     const newProject = new Project({
       name,
       students: studentIds,
@@ -191,12 +193,11 @@ export async function createProject(req, res, next) {
       panel: null,
       school,
       department,
+      specialization,
     });
 
-    // Save project with session
     await newProject.save({ session });
 
-    // If everything is successful, commit the transaction
     await session.commitTransaction();
 
     return res.status(201).json({
@@ -205,69 +206,66 @@ export async function createProject(req, res, next) {
       data: {
         projectId: newProject._id,
         name: newProject.name,
-        studentsCount: studentIds.length
-      }
+        studentsCount: studentIds.length,
+      },
     });
-
   } catch (error) {
-    // If any error occurs, abort the transaction
     await session.abortTransaction();
-    
     console.error("Error creating project:", error);
 
-    // Handle MongoDB duplicate key errors specifically
     if (error.code === 11000) {
       const duplicateField = Object.keys(error.keyValue)[0];
       const duplicateValue = error.keyValue[duplicateField];
-      
       return res.status(409).json({
         success: false,
         message: `Project with ${duplicateField} "${duplicateValue}" already exists. Please choose a different ${duplicateField}.`,
-        errorType: 'DUPLICATE_KEY',
+        errorType: "DUPLICATE_KEY",
         field: duplicateField,
-        value: duplicateValue
+        value: duplicateValue,
       });
     }
 
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
+    if (error.name === "ValidationError") {
       return res.status(400).json({
         success: false,
         message: "Validation error: " + error.message,
-        errorType: 'VALIDATION_ERROR'
+        errorType: "VALIDATION_ERROR",
       });
     }
 
-    // Handle custom thrown errors (like existing student, faculty not found, etc.)
-    if (error.message.includes('Student already exists') || 
-        error.message.includes('Guide faculty') || 
-        error.message.includes('mismatched school')) {
+    if (
+      error.message.includes("Student already exists") ||
+      error.message.includes("Guide faculty") ||
+      error.message.includes("mismatched school")
+    ) {
       return res.status(400).json({
         success: false,
         message: error.message,
-        errorType: 'BUSINESS_LOGIC_ERROR'
+        errorType: "BUSINESS_LOGIC_ERROR",
       });
     }
 
-    // Handle all other errors
     return res.status(500).json({
       success: false,
       message: "Failed to create project. Please try again.",
-      errorType: 'INTERNAL_ERROR',
-      // Only include error details in development
-      ...(process.env.NODE_ENV === 'development' && { error: error.message })
+      errorType: "INTERNAL_ERROR",
+      ...(process.env.NODE_ENV === "development" && { error: error.message }),
     });
   } finally {
-    // Always end the session
     session.endSession();
   }
 }
 
 export async function createProjectsBulk(req, res) {
+  const session = await mongoose.startSession();
+
   try {
+    session.startTransaction();
+
     const { school, department, projects, guideFacultyEmpId } = req.body;
 
     if (!school || !department) {
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: "School and department are required.",
@@ -275,6 +273,7 @@ export async function createProjectsBulk(req, res) {
     }
 
     if (!Array.isArray(projects) || projects.length === 0) {
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: "Projects array is required and must be non-empty.",
@@ -282,44 +281,43 @@ export async function createProjectsBulk(req, res) {
     }
 
     if (!guideFacultyEmpId) {
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: "Guide faculty employee ID is required.",
       });
     }
 
-    // Verify marking schema exists for school/department
-    const markingSchema = await MarkingSchema.findOne({ school, department });
+    // Verify MarkingSchema for school/department in transaction session
+    const markingSchema = await MarkingSchema.findOne({
+      school,
+      department,
+    }).session(session);
     if (!markingSchema) {
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: `Marking schema not found for school: ${school}, department: ${department}`,
       });
     }
 
-    // Verify guide faculty exists
+    // Verify guide faculty existence within the school and department
     const guideFacultyDoc = await Faculty.findOne({
       employeeId: guideFacultyEmpId,
-      school,
-      department,
-    });
+      schools: school,
+      departments: department,
+    }).session(session);
     if (!guideFacultyDoc) {
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: `Guide faculty with employee ID ${guideFacultyEmpId} not found in ${school}-${department}`,
       });
     }
 
-    const results = {
-      created: 0,
-      errors: 0,
-      details: []
-    };
-
-    // Extract review keys and default deadlines from markingSchema
+    // Prepare review keys and default deadlines map from markingSchema
     const reviewKeys = markingSchema.reviews.map((review) => review.reviewName);
     const defaultDeadlinesMap = new Map();
-
     markingSchema.reviews.forEach((review) => {
       if (review.deadline && review.deadline.from && review.deadline.to) {
         defaultDeadlinesMap.set(review.reviewName, {
@@ -331,137 +329,156 @@ export async function createProjectsBulk(req, res) {
       }
     });
 
-    // Process each project
+    const results = { created: 0, errors: 0, details: [] };
+
+    // Process projects sequentially for transactional safety
     for (let i = 0; i < projects.length; i++) {
       const project = projects[i];
-      
+
       try {
-        // Validate project structure
-        if (!project.name || !Array.isArray(project.students) || project.students.length === 0) {
+        // Validate project name and students array
+        if (
+          !project.name ||
+          !Array.isArray(project.students) ||
+          project.students.length === 0
+        ) {
           results.errors++;
           results.details.push({
             project: project.name || `Project ${i + 1}`,
-            error: "Missing project name or students array"
+            error: "Missing project name or students array",
           });
           continue;
         }
 
-        // Check if project already exists
-        const existingProject = await Project.findOne({ 
+        // Check if project already exists with the same name, school, and department
+        const existingProject = await Project.findOne({
           name: project.name,
           school,
-          department 
-        });
+          department,
+        }).session(session);
 
         if (existingProject) {
           results.errors++;
           results.details.push({
             project: project.name,
-            error: "Project with this name already exists"
+            error: "Project with this name already exists",
           });
           continue;
         }
 
-        // Process students for this project
         const studentIds = [];
-        let studentError = false;
 
+        // Process each student in this project
         for (const studentObj of project.students) {
-          try {
-            const { regNo, name: studentName, emailId } = studentObj;
+          const {
+            regNo,
+            name: studentName,
+            emailId,
+            school: studSchool,
+            department: studDept,
+          } = studentObj;
 
-            if (!regNo || !studentName || !emailId) {
-              throw new Error("Student missing required fields (regNo, name, emailId)");
-            }
-
-            // Check if student already exists
-            const existingStudent = await Student.findOne({ regNo });
-            if (existingStudent) {
-              throw new Error(`Student already exists with regNo ${regNo}`);
-            }
-
-            // Create reviews map with default structure
-            const reviewsMap = new Map();
-            for (const reviewKey of reviewKeys) {
-              const reviewDef = markingSchema.reviews.find(
-                (rev) => rev.reviewName === reviewKey
-              );
-
-              let marks = {};
-              if (reviewDef && Array.isArray(reviewDef.components)) {
-                for (const comp of reviewDef.components) {
-                  marks[comp.name] = 0;
-                }
-              }
-
-              reviewsMap.set(reviewKey, {
-                marks,
-                comments: "",
-                attendance: { value: false, locked: false },
-                locked: false,
-              });
-            }
-
-            // Create student with default deadlines
-            const student = new Student({
-              regNo,
-              name: studentName,
-              emailId,
-              reviews: reviewsMap,
-              pptApproved: { approved: false, locked: false },
-              deadline: new Map(defaultDeadlinesMap),
-              school,
-              department,
-            });
-
-            await student.save();
-            studentIds.push(student._id);
-
-          } catch (studentError) {
-            throw new Error(`Student ${studentObj.regNo}: ${studentError.message}`);
+          if (!regNo || !studentName || !emailId) {
+            throw new Error(
+              "Student missing required fields (regNo, name, emailId)"
+            );
           }
-        }
 
-        if (!studentError) {
-          // Create the project
-          const newProject = new Project({
-            name: project.name,
-            students: studentIds,
-            guideFaculty: guideFacultyDoc._id,
-            panel: null,
+          // Verify student's school and department match the provided ones
+          if (studSchool !== school || studDept !== department) {
+            throw new Error(
+              `Student ${regNo} has mismatched school or department`
+            );
+          }
+
+          // Check if student already exists
+          const existingStudent = await Student.findOne({ regNo }).session(
+            session
+          );
+          if (existingStudent) {
+            throw new Error(`Student already exists with regNo ${regNo}`);
+          }
+
+          // Build default reviews map with zeros and defaults
+          const reviewsMap = new Map();
+          for (const reviewKey of reviewKeys) {
+            const reviewDef = markingSchema.reviews.find(
+              (rev) => rev.reviewName === reviewKey
+            );
+            const marks = {};
+
+            if (reviewDef && Array.isArray(reviewDef.components)) {
+              for (const comp of reviewDef.components) {
+                marks[comp.name] = 0;
+              }
+            }
+
+            reviewsMap.set(reviewKey, {
+              marks,
+              comments: "",
+              attendance: { value: false, locked: false },
+              locked: false,
+            });
+          }
+
+          // Create student with default deadlines and school/department
+          const student = new Student({
+            regNo,
+            name: studentName,
+            emailId,
+            reviews: reviewsMap,
+            pptApproved: { approved: false, locked: false },
+            deadline: new Map(defaultDeadlinesMap),
             school,
             department,
           });
 
-          await newProject.save();
-          results.created++;
+          await student.save({ session });
+          studentIds.push(student._id);
         }
 
+        // Create project document referencing students and guide faculty
+        const newProject = new Project({
+          name: project.name,
+          students: studentIds,
+          guideFaculty: guideFacultyDoc._id,
+          panel: null,
+          school,
+          department,
+          specialization: project.specialization || "", // if specialization is required, validate as needed
+        });
+
+        await newProject.save({ session });
+        results.created++;
       } catch (error) {
         results.errors++;
         results.details.push({
           project: project.name || `Project ${i + 1}`,
-          error: error.message
+          error: error.message,
         });
       }
     }
 
+    await session.commitTransaction();
+
     return res.status(201).json({
       success: true,
       message: `Bulk project creation completed. ${results.created} created, ${results.errors} errors.`,
-      data: results
+      data: results,
     });
-
   } catch (error) {
+    await session.abortTransaction();
     console.error("Error in bulk project creation:", error);
+
     return res.status(500).json({
       success: false,
       message: "Server error during bulk project creation",
       error: error.message,
     });
+  } finally {
+    session.endSession();
   }
 }
-
 
 export async function deleteProject(req, res) {
   try {

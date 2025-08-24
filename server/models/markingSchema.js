@@ -22,7 +22,7 @@ const reviewSchema = new mongoose.Schema(
     reviewName: { type: String, required: true },
     components: [componentSchema],
     deadline: { type: deadlineSchema, required: true },
-    requiresPPT: { type: Boolean, default: false } // ✅ Add PPT flag
+    requiresPPT: { type: Boolean, default: false } 
   },
   { _id: false }
 );

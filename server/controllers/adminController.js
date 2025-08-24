@@ -34,7 +34,15 @@ export async function createOrUpdateMarkingSchema(req, res) {
 }
 
 export async function createFaculty(req, res) {
-  const { name, emailId, password, employeeId, school, department } = req.body;
+  const {
+    name,
+    emailId,
+    password,
+    employeeId,
+    school,
+    department,
+    specialization,
+  } = req.body;
 
   // for otp testing used gmail - need some profs mail id for checking with vit.ac.in
   // Only allow college emails
@@ -82,6 +90,7 @@ export async function createFaculty(req, res) {
     role: "faculty",
     school,
     department,
+    specialization,
   });
 
   await newFaculty.save();
@@ -91,9 +100,100 @@ export async function createFaculty(req, res) {
     message: "Faculty created successfully!",
   });
 }
+
+export async function updateFaculty(req, res) {
+  try {
+    const { employeeId } = req.params;
+    const {
+      name,
+      emailId,
+      password,
+      schools,
+      departments,
+      specialization,
+      role,
+      imageUrl,
+    } = req.body;
+
+    // Find existing faculty by employeeId (normalize case if needed)
+    const faculty = await Faculty.findOne({
+      employeeId: employeeId.trim().toUpperCase(),
+    });
+    if (!faculty) {
+      return res.status(404).json({
+        success: false,
+        message: "Faculty with the given employee ID not found.",
+      });
+    }
+
+    // Validate updated email if provided
+    if (emailId && !emailId.endsWith("@vit.ac.in")) {
+      return res.status(400).json({
+        success: false,
+        message: "Only college emails allowed!",
+      });
+    }
+
+    // If email is updated and different, check uniqueness
+    if (emailId && emailId !== faculty.emailId) {
+      const emailExists = await Faculty.findOne({ emailId });
+      if (emailExists) {
+        return res.status(400).json({
+          success: false,
+          message: "Another faculty with this email already exists.",
+        });
+      }
+    }
+
+    // Validate password if provided
+    if (password) {
+      if (
+        password.length < 8 ||
+        !/[A-Z]/.test(password) ||
+        !/[a-z]/.test(password) ||
+        !/[0-9]/.test(password) ||
+        !/[^A-Za-z0-9]/.test(password)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Password must be at least 8 characters and include uppercase, lowercase, number, and special character",
+        });
+      }
+      // Hash new password
+      const salt = await bcrypt.genSalt(10);
+      faculty.password = await bcrypt.hash(password, salt);
+    }
+
+    // Update fields if provided
+    if (name) faculty.name = name;
+    if (emailId) faculty.emailId = emailId.trim().toLowerCase();
+    if (role && ["admin", "faculty"].includes(role)) faculty.role = role;
+    if (Array.isArray(schools) && schools.length > 0) faculty.schools = schools;
+    if (Array.isArray(departments) && departments.length > 0)
+      faculty.departments = departments;
+    if (Array.isArray(specialization) && specialization.length > 0)
+      faculty.specialization = specialization;
+    if (imageUrl !== undefined) faculty.imageUrl = imageUrl;
+
+    await faculty.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Faculty updated successfully!",
+    });
+  } catch (error) {
+    console.error("Error updating faculty:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating faculty",
+    });
+  }
+}
+
 export async function createFacultyBulk(req, res) {
   try {
-    const { facultyList, school, department } = req.body;
+    const { facultyList } = req.body;
 
     if (!Array.isArray(facultyList) || facultyList.length === 0) {
       return res.status(400).json({
@@ -102,30 +202,48 @@ export async function createFacultyBulk(req, res) {
       });
     }
 
-    if (!school || !department) {
-      return res.status(400).json({
-        success: false,
-        message: "School and department are required",
-      });
-    }
-
     const results = {
       created: 0,
       errors: 0,
-      details: []
+      details: [],
     };
 
-    // Process each faculty member
     for (let i = 0; i < facultyList.length; i++) {
       const faculty = facultyList[i];
-      
+
       try {
-        // Validate each faculty record
-        if (!faculty.name || !faculty.emailId || !faculty.password || !faculty.employeeId) {
+        // Validate required fields including arrays for schools, departments and specialization
+        if (
+          !faculty.name ||
+          !faculty.emailId ||
+          !faculty.password ||
+          !faculty.employeeId ||
+          !faculty.schools ||
+          !faculty.departments ||
+          !faculty.specialization
+        ) {
           results.errors++;
           results.details.push({
             row: i + 1,
-            error: "Missing required fields"
+            error:
+              "Missing required fields including schools, departments, or specialization",
+          });
+          continue;
+        }
+
+        if (
+          !Array.isArray(faculty.schools) ||
+          faculty.schools.length === 0 ||
+          !Array.isArray(faculty.departments) ||
+          faculty.departments.length === 0 ||
+          !Array.isArray(faculty.specialization) ||
+          faculty.specialization.length === 0
+        ) {
+          results.errors++;
+          results.details.push({
+            row: i + 1,
+            error:
+              "Schools, departments, and specialization must be non-empty arrays",
           });
           continue;
         }
@@ -134,51 +252,52 @@ export async function createFacultyBulk(req, res) {
           results.errors++;
           results.details.push({
             row: i + 1,
-            error: "Invalid email domain"
+            error: "Invalid email domain",
           });
           continue;
         }
 
-        // Check if faculty already exists
-        const existingFaculty = await Faculty.findOne({ 
+        // Check existing faculty by email or employeeId (case normalized)
+        const existingFaculty = await Faculty.findOne({
           $or: [
-            { emailId: faculty.emailId },
-            { employeeId: faculty.employeeId }
-          ]
+            { emailId: faculty.emailId.trim().toLowerCase() },
+            { employeeId: faculty.employeeId.trim().toUpperCase() },
+          ],
         });
 
         if (existingFaculty) {
           results.errors++;
           results.details.push({
             row: i + 1,
-            error: "Faculty with this email or employee ID already exists"
+            error: "Faculty with this email or employee ID already exists",
           });
           continue;
         }
 
-        // Hash password
+        // Hash password securely
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(faculty.password, salt);
 
-        // Create faculty
+        // Create new faculty record with array fields and other details
         const newFaculty = new Faculty({
+          imageUrl: faculty.imageUrl || "",
           name: faculty.name.trim(),
           emailId: faculty.emailId.trim().toLowerCase(),
           password: hashedPassword,
           employeeId: faculty.employeeId.trim().toUpperCase(),
           role: faculty.role || "faculty",
-          school: school,
-          department: department,
+          schools: faculty.schools.map((s) => s.trim()),
+          departments: faculty.departments.map((d) => d.trim()),
+          specialization: faculty.specialization.map((sp) => sp.trim()),
         });
 
         await newFaculty.save();
         results.created++;
-
       } catch (error) {
         results.errors++;
         results.details.push({
           row: i + 1,
-          error: error.message
+          error: error.message,
         });
       }
     }
@@ -186,9 +305,8 @@ export async function createFacultyBulk(req, res) {
     return res.status(201).json({
       success: true,
       message: `Bulk faculty creation completed. ${results.created} created, ${results.errors} errors.`,
-      data: results
+      data: results,
     });
-
   } catch (error) {
     console.error("Error in bulk faculty creation:", error);
     return res.status(500).json({
@@ -199,34 +317,74 @@ export async function createFacultyBulk(req, res) {
   }
 }
 
+// export async function getAllFaculty(req, res) {
+//   const allFaculty = await Faculty.find({});
+
+//   if (allFaculty.length === 0) {
+//     console.log("no faculty found");
+//     return res.status(404).json({
+//       success: false,
+//       message: "No Faculty found",
+//     });
+//   }
+
+//   return res.status(200).json({
+//     success: true,
+//     data: allFaculty,
+//   });
+// }
+
+
+// controller for getAllFaculty based on school, dept or specilization 
+
 export async function getAllFaculty(req, res) {
-  const allFaculty = await Faculty.find({});
-
-  if (allFaculty.length === 0) {
-    console.log("no faculty found");
-    return res.status(404).json({
-      success: false,
-      message: "No Faculty found",
-    });
-  }
-
-  return res.status(200).json({
-    success: true,
-    data: allFaculty,
-  });
-}
-
-// controller for getAllFaculty based on school and dept
-export async function getFacultyBySchoolAndDept(req, res) {
-  const { school, department } = req.params;
+  const { school, department, specialization, sortBy, sortOrder } = req.params;
 
   try {
-    const faculty = await Faculty.find({ school, department });
+    // Build dynamic query based on provided params
+    let query = {};
+    if (school) query.schools = school;
+    if (department) query.departments = department;
+    if (specialization) query.specialization = specialization;
+
+    if (Object.keys(query).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "At least one of school, department, or specialization must be provided",
+      });
+    }
+
+    // Allowed sorting fields (only from the ones present in query if any)
+    const validSortFields = ["schools", "departments", "specialization"];
+    // Determine default sort priority based on which params are provided
+    // e.g., sort by school if only school given,
+    // by school then department if both given,
+    // by school then department then specialization if all given
+    const sortFieldsPriority = [];
+    if (school) sortFieldsPriority.push("schools");
+    if (department) sortFieldsPriority.push("departments");
+    if (specialization) sortFieldsPriority.push("specialization");
+
+    let sortOption = {};
+
+    if (sortBy && validSortFields.includes(sortBy)) {
+      // Use user provided sorting if valid
+      const order = sortOrder && sortOrder.toLowerCase() === "desc" ? -1 : 1;
+      sortOption[sortBy] = order;
+    } else {
+      // Otherwise, default sort order based on presence in priority array ascending
+      sortFieldsPriority.forEach((field) => {
+        sortOption[field] = 1;
+      });
+    }
+
+    const faculty = await Faculty.find(query).sort(sortOption);
 
     if (!faculty.length) {
       return res.status(404).json({
         success: false,
-        message: "No faculty found for this school and department.",
+        message: "No faculty found matching the given criteria.",
       });
     }
 
@@ -234,10 +392,14 @@ export async function getFacultyBySchoolAndDept(req, res) {
       success: true,
       data: faculty.map((f) => ({
         _id: f._id,
+        imageUrl: f.imageUrl,
         name: f.name,
         employeeId: f.employeeId,
         emailId: f.emailId,
         role: f.role,
+        schools: f.schools,
+        departments: f.departments,
+        specialization: f.specialization,
       })),
     });
   } catch (error) {
@@ -296,6 +458,7 @@ export async function getFacultyBySchoolAndDept(req, res) {
 // }
 
 // with dept and school specific
+
 export async function getAllGuideWithProjects(req, res) {
   try {
     const { school, department } = req.query;
@@ -310,8 +473,8 @@ export async function getAllGuideWithProjects(req, res) {
     // Find faculties by role, school, and department
     const faculties = await Faculty.find({
       role: "faculty",
-      school,
-      department,
+      schools: school,
+      departments: department,
     });
 
     const result = await Promise.all(
@@ -377,8 +540,8 @@ export async function getAllPanelsWithProjects(req, res) {
       filteredPanels.map(async (panel) => {
         const projects = await Project.find({
           panel: panel._id,
-          school,
-          department,
+          school: school,
+          department: department,
         })
           .populate("students", "regNo name")
           .lean();
@@ -396,6 +559,35 @@ export async function getAllPanelsWithProjects(req, res) {
   } catch (error) {
     console.error("Error in getAllPanelsWithProjects:", error);
     res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+export async function deleteFacultyByEmployeeId(req, res) {
+  const { employeeId } = req.params;
+
+  try {
+    const deletedFaculty = await Faculty.findOneAndDelete({
+      employeeId: employeeId.trim().toUpperCase(),
+    });
+
+    if (!deletedFaculty) {
+      return res.status(404).json({
+        success: false,
+        message: `No faculty found with employee ID: ${employeeId}`,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Faculty with employee ID ${employeeId} has been deleted successfully.`,
+      data: deletedFaculty,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server error while deleting faculty",
+      error: error.message,
+    });
   }
 }
 
@@ -495,8 +687,6 @@ export async function getDefaultDeadline(req, res) {
     });
   }
 }
-
-
 
 export async function setDefaultDeadline(req, res) {
   try {
@@ -874,6 +1064,164 @@ export async function createPanelManually(req, res) {
   }
 }
 
+export async function autoCreatePanels(req, res) {
+  try {
+    const existingPanelsCount = await Panel.countDocuments();
+    const force = req.body.force === true || req.body.force === "true";
+
+    if (existingPanelsCount > 0 && !force) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Panels already exist. Use force=true parameter to recreate panels.",
+        existingPanels: existingPanelsCount,
+      });
+    }
+
+    if (existingPanelsCount > 0 && force) {
+      await Project.updateMany(
+        { panel: { $exists: true, $ne: null } },
+        { $set: { panel: null } }
+      );
+      await Panel.deleteMany({});
+      console.log(
+        `Deleted ${existingPanelsCount} existing panels due to force=${force}`
+      );
+    }
+
+    const faculties = await Faculty.find({ role: "faculty" });
+    if (faculties.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: "Not enough faculty members to create panels.",
+      });
+    }
+
+    // Group faculties by school and department
+    const groupedFaculties = {};
+    for (const faculty of faculties) {
+      const key = `${faculty.school}||${faculty.department}`;
+      if (!groupedFaculties[key]) groupedFaculties[key] = [];
+      groupedFaculties[key].push(faculty);
+    }
+
+    const createdPanels = [];
+
+    // ✅ Process each department separately (no cross-department panels)
+    for (const groupKey in groupedFaculties) {
+      const groupFaculties = groupedFaculties[groupKey];
+      const [school, department] = groupKey.split("||");
+
+      console.log(
+        `Processing department: ${school} - ${department} with ${groupFaculties.length} faculties`
+      );
+
+      const n = groupFaculties.length;
+
+      if (n < 2) {
+        console.log(
+          `⚠️ Department ${department} has only ${n} faculty - skipping panel creation`
+        );
+        continue;
+      }
+
+      // ✅ SORT BY EMPLOYEE ID (lower empId = more experienced)
+      groupFaculties.sort((a, b) => {
+        const empIdA = parseInt(a.employeeId) || 999999;
+        const empIdB = parseInt(b.employeeId) || 999999;
+        return empIdA - empIdB; // Ascending order (lower empId first)
+      });
+
+      console.log(
+        "Sorted faculties by experience (empId):",
+        groupFaculties.map((f) => `${f.name} (${f.employeeId})`).join(", ")
+      );
+
+      // ✅ EXPERIENCE-BASED PAIRING: Most experienced + Least experienced (excluding odd faculty)
+      const pairsToCreate = Math.floor(n / 2);
+
+      for (let i = 0; i < pairsToCreate; i++) {
+        const experiencedFaculty = groupFaculties[i]; // Most experienced available
+        const lessExperiencedFaculty = groupFaculties[n - 1 - i]; // Least experienced available
+
+        // Skip if they're the same person (happens when n=2)
+        if (experiencedFaculty._id.equals(lessExperiencedFaculty._id)) {
+          continue;
+        }
+
+        console.log(
+          `Creating panel ${i + 1}: ${experiencedFaculty.name} (${
+            experiencedFaculty.employeeId
+          }) + ${lessExperiencedFaculty.name} (${
+            lessExperiencedFaculty.employeeId
+          })`
+        );
+
+        const panel = new Panel({
+          faculty1: experiencedFaculty._id,
+          faculty2: lessExperiencedFaculty._id,
+          school,
+          department,
+        });
+
+        await panel.save();
+        createdPanels.push(panel);
+      }
+
+      // ✅ HANDLE ODD FACULTY: Pair with MOST EXPERIENCED faculty (empId 101)
+      if (n % 2 !== 0) {
+        const oddFaculty = groupFaculties[Math.floor(n / 2)]; // Middle faculty (unpaired)
+        const mostExperiencedFaculty = groupFaculties[0]; // First faculty (lowest empId)
+
+        console.log(
+          `Handling odd faculty: ${oddFaculty.name} (${oddFaculty.employeeId})`
+        );
+        console.log(
+          `Pairing with most experienced: ${mostExperiencedFaculty.name} (${mostExperiencedFaculty.employeeId})`
+        );
+
+        const oddPanel = new Panel({
+          faculty1: mostExperiencedFaculty._id, // Most experienced first
+          faculty2: oddFaculty._id, // Odd faculty second
+          school,
+          department,
+        });
+
+        await oddPanel.save();
+        createdPanels.push(oddPanel);
+
+        console.log(
+          `✅ Most experienced faculty ${mostExperiencedFaculty.name} now appears in 2 panels`
+        );
+      }
+
+      console.log(`✅ Department ${department} processing completed`);
+    }
+
+    console.log(
+      `🎉 Panel creation completed. Created ${createdPanels.length} panels total.`
+    );
+
+    return res.status(200).json({
+      success: true,
+      message:
+        existingPanelsCount > 0
+          ? "Existing panels replaced successfully."
+          : "Panels created successfully.",
+      panelsCreated: createdPanels.length,
+      departmentWise: true,
+      experienceBased: true,
+    });
+  } catch (error) {
+    console.error("Error in autoCreatePanels:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+}
+
 export async function deletePanel(req, res) {
   try {
     const { panelId } = req.params;
@@ -1034,48 +1382,38 @@ export async function autoAssignPanelsToProjects(req, res) {
     let panelIndex = 0;
 
     for (const project of unassignedProjects) {
-      const guideId = project.guideFaculty?._id?.toString();
-      const guideSchool = project.guideFaculty?.school;
-      const guideDepartment = project.guideFaculty?.department;
+      const projSpec = project.specialization?.trim();
 
-      // Filter panels to only those with matching school and department
+      // Filter panels where panel.specialization matches project specialization
+      // and ensure both faculties exist and specialization matches at least one faculty
       let eligiblePanels = panels.filter((panel) => {
-        const { faculty1, faculty2 } = panel;
-        // Both faculties must exist
+        const { faculty1, faculty2, specialization } = panel;
         if (!faculty1 || !faculty2) return false;
 
-        // Check school and department match (both faculties assumed to belong to same dept & school in your model)
-        if (
-          faculty1.school !== guideSchool ||
-          faculty2.school !== guideSchool ||
-          faculty1.department !== guideDepartment ||
-          faculty2.department !== guideDepartment
-        ) {
-          return false; // Different school or department
-        }
+        if (!specialization || !projSpec || specialization.trim() !== projSpec)
+          return false;
 
-        // Skip if guide is on the panel
-        if (guideId) {
-          if (
-            faculty1._id.toString() === guideId ||
-            faculty2._id.toString() === guideId
-          ) {
-            return false;
-          }
-        }
+        // Check if either faculty's specializations include the project specialization
+        const faculty1HasSpec = faculty1.specialization?.some(
+          (s) => s.trim() === projSpec
+        );
+        const faculty2HasSpec = faculty2.specialization?.some(
+          (s) => s.trim() === projSpec
+        );
 
-        return true;
+        return faculty1HasSpec || faculty2HasSpec;
       });
 
-      // If no eligible panel found (due to mismatches), allow all as fallback
+      // If no eligible panel found by specialization, fallback to any panel
       if (!eligiblePanels.length) {
         eligiblePanels = panels;
       }
 
-      // Assign to next eligible panel in round-robin
+      // Assign project to next eligible panel round-robin
       const eligiblePanel = eligiblePanels[panelIndex % eligiblePanels.length];
       project.panel = eligiblePanel._id;
       await project.save();
+
       panelAssignments[eligiblePanel._id.toString()].push(project._id);
 
       panelIndex++;
@@ -1083,7 +1421,8 @@ export async function autoAssignPanelsToProjects(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: "Panels assigned equally to unassigned projects.",
+      message:
+        "Panels assigned to unassigned projects based on specialization.",
       assignments: panelAssignments,
     });
   } catch (error) {
@@ -1092,310 +1431,172 @@ export async function autoAssignPanelsToProjects(req, res) {
   }
 }
 
-export async function assignPanelToProject(req, res) {
-  try {
-    const { panelFacultyIds, projectId } = req.body;
+// export async function assignPanelToProject(req, res) {
+//   try {
+//     const { panelFacultyIds, projectId } = req.body;
 
-    if (!Array.isArray(panelFacultyIds) || panelFacultyIds.length !== 2) {
-      return res.status(400).json({
-        success: false,
-        message: "Exactly 2 panel faculty IDs required.",
-      });
-    }
+//     if (!Array.isArray(panelFacultyIds) || panelFacultyIds.length !== 2) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Exactly 2 panel faculty IDs required.",
+//       });
+//     }
 
-    // Check distinctness
-    if (panelFacultyIds[0] === panelFacultyIds[1]) {
-      return res.status(400).json({
-        success: false,
-        message: "Panel faculty members must be distinct.",
-      });
-    }
+//     // Check distinctness
+//     if (panelFacultyIds[0] === panelFacultyIds[1]) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Panel faculty members must be distinct.",
+//       });
+//     }
 
-    const [faculty1, faculty2] = await Promise.all([
-      Faculty.findById(panelFacultyIds[0]),
-      Faculty.findById(panelFacultyIds[1]),
-    ]);
+//     const [faculty1, faculty2] = await Promise.all([
+//       Faculty.findById(panelFacultyIds[0]),
+//       Faculty.findById(panelFacultyIds[1]),
+//     ]);
 
-    if (!faculty1 || !faculty2) {
-      return res.status(404).json({
-        success: false,
-        message: "One or both faculty not found.",
-      });
-    }
+//     if (!faculty1 || !faculty2) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "One or both faculty not found.",
+//       });
+//     }
 
-    const project = await Project.findById(projectId).populate("guideFaculty");
-    if (!project) {
-      return res.status(404).json({
-        success: false,
-        message: "Project not found.",
-      });
-    }
+//     const project = await Project.findById(projectId).populate("guideFaculty");
+//     if (!project) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Project not found.",
+//       });
+//     }
 
-    if (!project.guideFaculty) {
-      return res.status(400).json({
-        success: false,
-        message: "Project has no guide faculty to check.",
-      });
-    }
+//     if (!project.guideFaculty) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Project has no guide faculty to check.",
+//       });
+//     }
 
-    // Check that panel faculty and guide faculty have same school and dept
-    if (
-      faculty1.school !== project.guideFaculty.school ||
-      faculty2.school !== project.guideFaculty.school ||
-      faculty1.department !== project.guideFaculty.department ||
-      faculty2.department !== project.guideFaculty.department
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Panel faculty and guide faculty must belong to the same school and department.",
-      });
-    }
+//     // Check that panel faculty and guide faculty have same school and dept
+//     if (
+//       faculty1.school !== project.guideFaculty.school ||
+//       faculty2.school !== project.guideFaculty.school ||
+//       faculty1.department !== project.guideFaculty.department ||
+//       faculty2.department !== project.guideFaculty.department
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Panel faculty and guide faculty must belong to the same school and department.",
+//       });
+//     }
 
-    // Prevent guide faculty from being panel member
-    if (
-      project.guideFaculty._id.toString() === panelFacultyIds[0] ||
-      project.guideFaculty._id.toString() === panelFacultyIds[1]
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Guide faculty cannot be a panel member for their own project.",
-      });
-    }
+//     // Prevent guide faculty from being panel member
+//     if (
+//       project.guideFaculty._id.toString() === panelFacultyIds[0] ||
+//       project.guideFaculty._id.toString() === panelFacultyIds[1]
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Guide faculty cannot be a panel member for their own project.",
+//       });
+//     }
 
-    // Create panel
-    const panel = new Panel({
-      faculty1: panelFacultyIds[0],
-      faculty2: panelFacultyIds[1],
-      school: faculty1.school,
-      department: faculty1.department,
-    });
-    await panel.save();
+//     // Create panel
+//     const panel = new Panel({
+//       faculty1: panelFacultyIds[0],
+//       faculty2: panelFacultyIds[1],
+//       school: faculty1.school,
+//       department: faculty1.department,
+//     });
+//     await panel.save();
 
-    // Assign panel to project
-    project.panel = panel._id;
-    await project.save();
+//     // Assign panel to project
+//     project.panel = panel._id;
+//     await project.save();
 
-    const populatedProject = await Project.findById(projectId).populate({
-      path: "panel",
-      populate: [{ path: "faculty1" }, { path: "faculty2" }],
-    });
+//     const populatedProject = await Project.findById(projectId).populate({
+//       path: "panel",
+//       populate: [{ path: "faculty1" }, { path: "faculty2" }],
+//     });
 
-    return res.status(200).json({
-      success: true,
-      message: "Panel assigned successfully",
-      data: populatedProject,
-    });
-  } catch (error) {
-    console.error("Error in assignPanelToProject:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-}
+//     return res.status(200).json({
+//       success: true,
+//       message: "Panel assigned successfully",
+//       data: populatedProject,
+//     });
+//   } catch (error) {
+//     console.error("Error in assignPanelToProject:", error);
+//     return res.status(500).json({ success: false, message: "Server error" });
+//   }
+// }
 
+// export async function getAllFacultyWithProjects(req, res) {
+//   try {
+//     const { school, department } = req.query;
 
-export async function autoCreatePanels(req, res) {
-  try {
-    const existingPanelsCount = await Panel.countDocuments();
-    const force = req.body.force === true || req.body.force === "true";
+//     // Filter faculties optionally by school and department
+//     const facultyFilter = {};
+//     if (school) facultyFilter.school = school;
+//     if (department) facultyFilter.department = department;
 
-    if (existingPanelsCount > 0 && !force) {
-      return res.status(400).json({
-        success: false,
-        message: "Panels already exist. Use force=true parameter to recreate panels.",
-        existingPanels: existingPanelsCount,
-      });
-    }
+//     const allFaculty = await Faculty.find(facultyFilter);
 
-    if (existingPanelsCount > 0 && force) {
-      await Project.updateMany(
-        { panel: { $exists: true, $ne: null } },
-        { $set: { panel: null } }
-      );
-      await Panel.deleteMany({});
-      console.log(`Deleted ${existingPanelsCount} existing panels due to force=${force}`);
-    }
+//     const facultyWithProjects = [];
 
-    const faculties = await Faculty.find({ role: "faculty" });
-    if (faculties.length < 2) {
-      return res.status(400).json({
-        success: false,
-        message: "Not enough faculty members to create panels.",
-      });
-    }
+//     for (const faculty of allFaculty) {
+//       const facultyId = faculty._id;
 
-    // Group faculties by school and department
-    const groupedFaculties = {};
-    for (const faculty of faculties) {
-      const key = `${faculty.school}||${faculty.department}`;
-      if (!groupedFaculties[key]) groupedFaculties[key] = [];
-      groupedFaculties[key].push(faculty);
-    }
+//       // Guided projects in same school and dept as faculty
+//       const guidedProjects = await Project.find({
+//         guideFaculty: facultyId,
+//         school: faculty.school,
+//         department: faculty.department,
+//       })
+//         .populate("students", "name regNo")
+//         .populate("panel");
 
-    const createdPanels = [];
+//       // Panels where faculty is either member and panel in same school/department
+//       const panelsWithFaculty = await Panel.find({
+//         $or: [{ faculty1: facultyId }, { faculty2: facultyId }],
+//         school: faculty.school,
+//         department: faculty.department,
+//       });
 
-    // ✅ Process each department separately (no cross-department panels)
-    for (const groupKey in groupedFaculties) {
-      const groupFaculties = groupedFaculties[groupKey];
-      const [school, department] = groupKey.split("||");
-      
-      console.log(`Processing department: ${school} - ${department} with ${groupFaculties.length} faculties`);
+//       const panelIds = panelsWithFaculty.map((panel) => panel._id);
 
-      const n = groupFaculties.length;
+//       const panelProjects = await Project.find({
+//         panel: { $in: panelIds },
+//         school: faculty.school,
+//         department: faculty.department,
+//       })
+//         .populate("students", "name regNo")
+//         .populate("panel");
 
-      if (n < 2) {
-        console.log(`⚠️ Department ${department} has only ${n} faculty - skipping panel creation`);
-        continue;
-      }
+//       facultyWithProjects.push({
+//         faculty: {
+//           name: faculty.name,
+//           employeeId: faculty.employeeId,
+//           emailId: faculty.emailId,
+//           school: faculty.school,
+//           department: faculty.department,
+//         },
+//         guide: guidedProjects,
+//         panel: panelProjects,
+//       });
+//     }
 
-      // ✅ SORT BY EMPLOYEE ID (lower empId = more experienced)
-      groupFaculties.sort((a, b) => {
-        const empIdA = parseInt(a.employeeId) || 999999;
-        const empIdB = parseInt(b.employeeId) || 999999;
-        return empIdA - empIdB; // Ascending order (lower empId first)
-      });
-
-      console.log('Sorted faculties by experience (empId):', 
-        groupFaculties.map(f => `${f.name} (${f.employeeId})`).join(', ')
-      );
-
-      // ✅ EXPERIENCE-BASED PAIRING: Most experienced + Least experienced (excluding odd faculty)
-      const pairsToCreate = Math.floor(n / 2);
-      
-      for (let i = 0; i < pairsToCreate; i++) {
-        const experiencedFaculty = groupFaculties[i]; // Most experienced available
-        const lessExperiencedFaculty = groupFaculties[n - 1 - i]; // Least experienced available
-        
-        // Skip if they're the same person (happens when n=2)
-        if (experiencedFaculty._id.equals(lessExperiencedFaculty._id)) {
-          continue;
-        }
-        
-        console.log(`Creating panel ${i + 1}: ${experiencedFaculty.name} (${experiencedFaculty.employeeId}) + ${lessExperiencedFaculty.name} (${lessExperiencedFaculty.employeeId})`);
-        
-        const panel = new Panel({
-          faculty1: experiencedFaculty._id,
-          faculty2: lessExperiencedFaculty._id,
-          school,
-          department,
-        });
-        
-        await panel.save();
-        createdPanels.push(panel);
-      }
-
-      // ✅ HANDLE ODD FACULTY: Pair with MOST EXPERIENCED faculty (empId 101)
-      if (n % 2 !== 0) {
-        const oddFaculty = groupFaculties[Math.floor(n / 2)]; // Middle faculty (unpaired)
-        const mostExperiencedFaculty = groupFaculties[0]; // First faculty (lowest empId)
-        
-        console.log(`Handling odd faculty: ${oddFaculty.name} (${oddFaculty.employeeId})`);
-        console.log(`Pairing with most experienced: ${mostExperiencedFaculty.name} (${mostExperiencedFaculty.employeeId})`);
-        
-        const oddPanel = new Panel({
-          faculty1: mostExperiencedFaculty._id, // Most experienced first
-          faculty2: oddFaculty._id, // Odd faculty second
-          school,
-          department,
-        });
-        
-        await oddPanel.save();
-        createdPanels.push(oddPanel);
-        
-        console.log(`✅ Most experienced faculty ${mostExperiencedFaculty.name} now appears in 2 panels`);
-      }
-
-      console.log(`✅ Department ${department} processing completed`);
-    }
-
-    console.log(`🎉 Panel creation completed. Created ${createdPanels.length} panels total.`);
-
-    return res.status(200).json({
-      success: true,
-      message: existingPanelsCount > 0 
-        ? "Existing panels replaced successfully." 
-        : "Panels created successfully.",
-      panelsCreated: createdPanels.length,
-      departmentWise: true,
-      experienceBased: true,
-    });
-
-  } catch (error) {
-    console.error("Error in autoCreatePanels:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message,
-    });
-  }
-}
-
-
-export async function getAllFacultyWithProjects(req, res) {
-  try {
-    const { school, department } = req.query;
-
-    // Filter faculties optionally by school and department
-    const facultyFilter = {};
-    if (school) facultyFilter.school = school;
-    if (department) facultyFilter.department = department;
-
-    const allFaculty = await Faculty.find(facultyFilter);
-
-    const facultyWithProjects = [];
-
-    for (const faculty of allFaculty) {
-      const facultyId = faculty._id;
-
-      // Guided projects in same school and dept as faculty
-      const guidedProjects = await Project.find({
-        guideFaculty: facultyId,
-        school: faculty.school,
-        department: faculty.department,
-      })
-        .populate("students", "name regNo")
-        .populate("panel");
-
-      // Panels where faculty is either member and panel in same school/department
-      const panelsWithFaculty = await Panel.find({
-        $or: [{ faculty1: facultyId }, { faculty2: facultyId }],
-        school: faculty.school,
-        department: faculty.department,
-      });
-
-      const panelIds = panelsWithFaculty.map((panel) => panel._id);
-
-      const panelProjects = await Project.find({
-        panel: { $in: panelIds },
-        school: faculty.school,
-        department: faculty.department,
-      })
-        .populate("students", "name regNo")
-        .populate("panel");
-
-      facultyWithProjects.push({
-        faculty: {
-          name: faculty.name,
-          employeeId: faculty.employeeId,
-          emailId: faculty.emailId,
-          school: faculty.school,
-          department: faculty.department,
-        },
-        guide: guidedProjects,
-        panel: panelProjects,
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: facultyWithProjects,
-    });
-  } catch (error) {
-    console.error("Error in getAllFacultyWithProjects:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message,
-    });
-  }
-}
+//     return res.status(200).json({
+//       success: true,
+//       data: facultyWithProjects,
+//     });
+//   } catch (error) {
+//     console.error("Error in getAllFacultyWithProjects:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//       error: error.message,
+//     });
+//   }
+// }

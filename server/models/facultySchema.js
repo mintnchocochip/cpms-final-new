@@ -10,7 +10,7 @@ const facultySchema = new mongoose.Schema({
     type: String,
     unique: true,
     required: true,
-    match: [/^[A-Za-z0-9]+$/, "Please enter a valid employee ID"], // need to put proper validation
+    match: [/^[A-Za-z0-9]+$/, "Please enter a valid employee ID"],
   },
   name: {
     type: String,
@@ -20,7 +20,7 @@ const facultySchema = new mongoose.Schema({
     type: String,
     unique: true,
     required: true,
-    match: [/.+@vit\.ac\.in$/, "Please enter a valid VIT email address"], // for testing purposes we use gmail
+    match: [/.+@vit\.ac\.in$/, "Please enter a valid VIT email address"],
   },
   password: {
     type: String,
@@ -31,9 +31,27 @@ const facultySchema = new mongoose.Schema({
     enum: ["admin", "faculty"],
     required: true,
   },
-  school: { type: String, required: true },
-  department: { type: String, required: true },
+  school: {
+    type: [String],
+    required: true,
+    validate: [arrayLimit, "{PATH} must have at least one school"],
+  },
+  department: {
+    type: [String],
+    required: true,
+    validate: [arrayLimit, "{PATH} must have at least one department"],
+  },
+  specialization: {
+    type: [String],
+    required: true,
+    validate: [arrayLimit, "{PATH} must have at least one specialization"],
+  },
 });
 
-const Faculty = mongoose.model("Faculty", facultySchema);
+function arrayLimit(val) {
+  return val.length > 0;
+}
+
+const Faculty =  mongoose.model("Faculty", facultySchema);
+
 export default Faculty;

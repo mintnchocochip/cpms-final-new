@@ -5,7 +5,6 @@ import {
   createAdmin,
   updateRequestStatus,
   getAllRequests,
-  assignPanelToProject,
   autoCreatePanels,
   createPanelManually,
   assignExistingPanelToProject,
@@ -14,8 +13,6 @@ import {
   getAllPanels,
   getAllGuideWithProjects,
   getAllPanelsWithProjects,
-  getAllFacultyWithProjects,
-  getFacultyBySchoolAndDept,
   createOrUpdateMarkingSchema,
 } from "../controllers/adminController.js";
 import { adminMiddleware } from "../middlewares/adminMiddleware.js";
@@ -34,12 +31,12 @@ adminRouter.post("/createAdmin", adminMiddleware, createAdmin);
 // Admin should create faculty accounts
 adminRouter.post("/createFaculty", adminMiddleware, createFaculty);
 
-adminRouter.get("/getAllFaculty", adminMiddleware, getAllFaculty);
+// adminRouter.get("/getAllFaculty", adminMiddleware, getAllFaculty);
 
 adminRouter.get(
-  "/faculty/:school/:department",
+  "/faculty/:school/:department/:specialization",
   adminMiddleware,
-  getFacultyBySchoolAndDept
+  getAllFaculty
 );
 
 // seems redundant as all details will be fetched from "/getAllGuideProjects" and "/getAllPanelProjects" endpoints
