@@ -6,10 +6,18 @@ export const facultyLogin = async (req, res) => {
   const { emailId, password, expectedRole } = req.body;
 
   try {
-    // Find faculty by email
-    const faculty = await Faculty.findOne({ emailId });
+    // Find faculty by either email OR employee ID
+    const faculty = await Faculty.findOne({
+      $or: [
+        { emailId: emailId },
+        { employeeId: emailId } // Since we're using the same field name, check both
+      ]
+    });
+
     if (!faculty) {
-      return res.status(404).json({ message: "Faculty not found!" });
+      return res.status(404).json({ 
+        message: "Faculty not found! Please check your email or employee ID." 
+      });
     }
 
     // Check role if expectedRole is provided

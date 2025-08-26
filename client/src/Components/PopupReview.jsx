@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react'; 
-import { X } from 'lucide-react';
-import { getFacultyMarkingSchema } from '../api';
+import React, { useState, useEffect } from 'react';
+import { X, Award } from 'lucide-react';
 
 const PopupReview = ({
   title,
@@ -16,7 +15,6 @@ const PopupReview = ({
   requiresPPT = false,
   markingSchema = null,
 }) => {
-  // State management
   const [marks, setMarks] = useState({});
   const [comments, setComments] = useState({});
   const [attendance, setAttendance] = useState({});
@@ -26,196 +24,138 @@ const PopupReview = ({
   const [error, setError] = useState('');
   const [hasAttendance, setHasAttendance] = useState(true);
 
-  // ✅ Load marking schema and initialize
+  // ✅ Load schema and initialize components
   useEffect(() => {
-    const loadMarkingSchema = async () => {
-      if (!isOpen) return;
+    if (!isOpen) return;
+    
+    setLoading(true);
+    try {
+      console.log('=== [PopupReview] LOADING MARKING SCHEMA ===');
+      console.log('📋 [PopupReview] Review type:', reviewType);
+      console.log('📋 [PopupReview] Schema:', markingSchema);
       
-      try {
-        setLoading(true);
-        console.log('=== LOADING MARKING SCHEMA FOR RETRIEVAL ===');
-        console.log('Review type:', reviewType);
-        console.log('Requires PPT:', requiresPPT);
+      let components = [];
+      let hasValidSchema = false;
+      
+      if (markingSchema?.reviews) {
+        const reviewConfig = markingSchema.reviews.find(review => 
+          review.reviewName === reviewType
+        );
         
-        let schemaData = markingSchema;
-        
-        if (!schemaData) {
-          const response = await getFacultyMarkingSchema();
-          schemaData = response.data?.success ? response.data.data : null;
+        if (reviewConfig?.components?.length > 0) {
+          hasValidSchema = true;
+          components = reviewConfig.components.map((comp, index) => ({
+            key: `component${index + 1}`,
+            label: comp.name,
+            name: comp.name, // ✅ Component name from schema
+            points: comp.weight || 10
+          }));
+          console.log('✅ [PopupReview] Schema components loaded:', components);
         }
-        
-        if (schemaData && schemaData.reviews) {
-          const reviewConfig = schemaData.reviews.find(review => 
-            review.reviewName === reviewType
-          );
-
-          if (reviewConfig) {
-            setHasAttendance(true); // All reviews have attendance
-            
-            if (reviewConfig.components && reviewConfig.components.length > 0) {
-              const dynamicLabels = reviewConfig.components.map((comp, index) => ({
-                key: `component${index + 1}`,
-                label: comp.name,
-                name: comp.name,
-                points: comp.weight || 10
-              }));
-              
-              console.log('✅ Components for retrieval:', dynamicLabels);
-              setComponentLabels(dynamicLabels);
-            } else {
-              setComponentLabels([
-                { key: 'component1', label: 'Component 1', name: 'Component 1', points: 10 }
-              ]);
-            }
-          } else {
-            setComponentLabels([
-              { key: 'component1', label: 'Component 1', name: 'Component 1', points: 10 }
-            ]);
-          }
-        }
-        
-        setError('');
-      } catch (err) {
-        console.error('❌ Error loading schema:', err);
-        setComponentLabels([
-          { key: 'component1', label: 'Component 1', name: 'Component 1', points: 10 }
-        ]);
-        setHasAttendance(true);
-      } finally {
-        setLoading(false);
       }
-    };
-
-    if (isOpen) {
-      loadMarkingSchema();
+      
+      if (!hasValidSchema) {
+        console.log('❌ [PopupReview] No valid schema or components found');
+        setError('No marking components found for this review type');
+        components = [];
+      }
+      
+      setComponentLabels(components);
+      setHasAttendance(components.length > 0);
+      
+    } catch (err) {
+      console.error('❌ [PopupReview] Error loading schema:', err);
+      setComponentLabels([]);
+      setHasAttendance(false);
+      setError('Schema loading error');
+    } finally {
+      setLoading(false);
     }
-  }, [isOpen, reviewType, markingSchema, requiresPPT]);
+  }, [isOpen, reviewType, markingSchema]);
 
-  // ✅ FIXED: Proper data retrieval from MongoDB Map structure
+  // ✅ FIXED: Initialize form data from existing student data
   useEffect(() => {
-    if (isOpen && teamMembers && !loading && componentLabels.length > 0) {
-      console.log('=== POPUP INITIALIZATION WITH MAP RETRIEVAL ===');
-      console.log('Team members data:', teamMembers);
+    if (!isOpen || loading || componentLabels.length === 0) return;
+    
+    console.log('=== [PopupReview] INITIALIZING FORM DATA ===');
+    
+    const initialMarks = {};
+    const initialComments = {};
+    const initialAttendance = {};
+
+    teamMembers.forEach(member => {
+      console.log(`🔍 [PopupReview] Processing ${member.name}:`, member);
       
-      const initialMarks = {};
-      const initialComments = {};
-      const initialAttendance = {};
-      
-      teamMembers.forEach(member => {
-        console.log(`🔍 Processing ${member.name} for retrieval:`, member);
-        
-        // ✅ FIXED: Handle both Map and Object access patterns
-        let reviewData = null;
-        
-        // Try Map access first (student.reviews.get(reviewType))
-        if (member.reviews && typeof member.reviews.get === 'function') {
-          reviewData = member.reviews.get(reviewType);
-          console.log(`Map access for ${member.name} ${reviewType}:`, reviewData);
-        } 
-        // Try object access (student.reviews[reviewType])
-        else if (member.reviews && member.reviews[reviewType]) {
-          reviewData = member.reviews[reviewType];
-          console.log(`Object access for ${member.name} ${reviewType}:`, reviewData);
+      // ✅ FIXED: Get review data with proper Map handling
+      let reviewData = null;
+      if (member.reviews?.get) {
+        reviewData = member.reviews.get(reviewType);
+      } else if (member.reviews?.[reviewType]) {
+        reviewData = member.reviews[reviewType];
+      }
+
+      console.log(`📋 [PopupReview] Review data for ${member.name}:`, reviewData);
+
+      // Initialize marks using component names
+      const componentMarks = {};
+      componentLabels.forEach(comp => {
+        let markValue = '';
+        if (reviewData?.marks) {
+          // ✅ FIXED: Get mark by component name directly
+          markValue = reviewData.marks[comp.name] || '';
         }
-        // Fallback to direct property access (student[reviewType])
-        else if (member[reviewType]) {
-          reviewData = member[reviewType];
-          console.log(`Direct access for ${member.name} ${reviewType}:`, reviewData);
-        }
-        
-        console.log(`Final review data for ${member.name}:`, reviewData);
-        
-        // Initialize marks for each component
-        const componentMarks = {};
-        componentLabels.forEach(comp => {
-          let markValue = '';
-          
-          // ✅ FIXED: Handle marks from MongoDB Map structure
-          if (reviewData?.marks) {
-            // Try to get mark by component name from schema
-            markValue = reviewData.marks[comp.name];
-            if (markValue === undefined) {
-              // Fallback to component key
-              markValue = reviewData.marks[comp.key];
-            }
-            if (markValue === undefined) {
-              markValue = '';
-            }
-            console.log(`Retrieved mark for ${comp.name}: ${markValue}`);
-          }
-          
-          componentMarks[comp.key] = markValue || '';
-        });
-        
-        initialMarks[member._id] = componentMarks;
-        console.log(`Marks initialized for ${member.name}:`, componentMarks);
-        
-        // Initialize comments
-        const commentValue = reviewData?.comments || '';
-        initialComments[member._id] = commentValue;
-        console.log(`Comments for ${member.name}: "${commentValue}"`);
-        
-        // ✅ FIXED: Initialize attendance from proper structure
-        if (hasAttendance) {
-          let attendanceValue = false;
-          if (reviewData?.attendance) {
-            attendanceValue = reviewData.attendance.value ?? false;
-          }
-          initialAttendance[member._id] = attendanceValue;
-          console.log(`Attendance for ${member.name}: ${attendanceValue}`);
-        }
+        componentMarks[comp.key] = markValue || '';
+        console.log(`📊 [PopupReview] Component ${comp.name} (${comp.key}): ${markValue} for ${member.name}`);
       });
-      
-      console.log('=== FINAL INITIALIZATION RESULTS ===');
-      console.log('Marks:', initialMarks);
-      console.log('Comments:', initialComments);
-      console.log('Attendance:', initialAttendance);
-      
-      setMarks(initialMarks);
-      setComments(initialComments);
+
+      initialMarks[member._id] = componentMarks;
+      initialComments[member._id] = reviewData?.comments || '';
       
       if (hasAttendance) {
-        setAttendance(initialAttendance);
+        initialAttendance[member._id] = reviewData?.attendance?.value ?? false;
       }
-      
-      if (requiresPPT) {
-        const teamPptStatus = teamMembers.length > 0 && 
-          teamMembers.every(member => member.pptApproved?.approved === true);
-        setTeamPptApproved(teamPptStatus);
-        console.log(`Team PPT status: ${teamPptStatus}`);
-      }
+    });
+
+    setMarks(initialMarks);
+    setComments(initialComments);
+    if (hasAttendance) {
+      setAttendance(initialAttendance);
     }
+
+    // Team PPT status
+    if (requiresPPT) {
+      setTeamPptApproved(
+        teamMembers.length > 0 && 
+        teamMembers.every(member => member.pptApproved?.approved === true)
+      );
+    }
+    
+    console.log('✅ [PopupReview] Form data initialized');
   }, [isOpen, teamMembers, reviewType, loading, componentLabels, hasAttendance, requiresPPT]);
 
-  const handleMarksChange = (memberId, value, component = null) => {
+  const handleMarksChange = (memberId, value, componentKey) => {
     if (locked) return;
-    
-    if (hasAttendance && attendance[memberId] === false) {
-      console.log('❌ Blocked marks change - student is absent');
-      return;
-    }
-    
-    const componentInfo = componentLabels.find(comp => comp.key === component);
+    if (hasAttendance && attendance[memberId] === false) return;
+
+    const componentInfo = componentLabels.find(comp => comp.key === componentKey);
     const maxPoints = componentInfo?.points || 10;
-    
     const numValue = Number(value);
+
     if (numValue > maxPoints) {
-      alert(`Enter value less than ${maxPoints}, resetting to 0`);
+      alert(`Enter value less than ${maxPoints}, resetting to ${maxPoints}`);
       setMarks(prev => ({
         ...prev,
-        [memberId]: {
-          ...prev[memberId],
-          [component]: 0
-        }
+        [memberId]: { ...prev[memberId], [componentKey]: maxPoints }
+      }));
+    } else if (numValue < 0) {
+      setMarks(prev => ({
+        ...prev,
+        [memberId]: { ...prev[memberId], [componentKey]: 0 }
       }));
     } else {
-      console.log(`✅ Setting marks for ${component} = ${numValue}`);
       setMarks(prev => ({
         ...prev,
-        [memberId]: {
-          ...prev[memberId],
-          [component]: numValue
-        }
+        [memberId]: { ...prev[memberId], [componentKey]: numValue }
       }));
     }
   };
@@ -223,7 +163,6 @@ const PopupReview = ({
   const handleAttendanceChange = (memberId, isPresent) => {
     if (locked) return;
     
-    console.log(`✅ Setting attendance for ${memberId} = ${isPresent}`);
     setAttendance(prev => ({ ...prev, [memberId]: isPresent }));
     
     if (!isPresent) {
@@ -231,53 +170,48 @@ const PopupReview = ({
       componentLabels.forEach(comp => {
         zeroedMarks[comp.key] = 0;
       });
-      
-      setMarks(prev => ({
-        ...prev,
-        [memberId]: zeroedMarks
-      }));
+      setMarks(prev => ({ ...prev, [memberId]: zeroedMarks }));
       setComments(prev => ({ ...prev, [memberId]: '' }));
     }
   };
 
-  // ✅ Submit function (unchanged - working correctly)
+  const handleCommentsChange = (memberId, value) => {
+    if (locked) return;
+    setComments(prev => ({ ...prev, [memberId]: value }));
+  };
+
+  // ✅ FIXED: Submission format - uses component.name as keys
   const handleSubmit = () => {
     if (locked) return;
     
-    console.log('=== SUBMIT FOR BACKEND PROCESSING ===');
-    console.log('Review type:', reviewType);
-    console.log('Component labels:', componentLabels);
+    console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
     
     const submission = {};
     
     teamMembers.forEach(member => {
       const memberMarks = marks[member._id] || {};
-      console.log(`Processing ${member.name} for backend submission:`, memberMarks);
-      
       const submissionData = {
         comments: comments[member._id] || ''
       };
-      
-      // Map component data to backend format using schema component names
+
+      // ✅ KEY FIX: Use comp.name as the key for backend
       componentLabels.forEach(comp => {
-        submissionData[comp.name] = memberMarks[comp.key] || 0;
-        console.log(`Backend mapping: ${comp.name} = ${submissionData[comp.name]}`);
+        submissionData[comp.name] = Number(memberMarks[comp.key]) || 0;
+        console.log(`📤 [PopupReview] Setting ${comp.name} = ${submissionData[comp.name]} for ${member.name}`);
       });
-      
-      // Add attendance
+
       if (hasAttendance) {
-        submissionData.attendance = { 
+        submissionData.attendance = {
           value: attendance[member._id] || false,
-          locked: false 
+          locked: false
         };
       }
-      
+
       submission[member.regNo] = submissionData;
     });
-    
-    console.log('✅ Complete submission data for backend:', submission);
-    
-    // Submit with PPT object if required
+
+    console.log('📤 [PopupReview] Final submission object:', submission);
+
     if (requiresPPT) {
       const teamPptObj = {
         pptApproved: {
@@ -285,10 +219,8 @@ const PopupReview = ({
           locked: false
         }
       };
-      console.log('✅ Submitting with PPT object:', teamPptObj);
       onSubmit(submission, teamPptObj);
     } else {
-      console.log('✅ Submitting without PPT object');
       onSubmit(submission);
     }
   };
@@ -297,216 +229,193 @@ const PopupReview = ({
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl p-8">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-            <span>Loading review configuration...</span>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-8 shadow-2xl">
+          <div className="flex items-center justify-center space-x-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <span className="text-lg text-gray-700">Loading marking schema...</span>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl p-8 max-w-md">
-          <h3 className="text-lg font-semibold text-red-600 mb-4">Error Loading Configuration</h3>
-          <p className="text-gray-700 mb-4">{error}</p>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-          >
-            Close
-          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl mx-4 max-h-[90vh] overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">
-            <X size={24} />
-          </button>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] flex flex-col border-2 border-blue-100">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-purple-600 text-white p-6 rounded-t-2xl">
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <Award className="w-7 h-7" />
+                <h2 className="text-2xl font-bold">{title}</h2>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-sm text-white/90">
+                <span className="bg-white/20 px-3 py-1 rounded-full">
+                  {componentLabels.length} components
+                </span>
+                <span className="bg-white/20 px-3 py-1 rounded-full">
+                  {teamMembers.length} students
+                </span>
+                {requiresPPT && (
+                  <span className="bg-yellow-400/30 px-3 py-1 rounded-full">
+                    PPT Required
+                  </span>
+                )}
+                {locked && (
+                  <span className="bg-red-400/30 px-3 py-1 rounded-full">
+                    🔒 Locked
+                  </span>
+                )}
+              </div>
+            </div>
+            <button 
+              onClick={onClose}
+              className="p-2 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <X size={28} />
+            </button>
+          </div>
         </div>
 
-        {locked && (
-          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 flex justify-between items-center">
-            <span>This review is locked. Deadline has passed and no edit permission granted.</span>
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+          {error && (
+            <div className="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 mb-6 rounded">
+              <p className="font-medium">Error: {error}</p>
+            </div>
+          )}
+
+          {/* Team PPT Approval */}
+          {requiresPPT && (
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+              <label className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  checked={teamPptApproved}
+                  onChange={(e) => setTeamPptApproved(e.target.checked)}
+                  disabled={locked}
+                  className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="font-semibold text-yellow-800">
+                  Team PPT Approved
+                </span>
+              </label>
+            </div>
+          )}
+
+          {/* Students Grid */}
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {teamMembers.map(member => (
+              <div 
+                key={member._id}
+                className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+              >
+                {/* Student Header */}
+                <div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-100">
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg text-gray-800 mb-1">
+                      {member.name}
+                    </h3>
+                    <p className="text-sm text-gray-500">{member.regNo}</p>
+                  </div>
+                  
+                  {/* Attendance */}
+                  {hasAttendance && (
+                    <div className="ml-3">
+                      <select
+                        value={attendance[member._id] ? 'present' : 'absent'}
+                        onChange={(e) => handleAttendanceChange(member._id, e.target.value === 'present')}
+                        disabled={locked}
+                        className={`px-3 py-2 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 ${
+                          attendance[member._id] 
+                            ? 'bg-green-50 border-green-300 text-green-800' 
+                            : 'bg-red-50 border-red-300 text-red-800'
+                        }`}
+                      >
+                        <option value="present">✓ Present</option>
+                        <option value="absent">✗ Absent</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Components */}
+                <div className="space-y-3 mb-4">
+                  {componentLabels.map(comp => (
+                    <div key={comp.key} className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-gray-700 flex-1 mr-3">
+                        {comp.label}
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max={comp.points}
+                          value={marks[member._id]?.[comp.key] || ''}
+                          onChange={(e) => handleMarksChange(member._id, e.target.value, comp.key)}
+                          disabled={locked || (hasAttendance && attendance[member._id] === false)}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                          placeholder="0"
+                        />
+                        <span className="text-xs text-gray-500 min-w-fit">
+                          /{comp.points}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Comments */}
+                <textarea
+                  value={comments[member._id] || ''}
+                  onChange={(e) => handleCommentsChange(member._id, e.target.value)}
+                  disabled={locked || (hasAttendance && attendance[member._id] === false)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  rows="3"
+                  placeholder="Add comments..."
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-white border-t border-gray-200 px-6 py-4 flex justify-between items-center rounded-b-2xl">
+          <div className="flex space-x-3">
             {requestEditVisible && !requestPending && (
               <button
                 onClick={onRequestEdit}
-                className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm ml-4"
+                className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors"
               >
                 Request Edit
               </button>
             )}
             {requestPending && (
-              <button
-                disabled
-                className="px-3 py-1 bg-yellow-400 text-white rounded cursor-not-allowed text-sm ml-4"
-              >
-                Request Pending
-              </button>
+              <span className="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg text-sm">
+                Request Pending...
+              </span>
             )}
           </div>
-        )}
-
-        <div className="p-4 max-h-[70vh] overflow-y-auto">
-          {/* PPT Approval Section */}
-          {requiresPPT && (
-            <div className="mb-6 p-4 bg-blue-50 rounded-lg border">
-              <h3 className="text-lg font-semibold mb-3">Team PPT Approval</h3>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="teamPpt"
-                    checked={teamPptApproved === true}
-                    onChange={() => {
-                      if (!locked) {
-                        setTeamPptApproved(true);
-                      }
-                    }}
-                    disabled={locked}
-                    className="mr-2"
-                  />
-                  <span className="text-green-600 font-semibold">Approved</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="teamPpt"
-                    checked={teamPptApproved === false}
-                    onChange={() => {
-                      if (!locked) {
-                        setTeamPptApproved(false);
-                      }
-                    }}
-                    disabled={locked}
-                    className="mr-2"
-                  />
-                  <span className="text-red-600 font-semibold">Not Approved</span>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* Student Marking Section */}
-          {teamMembers.map((member) => {
-            const isAbsent = hasAttendance && attendance[member._id] === false;
-            
-            return (
-              <div key={member._id} className="py-4 border-b last:border-b-0">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <span className="font-medium text-gray-700">{member.name}</span>
-                    <span className="text-sm text-gray-500 ml-2">({member.regNo})</span>
-                    {isAbsent && (
-                      <span className="ml-2 px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
-                        ABSENT - Fields Disabled
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* ✅ Dynamic Component Inputs with proper value display */}
-                  <div className="flex gap-2">
-                    {componentLabels.map(comp => (
-                      <div key={comp.key} className="flex items-center gap-1">
-                        <label className="text-xs font-medium">{comp.label}:</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max={comp.points}
-                          className={`w-16 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                            isAbsent || locked ? 'bg-gray-100 cursor-not-allowed' : ''
-                          }`}
-                          value={marks[member._id]?.[comp.key] || ''}
-                          onChange={(e) => {
-                            console.log(`Input onChange: value=${e.target.value}, component=${comp.key}`);
-                            handleMarksChange(member._id, e.target.value, comp.key);
-                          }}
-                          placeholder={`0-${comp.points}`}
-                          disabled={locked || isAbsent}
-                        />
-                        <span className="text-xs text-gray-500">/{comp.points}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={`grid gap-4 ${hasAttendance ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-                  <div>
-                    <label className="block text-gray-700 text-sm font-medium mb-2">Comments</label>
-                    <textarea
-                      className={`w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        isAbsent || locked ? 'bg-gray-100 cursor-not-allowed' : ''
-                      }`}
-                      placeholder="Enter Comments"
-                      rows="2"
-                      value={comments[member._id] || ''}
-                      onChange={(e) => {
-                        if (!locked && !isAbsent) {
-                          setComments(prev => ({ ...prev, [member._id]: e.target.value }));
-                        }
-                      }}
-                      disabled={locked || isAbsent}
-                    />
-                  </div>
-
-                  {hasAttendance && (
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2">Attendance</label>
-                      <div className="flex items-center gap-4">
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name={`attendance_${member._id}`}
-                            checked={attendance[member._id] === true}
-                            onChange={() => handleAttendanceChange(member._id, true)}
-                            disabled={locked}
-                            className="mr-2"
-                          />
-                          Present
-                        </label>
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name={`attendance_${member._id}`}
-                            checked={attendance[member._id] === false}
-                            onChange={() => handleAttendanceChange(member._id, false)}
-                            disabled={locked}
-                            className="mr-2"
-                          />
-                          Absent
-                        </label>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
           
-          <div className="mt-6 flex justify-end">
+          <div className="flex space-x-3">
             <button
-              onClick={() => {
-                console.log('🚀 SUBMIT BUTTON CLICKED');
-                handleSubmit();
-              }}
-              disabled={locked || loading}
-              className={`px-6 py-2 rounded transition-colors ${
-                locked || loading
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-blue-500 hover:bg-blue-600'
-              } text-white`}
+              onClick={onClose}
+              className="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
             >
-              {loading ? 'Loading...' : 'Submit Review'}
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={locked || loading}
+              className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                locked || loading
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {locked ? 'Locked' : 'Submit Review'}
             </button>
           </div>
         </div>

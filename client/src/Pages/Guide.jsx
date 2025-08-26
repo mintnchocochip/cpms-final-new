@@ -2,24 +2,20 @@ import React, { useState, useEffect } from 'react';
 import PopupReview from '../Components/PopupReview';
 import ReviewTable from '../Components/ReviewTable';
 import Navbar from '../Components/UniversalNavbar';
-import { ChevronRight, RefreshCw } from 'lucide-react'; // ✅ Added RefreshCw import
+import { ChevronRight, RefreshCw } from 'lucide-react';
 import { 
   getGuideProjects, 
   updateProject,
   createReviewRequest,
-  checkRequestStatus,
   batchCheckRequestStatuses,
-  getFacultyMarkingSchema
 } from '../api';
 
 const Guide = () => {
   const [teams, setTeams] = useState([]);
-  const [deadlines, setDeadlines] = useState({});
-  const [markingSchema, setMarkingSchema] = useState(null);
   const [activePopup, setActivePopup] = useState(null);
   const [expandedTeam, setExpandedTeam] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false); // ✅ Added refresh state
+  const [refreshing, setRefreshing] = useState(false);
   const [requestStatuses, setRequestStatuses] = useState({});
   const [error, setError] = useState(null);
 
@@ -27,268 +23,164 @@ const Guide = () => {
     fetchData();
   }, []);
 
+  const getReviewTypes = (markingSchema) => {
+    console.log('🔍 [Guide] Getting review types from schema:', markingSchema);
+    if (markingSchema?.reviews) {
+      const guideReviews = markingSchema.reviews
+        .filter(review => review.facultyType === 'guide')
+        .map(review => ({
+          key: review.reviewName,
+          name: review.displayName || review.reviewName,
+          components: review.components || [],
+          requiresPPT: review.requiresPPT || false,
+          facultyType: review.facultyType
+        }));
+      console.log('✅ [Guide] Guide reviews found:', guideReviews);
+      return guideReviews;
+    }
+    
+    console.log('❌ [Guide] No schema found - returning empty reviews');
+    return [];
+  };
+
+  const getDeadlines = (markingSchema) => {
+    console.log('📅 [Guide] Getting deadlines from schema:', markingSchema);
+    const deadlineData = {};
+    if (markingSchema?.reviews) {
+      markingSchema.reviews
+        .filter(review => review.facultyType === 'guide')
+        .forEach(review => {
+          if (review.deadline) {
+            deadlineData[review.reviewName] = review.deadline;
+          }
+        });
+    }
+    return deadlineData;
+  };
+
+  // ✅ FIXED: Proper student data normalization
+  const normalizeStudentData = (student) => {
+    console.log('🔧 [normalizeStudentData] Processing student:', student.name);
+    console.log('🔧 [normalizeStudentData] Raw student reviews:', student.reviews);
+    
+    const normalizedStudent = {
+      ...student,
+      reviews: new Map()
+    };
+
+    // Handle different review data formats
+    if (student.reviews) {
+      if (typeof student.reviews === 'object') {
+        // Convert plain object to Map
+        Object.entries(student.reviews).forEach(([reviewKey, reviewData]) => {
+          console.log(`🔧 [normalizeStudentData] Processing review ${reviewKey}:`, reviewData);
+          
+          // Normalize marks - handle both Map and plain object
+          let normalizedMarks = {};
+          if (reviewData.marks) {
+            if (typeof reviewData.marks === 'object') {
+              // Already a plain object or converted from Map
+              normalizedMarks = { ...reviewData.marks };
+            }
+          }
+          
+          const normalizedReview = {
+            marks: normalizedMarks,
+            comments: reviewData.comments || '',
+            attendance: reviewData.attendance || { value: false, locked: false },
+            locked: reviewData.locked || false
+          };
+          
+          normalizedStudent.reviews.set(reviewKey, normalizedReview);
+          console.log(`✅ [normalizeStudentData] Normalized review ${reviewKey}:`, normalizedReview);
+        });
+      }
+    }
+
+    console.log('✅ [normalizeStudentData] Final normalized student:', normalizedStudent.name, normalizedStudent.reviews);
+    return normalizedStudent;
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('=== GUIDE FETCH DATA STARTED ===');
-      
-      const [projectsRes, markingSchemaRes] = await Promise.all([
-        getGuideProjects().catch(error => {
-          console.error('❌ getGuideProjects failed:', error);
-          return { data: { success: false, error: error.message } };
-        }),
-        getFacultyMarkingSchema().catch(error => {
-          console.error('❌ getFacultyMarkingSchema failed:', error);
-          return { data: { success: false, error: error.message } };
-        })
-      ]);
+      console.log('=== [fetchData] GUIDE FETCH DATA STARTED ===');
 
-      console.log('📊 Projects API Response:', projectsRes.data);
-      console.log('📊 Marking Schema API Response:', markingSchemaRes.data);
+      const projectsRes = await getGuideProjects();
+      console.log('📊 [fetchData] Projects API Response:', projectsRes.data);
 
       let mappedTeams = [];
 
       if (projectsRes.data?.success) {
         const projects = projectsRes.data.data;
-        console.log('✅ Processing projects:', projects.length);
-        
-        mappedTeams = projects.map(project => ({
-          id: project._id,
-          title: project.name,
-          description: `Guide: ${project.guideFaculty?.name || 'N/A'}`,
-          students: project.students || [],
-          pptApproved: project.pptApproved || { approved: false, locked: false },
-          guideFaculty: project.guideFaculty
-        }));
-        
-        setTeams(mappedTeams);
-        console.log('✅ Teams set successfully:', mappedTeams.length);
-      }
+        console.log('✅ [fetchData] Processing projects:', projects.length);
 
-      if (markingSchemaRes.data?.success && markingSchemaRes.data.data) {
-        const markingSchemaData = markingSchemaRes.data.data;
-        console.log('✅ Processing marking schema:', markingSchemaData);
-        
-        if (markingSchemaData.reviews) {
-          const guideReviewTypes = ['draftReview', 'review0', 'review1'];
-          const filteredReviews = markingSchemaData.reviews.filter(review => 
-            guideReviewTypes.includes(review.reviewName)
-          );
+        const guideProjects = projects.filter(project => project.guideFaculty != null);
+        console.log('✅ [fetchData] Guide projects filtered:', guideProjects.length);
 
-          console.log('✅ Guide-specific reviews:', filteredReviews);
-
-          const deadlineData = {};
-          filteredReviews.forEach(review => {
-            if (review.deadline) {
-              deadlineData[review.reviewName] = review.deadline;
-              console.log(`📅 Deadline for ${review.reviewName}:`, review.deadline);
-            }
-          });
+        mappedTeams = guideProjects.map(project => {
+          console.log(`📋 [fetchData] Processing project: ${project.name}`);
           
-          setDeadlines(deadlineData);
+          // ✅ FIXED: Normalize all student data
+          const normalizedStudents = project.students.map(student => normalizeStudentData(student));
           
-          const filteredSchema = {
-            ...markingSchemaData,
-            reviews: filteredReviews
+          return {
+            id: project._id,
+            title: project.name,
+            description: `Guide: ${project.guideFaculty?.name || 'N/A'}`,
+            students: normalizedStudents, // ✅ Use normalized students
+            markingSchema: project.markingSchema,
+            school: project.school,
+            department: project.department,
+            pptApproved: project.pptApproved || { approved: false, locked: false },
+            guideFaculty: project.guideFaculty
           };
-          setMarkingSchema(filteredSchema);
+        });
 
-          if (mappedTeams.length > 0) {
-            const reviewTypes = filteredReviews.map(r => r.reviewName);
-            const batchRequests = [];
-            mappedTeams.forEach(team => {
-              team.students.forEach(student => {
-                reviewTypes.forEach(reviewType => {
-                  batchRequests.push({
-                    regNo: student.regNo,
-                    reviewType,
-                    facultyType: 'guide'
-                  });
+        setTeams(mappedTeams);
+        console.log('✅ [fetchData] Teams set successfully:', mappedTeams.length);
+
+        if (mappedTeams.length > 0) {
+          const batchRequests = [];
+          
+          mappedTeams.forEach(team => {
+            const reviewTypes = getReviewTypes(team.markingSchema);
+            team.students.forEach(student => {
+              reviewTypes.forEach(reviewType => {
+                batchRequests.push({
+                  regNo: student.regNo,
+                  reviewType: reviewType.key,
+                  facultyType: 'guide'
                 });
               });
             });
-            
-            console.log('🔍 Fetching request statuses for', batchRequests.length, 'requests');
-            const statuses = await batchCheckRequestStatuses(batchRequests);
-            console.log('✅ Request statuses received:', statuses);
-            setRequestStatuses(statuses);
-          }
+          });
+
+          console.log('🔍 [fetchData] Fetching request statuses for', batchRequests.length, 'requests');
+          const statuses = await batchCheckRequestStatuses(batchRequests);
+          setRequestStatuses(statuses);
         }
-      } else {
-        console.log('⚠️ No marking schema found, using defaults');
-        setDeadlines({});
-        setMarkingSchema(null);
       }
-      
-      console.log('✅ GUIDE FETCH DATA COMPLETED');
+
+      console.log('✅ [fetchData] GUIDE FETCH DATA COMPLETED');
     } catch (error) {
-      console.error('❌ Error fetching guide data:', error);
+      console.error('❌ [fetchData] Error fetching guide data:', error);
       setError('Failed to load guide data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ NEW: Refresh function for status updates
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      console.log('=== GUIDE REFRESH STARTED ===');
-      
-      if (teams.length > 0 && markingSchema) {
-        const reviewTypes = markingSchema.reviews?.map(r => r.reviewName) || ['draftReview', 'review0', 'review1'];
-        const batchRequests = [];
-        
-        teams.forEach(team => {
-          team.students.forEach(student => {
-            reviewTypes.forEach(reviewType => {
-              batchRequests.push({
-                regNo: student.regNo,
-                reviewType,
-                facultyType: 'guide'
-              });
-            });
-          });
-        });
-        
-        console.log('🔄 Refreshing request statuses for', batchRequests.length, 'requests');
-        const statuses = await batchCheckRequestStatuses(batchRequests);
-        console.log('✅ Updated request statuses:', statuses);
-        setRequestStatuses(statuses);
-        
-        // Also refresh project data to get latest deadlines
-        await fetchData();
-        
-        console.log('✅ GUIDE REFRESH COMPLETED');
-      }
+      await fetchData();
     } catch (error) {
-      console.error('❌ Error refreshing guide data:', error);
+      console.error('❌ [handleRefresh] Error refreshing guide data:', error);
     } finally {
       setRefreshing(false);
     }
-  };
-
-  // ✅ FIXED: Only use individual overrides for reviews that have approved requests
-  const isTeamDeadlinePassed = (reviewType, teamId) => {
-    console.log(`=== DEADLINE CHECK FOR ${reviewType} (Request-Based Override) ===`);
-    
-    const team = teams.find(t => t.id === teamId);
-    if (!team) {
-      console.log('❌ Team not found');
-      return false;
-    }
-    
-    const now = new Date();
-    const currentIST = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-    console.log(`⏰ Current IST time: ${currentIST.toISOString()} (${currentIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
-    
-    // ✅ FIXED: Only check individual overrides for reviews with APPROVED requests
-    const teamRequestStatus = getTeamRequestStatus(team, reviewType);
-    console.log(`📝 Team request status for ${reviewType}: ${teamRequestStatus}`);
-    
-    if (teamRequestStatus === 'approved') {
-      console.log(`🔑 REQUEST APPROVED - Checking individual overrides for ${reviewType}`);
-      
-      const studentsWithSpecificOverride = team.students.filter(student => 
-        student.deadline && student.deadline[reviewType]
-      );
-      
-      if (studentsWithSpecificOverride.length > 0) {
-        console.log(`👥 Found ${studentsWithSpecificOverride.length} students with APPROVED ${reviewType} individual overrides`);
-        
-        const specificReviewDeadlines = studentsWithSpecificOverride.map(student => {
-          try {
-            const deadline = new Date(student.deadline[reviewType].to);
-            const deadlineIST = new Date(deadline.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-            console.log(`👤 Student ${student.name} ${reviewType} APPROVED INDIVIDUAL deadline: ${deadlineIST.toISOString()} (${deadlineIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
-            return deadlineIST;
-          } catch (e) {
-            console.error(`Error parsing ${reviewType} deadline for ${student.name}:`, e);
-            return null;
-          }
-        }).filter(date => date !== null);
-        
-        if (specificReviewDeadlines.length > 0) {
-          const latestSpecificDeadline = new Date(Math.max(...specificReviewDeadlines));
-          console.log(`📅 LATEST APPROVED INDIVIDUAL ${reviewType} deadline: ${latestSpecificDeadline.toISOString()} (${latestSpecificDeadline.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
-          
-          const isPassed = currentIST > latestSpecificDeadline;
-          console.log(`✅ ${reviewType} APPROVED INDIVIDUAL deadline passed: ${isPassed}`);
-          console.log(`🎯 USING APPROVED INDIVIDUAL OVERRIDE - IGNORING SYSTEM DEADLINE`);
-          return isPassed;
-        }
-      }
-    } else {
-      console.log(`❌ No approved request for ${reviewType} - Using system deadline only`);
-    }
-    
-    // ✅ Use system deadline (default behavior)
-    if (!deadlines || !deadlines[reviewType]) {
-      console.log(`❌ No system deadline found for ${reviewType}`);
-      console.log('Available system deadlines:', Object.keys(deadlines));
-      return false;
-    }
-    
-    const deadline = deadlines[reviewType];
-    console.log(`📅 System deadline for ${reviewType}:`, deadline);
-    
-    try {
-      if (deadline.from && deadline.to) {
-        const fromDate = new Date(deadline.from);
-        const toDate = new Date(deadline.to);
-        
-        const fromIST = new Date(fromDate.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-        const toIST = new Date(toDate.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-        
-        console.log(`📅 ${reviewType} System From IST: ${fromIST.toISOString()} (${fromIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
-        console.log(`📅 ${reviewType} System To IST: ${toIST.toISOString()} (${toIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
-        
-        const isAfterEnd = currentIST > toIST;
-        
-        console.log(`🔍 ${reviewType} SYSTEM deadline analysis:`);
-        console.log(`   - Current time: ${currentIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
-        console.log(`   - System end time: ${toIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
-        console.log(`   - Is system deadline passed: ${isAfterEnd}`);
-        console.log(`🎯 USING SYSTEM DEADLINE`);
-        
-        return isAfterEnd;
-      } else if (typeof deadline === 'string' || deadline instanceof Date) {
-        const deadlineDate = new Date(deadline);
-        const deadlineIST = new Date(deadlineDate.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-        
-        console.log(`📅 ${reviewType} single system deadline IST: ${deadlineIST.toISOString()} (${deadlineIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`);
-        
-        const isPassed = currentIST > deadlineIST;
-        console.log(`✅ ${reviewType} single system deadline passed: ${isPassed}`);
-        console.log(`🎯 USING SYSTEM DEADLINE`);
-        return isPassed;
-      }
-    } catch (dateError) {
-      console.error(`❌ Error parsing ${reviewType} deadline dates:`, dateError);
-      console.error('Deadline object:', deadline);
-      return false;
-    }
-    
-    console.log(`❌ Invalid deadline format for ${reviewType}`);
-    return false;
-  };
-
-  const isReviewLocked = (student, reviewType, teamId) => {
-    console.log(`=== REVIEW LOCK CHECK FOR ${student.name} ${reviewType} ===`);
-    
-    // Check manual lock first
-    const reviewData = student.reviews?.get ? student.reviews.get(reviewType) : student[reviewType];
-    if (reviewData?.locked) {
-      console.log(`🔒 Student ${student.name} ${reviewType} is manually locked`);
-      return true;
-    }
-    
-    // Check deadline-based lock (now uses request-based individual override logic)
-    const teamDeadlinePassed = isTeamDeadlinePassed(reviewType, teamId);
-    console.log(`⏰ Team ${reviewType} deadline passed (request-based): ${teamDeadlinePassed}`);
-    
-    return teamDeadlinePassed;
   };
 
   const getTeamRequestStatus = (team, reviewType) => {
@@ -296,7 +188,8 @@ const Guide = () => {
     
     const statuses = team.students.map(student => {
       const requestKey = `${student.regNo}_${reviewType}`;
-      return requestStatuses[requestKey]?.status || 'none';
+      const status = requestStatuses[requestKey]?.status || 'none';
+      return status;
     });
     
     if (statuses.includes('pending')) return 'pending';
@@ -304,27 +197,81 @@ const Guide = () => {
     return 'none';
   };
 
+  const isTeamDeadlinePassed = (reviewType, teamId) => {
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return false;
+
+    const teamDeadlines = getDeadlines(team.markingSchema);
+    if (!teamDeadlines || !teamDeadlines[reviewType]) {
+      return false;
+    }
+
+    const deadline = teamDeadlines[reviewType];
+    const now = new Date();
+    
+    try {
+      if (deadline.from && deadline.to) {
+        const toDate = new Date(deadline.to);
+        return now > toDate;
+      } else if (typeof deadline === 'string' || deadline instanceof Date) {
+        const deadlineDate = new Date(deadline);
+        return now > deadlineDate;
+      }
+    } catch (dateError) {
+      console.error('❌ Error parsing deadline:', dateError);
+      return false;
+    }
+    
+    return false;
+  };
+
+  const isReviewLocked = (student, reviewType, teamId) => {
+    const reviewData = student.reviews?.get ? student.reviews.get(reviewType) : student.reviews?.[reviewType];
+    if (reviewData?.locked) {
+      return true;
+    }
+    
+    const deadlinePassed = isTeamDeadlinePassed(reviewType, teamId);
+    return deadlinePassed;
+  };
+
   const handleReviewSubmit = async (teamId, reviewType, reviewData, pptObj) => {
     try {
+      console.log('=== [FRONTEND] GUIDE REVIEW SUBMIT STARTED ===');
+      
       const team = teams.find(t => t.id === teamId);
-      if (!team) return;
+      if (!team) {
+        console.error('❌ [FRONTEND] Team not found for ID:', teamId);
+        alert('Team not found! Please refresh and try again.');
+        return;
+      }
 
-      console.log('=== GUIDE REVIEW SUBMIT TO BACKEND ===');
-      const reviewConfig = markingSchema?.reviews?.find(r => r.reviewName === reviewType);
+      console.log('✅ [FRONTEND] Team found:', team.title);
+      console.log('📋 [FRONTEND] Review Type:', reviewType);
+      console.log('📋 [FRONTEND] Raw Review Data from popup:', reviewData);
+      
+      const reviewTypes = getReviewTypes(team.markingSchema);
+      const reviewConfig = reviewTypes.find(r => r.key === reviewType);
+      
+      if (!reviewConfig) {
+        console.error('❌ [FRONTEND] Review config not found for type:', reviewType);
+        alert('Review configuration not found! Please refresh and try again.');
+        return;
+      }
 
       const studentUpdates = team.students.map(student => {
-        const studentReviewData = reviewData[student.regNo] || {};
+        console.log(`🎓 [FRONTEND] Processing student: ${student.name} (${student.regNo})`);
         
+        const studentReviewData = reviewData[student.regNo] || {};
+        console.log(`📊 [FRONTEND] Student review data for ${student.name}:`, studentReviewData);
+        
+        // Build marks object using component names from schema
         const marks = {};
-        if (reviewConfig && reviewConfig.components) {
+        if (reviewConfig.components && reviewConfig.components.length > 0) {
           reviewConfig.components.forEach(comp => {
-            marks[comp.name] = studentReviewData[comp.name] || 0;
-          });
-        } else {
-          Object.keys(studentReviewData).forEach(key => {
-            if (key !== 'comments' && key !== 'attendance' && key !== 'locked') {
-              marks[key] = studentReviewData[key] || 0;
-            }
+            const markValue = Number(studentReviewData[comp.name]) || 0;
+            marks[comp.name] = markValue;
+            console.log(`📊 [FRONTEND] Component ${comp.name}: ${markValue} for ${student.name}`);
           });
         }
 
@@ -356,27 +303,40 @@ const Guide = () => {
         updatePayload.pptApproved = pptObj.pptApproved;
       }
 
+      console.log('📤 [FRONTEND] Final update payload:', JSON.stringify(updatePayload, null, 2));
+      
       const response = await updateProject(updatePayload);
+      console.log('📨 [FRONTEND] Backend response received:', response);
       
       if (response.data?.success || response.data?.updates) {
         setActivePopup(null);
+        
         setTimeout(async () => {
           await fetchData();
           alert('Guide review submitted and saved successfully!');
-        }, 1000);
+        }, 300);
+        
+      } else {
+        console.error('❌ [FRONTEND] Backend response indicates failure:', response.data);
+        alert('Review submission failed. Please try again.');
       }
     } catch (error) {
-      console.error('❌ Error submitting guide review to backend:', error);
-      alert('Error submitting guide review. Please try again.');
+      console.error('❌ [FRONTEND] Critical error during submission:', error);
+      alert(`Error submitting review: ${error.message}`);
     }
   };
 
   const handleRequestEdit = async (teamId, reviewType) => {
     try {
-      console.log(`=== HANDLING REQUEST EDIT FOR ${reviewType} ===`);
-      
       const team = teams.find(t => t.id === teamId);
       if (!team) return;
+
+      const currentRequestStatus = getTeamRequestStatus(team, reviewType);
+      
+      if (currentRequestStatus === 'pending') {
+        alert('There is already a pending request for this review. Please wait for approval.');
+        return;
+      }
       
       const reason = prompt('Please enter the reason for requesting edit access:', 'Need to correct marks after deadline');
       if (!reason?.trim()) return;
@@ -387,30 +347,11 @@ const Guide = () => {
         reason: reason.trim()
       };
       
-      console.log('🚀 Sending request:', requestData);
-      
       const response = await createReviewRequest('guide', requestData);
       
       if (response.success) {
         alert('Edit request submitted successfully!');
-        
-        const reviewTypes = markingSchema?.reviews?.map(r => r.reviewName) || ['draftReview', 'review0', 'review1'];
-        const batchRequests = [];
-        
-        teams.forEach(team => {
-          team.students.forEach(student => {
-            reviewTypes.forEach(reviewType => {
-              batchRequests.push({
-                regNo: student.regNo,
-                reviewType,
-                facultyType: 'guide'
-              });
-            });
-          });
-        });
-        
-        const statuses = await batchCheckRequestStatuses(batchRequests);
-        setRequestStatuses(statuses);
+        await handleRefresh();
       } else {
         alert(response.message || 'Error submitting request');
       }
@@ -420,38 +361,8 @@ const Guide = () => {
     }
   };
 
-  const getReviewTypes = () => {
-    if (markingSchema && markingSchema.reviews) {
-      return markingSchema.reviews.map(review => ({
-        key: review.reviewName,
-        name: getReviewDisplayName(review.reviewName),
-        components: review.components,
-        requiresPPT: review.requiresPPT || false
-      }));
-    }
-    return [
-      { key: 'draftReview', name: 'Draft Review', components: [], requiresPPT: false },
-      { key: 'review0', name: 'Review 0', components: [], requiresPPT: false },
-      { key: 'review1', name: 'Review 1', components: [], requiresPPT: false }
-    ];
-  };
-
-  const getReviewDisplayName = (reviewName) => {
-    const nameMap = {
-      'draftReview': 'Draft Review',
-      'review0': 'Review 0',
-      'review1': 'Review 1'
-    };
-    return nameMap[reviewName] || reviewName;
-  };
-
   const getButtonColor = (reviewType) => {
-    const colorMap = {
-      'draftReview': 'bg-orange-500 hover:bg-orange-600',
-      'review0': 'bg-green-500 hover:bg-green-600',
-      'review1': 'bg-red-500 hover:bg-red-600',
-    };
-    return colorMap[reviewType] || 'bg-gray-500 hover:bg-gray-600';
+    return 'bg-blue-500 hover:bg-blue-600';
   };
 
   if (loading) {
@@ -488,8 +399,6 @@ const Guide = () => {
     );
   }
 
-  const reviewTypes = getReviewTypes();
-
   return (
     <>
       <Navbar userType="faculty" />
@@ -497,18 +406,9 @@ const Guide = () => {
         <div className='p-24 items-center'>
           <div className='flex justify-between items-center mb-4'>
             <div>
-              <h1 className="text-3xl font-bold text-gray-800  ">Guide Dashboard</h1>
-              {/* {markingSchema && (
-                <p className="text-sm text-blue-600 mt-1">
-                  Marking Schema: {markingSchema.reviews?.length || 0} guide review types configured
-                </p>
-              )}
-              <p className="text-xs text-gray-500 mt-1">
-                Current IST: {new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-              </p> */}
+              <h1 className="text-3xl font-bold text-gray-800">Guide Dashboard</h1>
             </div>
             
-            {/* ✅ NEW: Refresh Button */}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -517,7 +417,6 @@ const Guide = () => {
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-blue-600 hover:bg-blue-700'
               }`}
-              title="Refresh request statuses and data"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               {refreshing ? 'Refreshing...' : 'Refresh Status'}
@@ -535,128 +434,123 @@ const Guide = () => {
                 <p className="text-sm">Projects you guide will appear here</p>
               </div>
             ) : (
-              teams.map(team => (
-                <div key={team.id} className="bg-white rounded-lg shadow-sm mb-4">
-                  <div className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
-                            className="flex items-center"
-                          >
-                            <span className={`inline-block transition-transform duration-200 ${
-                              expandedTeam === team.id ? 'rotate-90' : ''
-                            }`}>
-                              <ChevronRight />
-                            </span>
-                            <span className="font-medium text-black">{team.title}</span>
-                          </button>
+              teams.map(team => {
+                const reviewTypes = getReviewTypes(team.markingSchema);
+                const deadlines = getDeadlines(team.markingSchema);
+
+                if (!reviewTypes.length) {
+                  return (
+                    <div key={team.id} className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                      <div className="flex items-center">
+                        <div className="text-yellow-800">
+                          <p className="font-medium">{team.title}</p>
+                          <p className="text-sm">No marking schema configured for this project</p>
                         </div>
-                        <p className="text-sm text-gray-600 ml-6">{team.description}</p>
-                        <p className="text-xs text-blue-600 ml-6">
-                          {team.students.length} student{team.students.length !== 1 ? 's' : ''}
-                        </p>
-                        {/* ✅ FIXED: Show proper request-based override status */}
-                        <div className="text-xs text-gray-500 ml-6">
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={team.id} className="bg-white rounded-lg shadow-sm mb-4">
+                    <div className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
+                              className="flex items-center"
+                            >
+                              <span className={`inline-block transition-transform duration-200 ${
+                                expandedTeam === team.id ? 'rotate-90' : ''
+                              }`}>
+                                <ChevronRight />
+                              </span>
+                              <span className="font-medium text-black">{team.title}</span>
+                            </button>
+                          </div>
+                          <p className="text-sm text-gray-600 ml-6">{team.description}</p>
+                          <p className="text-xs text-blue-600 ml-6">
+                            {team.students.length} student{team.students.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        
+                        <div className="flex gap-2 flex-wrap">
                           {reviewTypes.map(reviewType => {
                             const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
                             const requestStatus = getTeamRequestStatus(team, reviewType.key);
                             
                             return (
-                              <span key={reviewType.key} className="mr-4">
-                                {reviewType.name}: 
-                                <span className={isPassed ? 'text-red-600 font-bold' : 'text-green-600'}>
-                                  {isPassed ? 'DEADLINE PASSED' : 'Active'}
-                                </span>
+                              <button
+                                key={reviewType.key}
+                                onClick={() => setActivePopup({ 
+                                  type: reviewType.key, 
+                                  teamId: team.id,
+                                  teamTitle: team.title,
+                                  students: team.students,
+                                  markingSchema: team.markingSchema
+                                })}
+                                className={`px-4 py-2 text-white text-sm rounded transition-colors ${getButtonColor(reviewType.key)} ${
+                                  isPassed ? 'opacity-75' : ''
+                                }`}
+                              >
+                                {reviewType.name}
+                                {reviewType.requiresPPT && (
+                                  <span className="ml-1 text-xs bg-white bg-opacity-20 px-1 rounded">PPT</span>
+                                )}
                                 {requestStatus === 'approved' && (
-                                  <span className="text-purple-600 text-xs"> (extended)</span>
+                                  <span className="ml-1 text-xs bg-purple-500 px-1 rounded">EXT</span>
                                 )}
-                                {requestStatus !== 'none' && requestStatus !== 'approved' && (
-                                  <span className="text-blue-600"> ({requestStatus})</span>
+                                {isPassed && (
+                                  <span className="ml-1 text-xs bg-red-500 px-1 rounded">🔒</span>
                                 )}
-                              </span>
+                              </button>
                             );
                           })}
                         </div>
                       </div>
                       
-                      <div className="flex gap-2 flex-wrap">
-                        {reviewTypes.map(reviewType => {
-                          const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
-                          const requestStatus = getTeamRequestStatus(team, reviewType.key);
-                          
-                          return (
-                            <button
-                              key={reviewType.key}
-                              onClick={() => setActivePopup({ type: reviewType.key, teamId: team.id })}
-                              className={`px-4 py-2 text-white text-sm rounded transition-colors ${getButtonColor(reviewType.key)} ${
-                                isPassed ? 'opacity-75' : ''
-                              }`}
-                              title={`${reviewType.components?.length || 0} components${
-                                requestStatus === 'approved' ? ' | Extended by Admin' : ''
-                              }${isPassed ? ' | DEADLINE PASSED' : ''}`}
-                            >
-                              {reviewType.name}
-                              {reviewType.requiresPPT && (
-                                <span className="ml-1 text-xs bg-white bg-opacity-20 px-1 rounded">PPT</span>
-                              )}
-                              {requestStatus === 'approved' && (
-                                <span className="ml-1 text-xs bg-purple-500 px-1 rounded">EXT</span>
-                              )}
-                              {isPassed && (
-                                <span className="ml-1 text-xs bg-red-500 px-1 rounded">🔒</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      {expandedTeam === team.id && (
+                        <ReviewTable 
+                          team={team} 
+                          deadlines={deadlines}
+                          requestStatuses={requestStatuses}
+                          isDeadlinePassed={(reviewType) => isTeamDeadlinePassed(reviewType, team.id)}
+                          isReviewLocked={(student, reviewType) => isReviewLocked(student, reviewType, team.id)}
+                          markingSchema={team.markingSchema}
+                          panelMode={false}
+                        />
+                      )}
                     </div>
-                    
-                    {expandedTeam === team.id && (
-                      <ReviewTable 
-                        team={team} 
-                        deadlines={deadlines}
-                        requestStatuses={requestStatuses}
-                        isDeadlinePassed={(reviewType) => isTeamDeadlinePassed(reviewType, team.id)}
-                        isReviewLocked={(student, reviewType) => isReviewLocked(student, reviewType, team.id)}
-                        markingSchema={markingSchema}
-                        panelMode={false}
-                      />
-                    )}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
-          {/* ✅ FIXED: Popup with request-based override logic */}
           {activePopup && (() => {
             const team = teams.find(t => t.id === activePopup.teamId);
+            const reviewTypes = getReviewTypes(team.markingSchema);
             const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
             const requestStatus = getTeamRequestStatus(team, activePopup.type);
             
-            console.log(`=== POPUP RENDER DEBUG (Request-Based Override) ===`);
-            console.log(`Review type: ${activePopup.type}`);
-            console.log(`Is locked: ${isLocked}`);
-            console.log(`Request status: ${requestStatus}`);
-            console.log(`Request edit visible: ${isLocked && requestStatus === 'none'}`);
+            const showRequestEdit = isLocked && (requestStatus === 'none' || requestStatus === 'rejected');
             
             return (
               <PopupReview
-                title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} Review`}
-                teamMembers={team.students}
+                title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
+                teamMembers={activePopup.students}
                 reviewType={activePopup.type}
                 isOpen={true}
                 locked={isLocked}
+                markingSchema={activePopup.markingSchema}
                 onClose={() => setActivePopup(null)}
                 onSubmit={(data, pptObj) => {
                   handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj);
                 }}
                 onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
-                requestEditVisible={isLocked && requestStatus === 'none'}
+                requestEditVisible={showRequestEdit}
                 requestPending={requestStatus === 'pending'}
-                markingSchema={markingSchema}
                 requiresPPT={reviewTypes.find(r => r.key === activePopup.type)?.requiresPPT || false}
               />
             );

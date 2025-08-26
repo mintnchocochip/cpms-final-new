@@ -9,113 +9,19 @@ export const useAdminContext = () => {
 
   const SESSION_STORAGE_KEY = 'adminContext';
 
-  const schoolsData = {
-    'SCOPE': {
-      fullName: 'School of Computer Science and Engineering',
-      code: 'SCOPE'
-    },
-    'SELECT': {
-      fullName: 'School of Electrical Engineering',
-      code: 'SELECT'
-    },
-    'SENSE': {
-      fullName: 'School of Electronics Engineering',
-      code: 'SENSE'
-    },
-    'SSL': {
-      fullName: 'School of Business',
-      code: 'SSL'
-    },
-    'SAS': {
-      fullName: 'School of Advanced Sciences',
-      code: 'SAS'
-    },
-    'SMEC': {
-      fullName: 'School of Mechanical Engineering',
-      code: 'SMEC'
-    },
-    'SCE': {
-      fullName: 'School of Civil Engineering',
-      code: 'SCE'
-    }
-  };
-
-  const departmentsBySchool = {
-    'SCOPE': [
-      'B.Tech. Computer Science and Engineering',
-      'B.Tech. Computer Science and Engineering (Artificial Intelligence and Machine Learning)',
-      'B.Tech. Computer Science and Engineering (Cyber Physical Systems)',
-      'B.Tech. Computer Science and Engineering (Artificial Intelligence and Robotics)',
-      'B.Tech. Computer Science and Engineering (Data Science)',
-      'B.Tech. Computer Science and Engineering (Cyber Security)',
-      'B.Sc. Computer Science',
-    ],
-    'SELECT': [
-      'B.Tech. Electrical and Electronics Engineering',
-      'B.Tech. Electrical and Computer Science Engineering',
-    ],
-    'SENSE': [
-      'B. Tech in Electronics and Communication Engineering',
-      'B. Tech in Electronics and Computer Engineering',
-      'B. Tech in Electronics Engineering (VLSI Design and Technology)',
-    ],
-    'SSL': [
-      'BBA',
-      'MBA',
-      'MBA with Business Analytics',
-      'MBA with Digital Marketing',
-      'BBA with Digital Marketing',
-      'BBA with International Business'
-    ],
-    'SAS': [
-      'BSc Mathematics',
-      'BSc Physics',
-      'BSc Chemistry',
-      'BSc Statistics',
-      'MSc Mathematics',
-      'MSc Physics',
-      'MSc Applied Mathematics'
-    ],
-    'SMEC': [
-      'B.Tech. Mechanical Engineering',
-      'B.Tech. Mechatronics and Automation',
-      'B.Tech. Mechanical Engineering (Electric Vehicles)',
-    ],
-    'SCE': [
-      'B.Tech Civil Engineering',
-      'B.Tech Civil Engineering(In Collaboration with L & T)',
-    ]
-  };
-
+  // Simplified validation - only check structure, not content
   const validateContext = useCallback((contextData) => {
     if (!contextData || typeof contextData !== 'object') {
       return false;
     }
 
-    const { school, department } = contextData;
-    
-    if (!school || typeof school !== 'string' || school.trim().length === 0) {
-      return false;
-    }
-    
-    if (!department || typeof department !== 'string' || department.trim().length === 0) {
-      return false;
+    // Allow super admin mode
+    if (contextData.skipped === true) {
+      return true;
     }
 
-    const validSchools = Object.keys(schoolsData);
-    
-    if (!validSchools.includes(school)) {
-      console.log(`Invalid school: ${school}. Valid schools:`, validSchools);
-      return false;
-    }
-
-    const validDepartments = departmentsBySchool[school] || [];
-    if (!validDepartments.includes(department)) {
-      console.log(`Invalid department: ${department} for school: ${school}. Valid departments:`, validDepartments);
-      return false;
-    }
-
-    return true;
+    // Simple structure check
+    return Boolean(contextData.school && contextData.department);
   }, []);
 
   const getContext = useCallback(() => {
@@ -126,7 +32,7 @@ export const useAdminContext = () => {
         if (validateContext(parsed)) {
           return parsed;
         } else {
-          console.log('Invalid context in sessionStorage:', parsed);
+          console.log('Invalid context structure in sessionStorage:', parsed);
         }
       }
       return null;
@@ -160,7 +66,6 @@ export const useAdminContext = () => {
     }
   }, [validateContext]);
 
-  // ✅ FIX: Enable clearContext function
   const clearContext = useCallback(() => {
     try {
       sessionStorage.removeItem(SESSION_STORAGE_KEY);
@@ -183,17 +88,12 @@ export const useAdminContext = () => {
     return !!(token && role === 'admin');
   }, []);
 
-  // Initialize context on hook mount
+  // Initialize context without automatic redirects
   useEffect(() => {
     const initializeContext = async () => {
       try {
         setLoading(true);
         setError(null);
-
-        if (!isValidAdmin()) {
-          navigate('/admin/login');
-          return;
-        }
 
         const existingContext = getContext();
         
@@ -201,20 +101,18 @@ export const useAdminContext = () => {
           console.log('Found existing valid context:', existingContext);
           setContextState(existingContext);
         } else {
-          console.log('No valid context found, redirecting to selection');
-          redirectToSelection();
+          console.log('No valid context found');
         }
       } catch (error) {
         console.error('Error initializing admin context:', error);
         setError('Failed to initialize admin context');
-        redirectToSelection();
       } finally {
         setLoading(false);
       }
     };
 
     initializeContext();
-  }, [getContext, isValidAdmin, navigate, redirectToSelection]);
+  }, [getContext]);
 
   const refreshContext = useCallback(() => {
     const currentContext = getContext();
@@ -232,18 +130,10 @@ export const useAdminContext = () => {
   const getDisplayString = useCallback(() => {
     if (!context) return 'No context selected';
     
-    const schoolName = schoolsData[context.school]?.fullName || context.school;
-    return `${schoolName} - ${context.department}`;
-  }, [context]);
-
-  const getSchoolFullName = useCallback(() => {
-    if (!context?.school) return '';
-    return schoolsData[context.school]?.fullName || context.school;
-  }, [context]);
-
-  const getAvailableDepartments = useCallback(() => {
-    if (!context?.school) return [];
-    return departmentsBySchool[context.school] || [];
+    // Handle skipped context
+    if (context.skipped) return 'All Schools (Super Admin)';
+    
+    return `${context.school} - ${context.department}`;
   }, [context]);
 
   return {
@@ -255,7 +145,7 @@ export const useAdminContext = () => {
     // Methods
     getContext,
     setContext,
-    clearContext, // ✅ Now works properly
+    clearContext,
     refreshContext,
     updateContext,
     redirectToSelection,
@@ -264,19 +154,13 @@ export const useAdminContext = () => {
     validateContext,
     isValidAdmin,
     getDisplayString,
-    getSchoolFullName,
-    getAvailableDepartments,
     
     // Computed values
     isContextValid: !!context,
     hasContext: !!context,
     school: context?.school || null,
     department: context?.department || null,
-    schoolFullName: context?.school ? (schoolsData[context.school]?.fullName || context.school) : null,
-    
-    // Data references
-    schoolsData,
-    departmentsBySchool
+    specialization: context?.specialization || []
   };
 };
 

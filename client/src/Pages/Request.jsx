@@ -2,13 +2,11 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../Components/UniversalNavbar";
 import { FaCheck, FaTimes, FaUser, FaClock, FaGraduationCap } from "react-icons/fa";
-import { ChevronRight, ChevronDown, Users, FileText, Calendar, Building2 } from "lucide-react";
+import { ChevronRight, ChevronDown, Users, FileText, Calendar } from "lucide-react";
 import { fetchRequests, updateRequestStatus } from "../api";
-import { useAdminContext } from "../hooks/useAdminContext";
 
 const RequestPage = () => {
   const navigate = useNavigate();
-  const { school, department, getDisplayString, clearContext, loading: contextLoading, error: contextError } = useAdminContext();
   const [facultyType, setFacultyType] = useState("panel");
   const [requests, setRequests] = useState([]);
   const [expanded, setExpanded] = useState({});
@@ -17,37 +15,36 @@ const RequestPage = () => {
   const [approvingRequestId, setApprovingRequestId] = useState(null);
   const [selectedDeadline, setSelectedDeadline] = useState("");
 
-  // ✅ Add this useEffect to handle missing admin context
+  // Check authentication
   useEffect(() => {
-    if (!contextLoading && (!school || !department)) {
-      console.log("Admin context missing, redirecting to school selection");
-      navigate("/admin/school-selection");
-    }
-  }, [contextLoading, school, department, navigate]);
-
-  const fetchRequestsByType = async (type) => {
-    if (!school || !department) {
-      setLoading(false);
+    const token = sessionStorage.getItem('token');
+    const role = sessionStorage.getItem('role');
+    
+    if (!token || role !== 'admin') {
+      console.log('Not authenticated as admin, redirecting to login');
+      navigate('/admin/login');
       return;
     }
+  }, [navigate]);
 
+  const fetchRequestsByType = async (type) => {
     setLoading(true);
     setError("");
     try {
-      console.log(`=== FETCHING ${type.toUpperCase()} REQUESTS ===`);
-      console.log(`School: ${school}, Department: ${department}`);
+      console.log(`=== FETCHING ${type.toUpperCase()} REQUESTS (ALL MODE) ===`);
       
-      const { data, error: apiError } = await fetchRequests(type, school, department);
+      // Pass null for school and department to get all requests
+      const { data, error: apiError } = await fetchRequests(type, null, null);
       
       console.log('API Response:', { data, apiError });
       
-      // ✅ UPDATED: Handle "no requests found" as a normal state, not an error
+      // Handle "no requests found" as a normal state, not an error
       if (apiError) {
         // Check if it's specifically a "no requests found" message
         if (apiError.includes("No requests found") || apiError.includes("not found")) {
           console.log('No requests found - this is normal, not an error');
           setRequests([]);
-          setError(""); // ✅ Don't set this as an error
+          setError(""); // Don't set this as an error
         } else {
           // This is an actual error (server error, network error, etc.)
           console.error('Actual API error:', apiError);
@@ -76,7 +73,7 @@ const RequestPage = () => {
         setError("");
       }
     } catch (err) {
-      // ✅ UPDATED: Better error handling for different types of errors
+      // Better error handling for different types of errors
       console.error("Error in fetchRequestsByType:", err);
       
       // Check if it's a 404 error (no requests found)
@@ -95,10 +92,8 @@ const RequestPage = () => {
   };
 
   useEffect(() => {
-    if (school && department) {
-      fetchRequestsByType(facultyType);
-    }
-  }, [facultyType, school, department]);
+    fetchRequestsByType(facultyType);
+  }, [facultyType]);
 
   const toggleExpand = (facultyId) => {
     setExpanded((prev) => ({ ...prev, [facultyId]: !prev[facultyId] }));
@@ -129,10 +124,7 @@ const RequestPage = () => {
     setApprovingRequestId(null);
     setSelectedDeadline("");
   };
-  const handleChangeSchoolDepartment = () => {
-    sessionStorage.removeItem("adminContext");
-    window.location.reload(); 
-  };
+
   const handleSubmitApproval = async () => {
     if (!approvingRequestId || !selectedDeadline) return;
 
@@ -184,349 +176,299 @@ const RequestPage = () => {
     }
   };
 
-  // ✅ Handle context loading state
-  if (contextLoading) {
-    return (
-      <>
-        <Navbar showLeftMenu={true} />
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 overflow-x-hidden">
-          <div className="pl-40 pt-20 w-[calc(100%-10rem)]">
-            <div className="p-6 md:p-10">
-              <div className="bg-white/80 backdrop-blur-sm shadow-xl rounded-2xl border border-white/20 p-8">
-                <div className="flex flex-col items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                  <p className="text-gray-600 text-lg">Loading admin context...</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ✅ Handle context error state
-  if (contextError || !school || !department) {
-    return (
-      <>
-        <Navbar showLeftMenu={true} />
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 overflow-x-hidden">
-          <div className="pl-40 pt-20 w-[calc(100%-10rem)]">
-            <div className="p-6 md:p-10">
-              <div className="bg-white/80 backdrop-blur-sm shadow-xl rounded-2xl border border-white/20 p-8">
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <FaTimes className="w-8 h-8 text-red-600" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Admin Context Required</h2>
-                  <p className="text-gray-600 mb-6">
-                    {contextError || "Please select your school and department to view requests"}
-                  </p>
-                  <button
-                    onClick={() => navigate("/admin/school-selection")}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
-                  >
-                    Select School & Department
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
   return (
-    <>
-      <Navbar showLeftMenu={true} />
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 overflow-x-hidden">
-        <div className="pl-40 pt-20 w-[calc(100%-10rem)]">
-          <div className="p-6 md:p-10">
-            {/* Header Section */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <FileText className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="font-bold text-3xl md:text-4xl text-gray-900 tracking-tight">
-                      Pending Requests
-                    </h1>
-                    <p className="text-gray-600 mt-1">
-                      Managing {getDisplayString()} requests
-                    </p>
-                  </div>
+    <div>
+      <Navbar userType="admin" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="container mx-auto px-4 pt-24 pb-8 max-w-7xl">
+
+          {/* Header Section */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <FileText className="w-6 h-6 text-white" />
                 </div>
-                
-                {/* Admin Context Display & Change Button */}
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-gray-200">
-                    <div className="flex items-center gap-2 text-sm text-gray-700">
-                      <Building2 className="h-4 w-4 text-blue-600" />
-                      <span className="font-medium">{getDisplayString()}</span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleChangeSchoolDepartment}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg"
-                  >
-                    Change Context
-                  </button>
+                <div>
+                  <h1 className="font-bold text-3xl md:text-4xl text-gray-900 tracking-tight">
+                    All Pending Requests
+                  </h1>
+                  <p className="text-gray-600 mt-1">
+                    Managing requests from all schools & departments
+                  </p>
                 </div>
               </div>
               
-              {/* Faculty Type Toggle */}
-              <div className="inline-flex bg-white rounded-xl p-1.5 shadow-md border border-gray-100">
-                <button
-                  onClick={() => setFacultyType("panel")}
-                  className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center gap-2 ${
-                    facultyType === "panel"
-                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md transform scale-105"
-                      : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                  }`}
-                >
-                  <Users size={16} />
-                  Panel Members
-                </button>
-                <button
-                  onClick={() => setFacultyType("guide")}
-                  className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center gap-2 ${
-                    facultyType === "guide"
-                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md transform scale-105"
-                      : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                  }`}
-                >
-                  <FaGraduationCap size={16} />
-                  Guides
-                </button>
+              {/* All Mode Indicator */}
+              <div className="flex items-center gap-4">
+                <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users className="h-4 w-4 text-amber-600" />
+                    <span className="text-sm font-medium text-amber-900">All Schools & Departments</span>
+                  </div>
+                  <div className="text-sm text-amber-700">Managing all requests across the institution</div>
+                </div>
               </div>
             </div>
+            
+            {/* Faculty Type Toggle */}
+            <div className="inline-flex bg-white rounded-xl p-1.5 shadow-md border border-gray-100">
+              <button
+                onClick={() => setFacultyType("panel")}
+                className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center gap-2 ${
+                  facultyType === "panel"
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md transform scale-105"
+                    : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                }`}
+              >
+                <Users size={16} />
+                Panel Members
+              </button>
+              <button
+                onClick={() => setFacultyType("guide")}
+                className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center gap-2 ${
+                  facultyType === "guide"
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md transform scale-105"
+                    : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                }`}
+              >
+                <FaGraduationCap size={16} />
+                Guides
+              </button>
+            </div>
+          </div>
 
-            {/* Main Content */}
-            <div className="bg-white/80 backdrop-blur-sm shadow-xl rounded-2xl border border-white/20">
-              {loading ? (
-                <div className="flex flex-col items-center justify-center py-20">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                  <p className="text-gray-600 text-lg">Loading {facultyType} requests...</p>
-                </div>
-              ) : error ? (
-                // ✅ UPDATED: Only show this for actual errors, not "no data found"
-                <div className="p-8">
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FaTimes className="w-6 h-6 text-red-600" />
-                    </div>
-                    <p className="text-red-800 font-medium text-lg mb-2">Error Loading Requests</p>
-                    <p className="text-red-600">{error}</p>
-                    <button
-                      onClick={() => fetchRequestsByType(facultyType)}
-                      className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200"
-                    >
-                      Retry
-                    </button>
+          {/* Main Content */}
+          <div className="bg-white/80 backdrop-blur-sm shadow-xl rounded-2xl border border-white/20">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                <p className="text-gray-600 text-lg">Loading {facultyType} requests...</p>
+              </div>
+            ) : error ? (
+              // Only show this for actual errors, not "no data found"
+              <div className="p-8">
+                <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FaTimes className="w-6 h-6 text-red-600" />
                   </div>
-                </div>
-              ) : requests.length === 0 ? (
-                // ✅ UPDATED: Enhanced empty state message
-                <div className="p-12 text-center">
-                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <FileText className="w-10 h-10 text-gray-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-700 mb-2">No Pending Requests</h3>
-                  <p className="text-gray-500 mb-4">
-                    There are no pending {facultyType} requests for {getDisplayString()} at the moment.
-                  </p>
-                  {/* <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
-                    <p className="text-blue-800 text-sm">
-                      <strong>This is normal!</strong> Requests will appear here when faculty members request 
-                      deadline extensions or review unlocks.
-                    </p>
-                  </div> */}
+                  <p className="text-red-800 font-medium text-lg mb-2">Error Loading Requests</p>
+                  <p className="text-red-600">{error}</p>
                   <button
                     onClick={() => fetchRequestsByType(facultyType)}
-                    className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center gap-2 mx-auto"
+                    className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
+                    Retry
                   </button>
                 </div>
-              ) : (
-                <div className="p-6 space-y-4">
-                  {requests.map((faculty, index) => (
-                    <div 
-                      key={faculty._id} 
-                      className="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 bg-white overflow-hidden"
+              </div>
+            ) : requests.length === 0 ? (
+              // Enhanced empty state message
+              <div className="p-12 text-center">
+                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <FileText className="w-10 h-10 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">No Pending Requests</h3>
+                <p className="text-gray-500 mb-4">
+                  There are no pending {facultyType} requests across all schools & departments at the moment.
+                </p>
+                <button
+                  onClick={() => fetchRequestsByType(facultyType)}
+                  className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center gap-2 mx-auto"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
+              </div>
+            ) : (
+              <div className="p-6 space-y-4">
+                {requests.map((faculty, index) => (
+                  <div 
+                    key={faculty._id} 
+                    className="border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 bg-white overflow-hidden"
+                  >
+                    <div
+                      className="cursor-pointer flex items-center justify-between p-6 bg-gradient-to-r from-gray-50 to-blue-50 hover:from-gray-100 hover:to-blue-100 transition-all duration-200"
+                      onClick={() => toggleExpand(faculty._id)}
                     >
-                      <div
-                        className="cursor-pointer flex items-center justify-between p-6 bg-gradient-to-r from-gray-50 to-blue-50 hover:from-gray-100 hover:to-blue-100 transition-all duration-200"
-                        onClick={() => toggleExpand(faculty._id)}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center justify-center w-10 h-10 bg-white rounded-lg shadow-sm">
-                            {expanded[faculty._id] ? (
-                              <ChevronDown size={20} className="text-gray-600" />
-                            ) : (
-                              <ChevronRight size={20} className="text-gray-600" />
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center w-10 h-10 bg-white rounded-lg shadow-sm">
+                          {expanded[faculty._id] ? (
+                            <ChevronDown size={20} className="text-gray-600" />
+                          ) : (
+                            <ChevronRight size={20} className="text-gray-600" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-3 mb-1">
+                            <FaUser className="text-blue-600" size={16} />
+                            <h2 className="font-bold text-xl text-gray-800">
+                              {faculty.name}
+                            </h2>
+                            {faculty.empId && (
+                              <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                                ID: {faculty.empId}
+                              </span>
+                            )}
+                            {/* Display faculty's school and department if available */}
+                            {(faculty.school || faculty.department) && (
+                              <div className="flex items-center gap-2">
+                                {faculty.school && (
+                                  <span className="text-xs text-blue-700 bg-blue-100 px-2 py-1 rounded">
+                                    {faculty.school}
+                                  </span>
+                                )}
+                                {faculty.department && (
+                                  <span className="text-xs text-purple-700 bg-purple-100 px-2 py-1 rounded">
+                                    {faculty.department}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-3 mb-1">
-                              <FaUser className="text-blue-600" size={16} />
-                              <h2 className="font-bold text-xl text-gray-800">
-                                {faculty.name}
-                              </h2>
-                              {faculty.empId && (
-                                <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                                  ID: {faculty.empId}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-gray-600 text-sm">Click to view pending requests</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-bold px-4 py-2 rounded-full shadow-md">
-                            {faculty.students.length} pending
-                          </div>
+                          <p className="text-gray-600 text-sm">Click to view pending requests</p>
                         </div>
                       </div>
+                      <div className="flex items-center gap-3">
+                        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-bold px-4 py-2 rounded-full shadow-md">
+                          {faculty.students.length} pending
+                        </div>
+                      </div>
+                    </div>
 
-                      {expanded[faculty._id] && (
-                        <div className="border-t border-gray-100">
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full">
-                              <thead className="bg-gradient-to-r from-gray-100 to-blue-100">
-                                <tr>
-                                  <th className="p-4 text-left font-semibold text-gray-700 border-b border-gray-200">
-                                    <div className="flex items-center gap-2">
-                                      <FaUser size={14} />
-                                      Student Details
+                    {expanded[faculty._id] && (
+                      <div className="border-t border-gray-100">
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full">
+                            <thead className="bg-gradient-to-r from-gray-100 to-blue-100">
+                              <tr>
+                                <th className="p-4 text-left font-semibold text-gray-700 border-b border-gray-200">
+                                  <div className="flex items-center gap-2">
+                                    <FaUser size={14} />
+                                    Student Details
+                                  </div>
+                                </th>
+                                <th className="p-4 text-center font-semibold text-gray-700 border-b border-gray-200">
+                                  Registration
+                                </th>
+                                <th className="p-4 text-center font-semibold text-gray-700 border-b border-gray-200">
+                                  Review Type
+                                </th>
+                                <th className="p-4 text-left font-semibold text-gray-700 border-b border-gray-200">
+                                  Comments
+                                </th>
+                                <th className="p-4 text-center font-semibold text-gray-700 border-b border-gray-200">
+                                  Actions
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {faculty.students.map((student, studentIndex) => (
+                                <tr
+                                  key={student.requestId}
+                                  className={`hover:bg-blue-50 transition-colors duration-150 ${
+                                    studentIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                  }`}
+                                >
+                                  <td className="p-4 border-b border-gray-100">
+                                    <div className="font-medium text-gray-900">{student.name}</div>
+                                  </td>
+                                  <td className="p-4 text-center border-b border-gray-100">
+                                    <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                                      {student.regNo}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 text-center border-b border-gray-100">
+                                    <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
+                                      {student.projectType}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 border-b border-gray-100">
+                                    <div className="text-gray-700 text-sm max-w-xs truncate" title={student.comments}>
+                                      {student.comments}
                                     </div>
-                                  </th>
-                                  <th className="p-4 text-center font-semibold text-gray-700 border-b border-gray-200">
-                                    Registration
-                                  </th>
-                                  <th className="p-4 text-center font-semibold text-gray-700 border-b border-gray-200">
-                                    Review Type
-                                  </th>
-                                  <th className="p-4 text-left font-semibold text-gray-700 border-b border-gray-200">
-                                    Comments
-                                  </th>
-                                  <th className="p-4 text-center font-semibold text-gray-700 border-b border-gray-200">
-                                    Actions
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {faculty.students.map((student, studentIndex) => (
-                                  <tr
-                                    key={student.requestId}
-                                    className={`hover:bg-blue-50 transition-colors duration-150 ${
-                                      studentIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                    }`}
-                                  >
-                                    <td className="p-4 border-b border-gray-100">
-                                      <div className="font-medium text-gray-900">{student.name}</div>
-                                    </td>
-                                    <td className="p-4 text-center border-b border-gray-100">
-                                      <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                                        {student.regNo}
-                                      </span>
-                                    </td>
-                                    <td className="p-4 text-center border-b border-gray-100">
-                                      <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
-                                        {student.projectType}
-                                      </span>
-                                    </td>
-                                    <td className="p-4 border-b border-gray-100">
-                                      <div className="text-gray-700 text-sm max-w-xs truncate" title={student.comments}>
-                                        {student.comments}
-                                      </div>
-                                    </td>
-                                    <td className="p-4 border-b border-gray-100">
-                                      <div className="flex justify-center items-center">
-                                        {approvingRequestId === student.requestId ? (
-                                          <div className="bg-white border-2 border-blue-200 rounded-xl p-4 shadow-lg min-w-[200px]">
-                                            <div className="text-center mb-3">
-                                              <Calendar className="w-5 h-5 text-blue-600 mx-auto mb-2" />
-                                              <p className="text-sm font-medium text-gray-800">
-                                                Set Review Deadline
-                                              </p>
-                                            </div>
-                                            <input
-                                              type="date"
-                                              value={selectedDeadline}
-                                              onChange={(e) =>
-                                                setSelectedDeadline(e.target.value)
-                                              }
-                                              className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
-                                              min={
-                                                new Date()
-                                                  .toISOString()
-                                                  .split("T")[0]
-                                              }
-                                            />
-                                            <div className="flex gap-2">
-                                              <button
-                                                onClick={handleSubmitApproval}
-                                                className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-md hover:shadow-lg"
-                                              >
-                                                Confirm
-                                              </button>
-                                              <button
-                                                onClick={handleCloseApprovalModal}
-                                                className="flex-1 bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-300 transition-all duration-200"
-                                              >
-                                                Cancel
-                                              </button>
-                                            </div>
+                                  </td>
+                                  <td className="p-4 border-b border-gray-100">
+                                    <div className="flex justify-center items-center">
+                                      {approvingRequestId === student.requestId ? (
+                                        <div className="bg-white border-2 border-blue-200 rounded-xl p-4 shadow-lg min-w-[200px]">
+                                          <div className="text-center mb-3">
+                                            <Calendar className="w-5 h-5 text-blue-600 mx-auto mb-2" />
+                                            <p className="text-sm font-medium text-gray-800">
+                                              Set Review Deadline
+                                            </p>
                                           </div>
-                                        ) : (
+                                          <input
+                                            type="date"
+                                            value={selectedDeadline}
+                                            onChange={(e) =>
+                                              setSelectedDeadline(e.target.value)
+                                            }
+                                            className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
+                                            min={
+                                              new Date()
+                                                .toISOString()
+                                                .split("T")[0]
+                                            }
+                                          />
                                           <div className="flex gap-2">
                                             <button
-                                              onClick={() =>
-                                                handleOpenApprovalModal(
-                                                  student.requestId
-                                                )
-                                              }
-                                              className="bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
-                                              title="Approve Request"
+                                              onClick={handleSubmitApproval}
+                                              className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-md hover:shadow-lg"
                                             >
-                                              <FaCheck size={14} />
+                                              Confirm
                                             </button>
                                             <button
-                                              onClick={() =>
-                                                handleReject(student.requestId)
-                                              }
-                                              className="bg-gradient-to-r from-red-500 to-red-600 text-white p-3 rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
-                                              title="Reject Request"
+                                              onClick={handleCloseApprovalModal}
+                                              className="flex-1 bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-300 transition-all duration-200"
                                             >
-                                              <FaTimes size={14} />
+                                              Cancel
                                             </button>
                                           </div>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                                        </div>
+                                      ) : (
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={() =>
+                                              handleOpenApprovalModal(
+                                                student.requestId
+                                              )
+                                            }
+                                            className="bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                                            title="Approve Request"
+                                          >
+                                            <FaCheck size={14} />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              handleReject(student.requestId)
+                                            }
+                                            className="bg-gradient-to-r from-red-500 to-red-600 text-white p-3 rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                                            title="Reject Request"
+                                          >
+                                            <FaTimes size={14} />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

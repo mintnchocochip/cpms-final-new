@@ -38,15 +38,17 @@ const AdminLogin = () => {
 
       if (!token) throw new Error("No token received");
 
-      // Store token
+      // ✅ DEFAULT to Super Admin Mode
       sessionStorage.setItem("token", token);
+      sessionStorage.setItem("role", "admin");
+      sessionStorage.setItem("adminContext", JSON.stringify({ skipped: true }));
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
       // Update context
       login(token, "admin");
 
-      // Navigate to school selection
-      navigate("/admin/school-selection");
+      // ✅ Go directly to super admin mode
+      navigate("/admin/panel-management");
     } catch (err) {
       console.error("Login error:", err);
       const msg =
@@ -133,7 +135,7 @@ const AdminLogin = () => {
                 <input
                   id="email"
                   type="email"
-                  placeholder="admin@example.com"
+                  placeholder="admin@vit.ac.in"
                   className="pl-10 w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -218,16 +220,17 @@ const AdminLogin = () => {
               </button>
             </div>
 
+            {/* ✅ SINGLE LOGIN BUTTON */}
             <div>
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center items-center bg-blue-700 text-white py-2 px-4 rounded-md hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:opacity-75"
+                className="w-full flex justify-center items-center bg-blue-700 text-white py-3 px-4 rounded-md hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:opacity-75 font-semibold text-lg"
               >
                 {isLoading ? (
                   <>
                     <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      className="animate-spin -ml-1 mr-2 h-5 w-5 text-white"
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
                       viewBox="0 0 24 24"
@@ -249,16 +252,15 @@ const AdminLogin = () => {
                     Logging in...
                   </>
                 ) : (
-                  "Sign In"
+                  "Admin Login"
                 )}
               </button>
             </div>
 
-            {/* New Faculty Login Button */}
             <div className="mt-4">
               <button
                 type="button"
-                onClick={() => navigate("/login")} // adjust path if different
+                onClick={() => navigate("/login")}
                 className="w-full text-center text-blue-600 hover:text-blue-800 font-semibold"
               >
                 Are you Faculty? Login here

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// AdminPanelManagement.jsx - Updated to handle both specific context and skip mode correctly
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getFacultyBySchoolAndDept,
@@ -70,7 +71,7 @@ const AdminPanelManagement = () => {
   const [isAutoCreating, setIsAutoCreating] = useState(false);
 
   // Show notification function
-  const showNotification = (type, title, message, duration = 4000) => {
+  const showNotification = useCallback((type, title, message, duration = 4000) => {
     setNotification({
       isVisible: true,
       type,
@@ -83,14 +84,14 @@ const AdminPanelManagement = () => {
     setTimeout(() => {
       setNotification(prev => ({ ...prev, isVisible: false }));
     }, duration);
-  };
+  }, []);
 
   // Hide notification function
-  const hideNotification = () => {
+  const hideNotification = useCallback(() => {
     setNotification(prev => ({ ...prev, isVisible: false }));
-  };
+  }, []);
 
-  // Check for admin context on component mount
+  // ✅ UPDATED: Check for admin context - handle both specific and skip modes
   useEffect(() => {
     const savedAdminContext = sessionStorage.getItem("adminContext");
     if (!savedAdminContext) {
@@ -100,28 +101,46 @@ const AdminPanelManagement = () => {
     
     try {
       const parsedContext = JSON.parse(savedAdminContext);
-      setAdminContext(parsedContext);
+      
+      // ✅ Handle all cases: specific selection, skipped selection, or old format
+      if (parsedContext.skipped) {
+        // User chose to skip - show all data
+        setAdminContext({ school: null, department: null, skipped: true });
+      } else if (parsedContext.school && parsedContext.department) {
+        // User selected specific school and department
+        setAdminContext(parsedContext);
+      } else {
+        // Invalid or old format - redirect to selection
+        navigate("/admin/school-selection");
+      }
     } catch (error) {
       console.error("Failed to parse admin context:", error);
       navigate("/admin/school-selection");
     }
   }, [navigate]);
 
-  const fetchData = async () => {
+  // ✅ UPDATED: Fetch data function with proper backend API usage
+  const fetchData = useCallback(async () => {
     if (!adminContext) return;
     
     try {
       setLoading(true);
-      const { school, department } = adminContext;
+      const { school, department, skipped } = adminContext;
 
       console.log("=== FETCHING PANEL DATA ===");
-      console.log("Admin Context:", { school, department });
+      console.log("Admin Context:", { school, department, skipped });
+
+      // ✅ Pass correct parameters to API based on context
+      const apiSchool = skipped ? null : school;
+      const apiDepartment = skipped ? null : department;
+
+      console.log("API Parameters:", { apiSchool, apiDepartment });
 
       const [facultyRes, panelRes, panelProjectsRes, guideProjectsRes] = await Promise.all([
-        getFacultyBySchoolAndDept(school, department),
-        getAllPanels(school, department),
-        getAllPanelProjects(school, department),
-        getAllGuideProjects(school, department),
+        getFacultyBySchoolAndDept(apiSchool, apiDepartment),
+        getAllPanels(apiSchool, apiDepartment),
+        getAllPanelProjects(apiSchool, apiDepartment),
+        getAllGuideProjects(apiSchool, apiDepartment),
       ]);
 
       console.log("=== RAW API RESPONSES ===");
@@ -235,20 +254,25 @@ const AdminPanelManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [adminContext]);
 
   useEffect(() => {
     if (adminContext) {
       fetchData();
     }
-  }, [adminContext]);
+  }, [adminContext, fetchData]);
+  
 
-  const handleChangeSchoolDepartment = () => {
-    sessionStorage.removeItem("adminContext");
-    navigate("/admin/school-selection");
-  };
+// ✅ UPDATED: Clear context before navigating
+const handleChangeSchoolDepartment = useCallback(() => {
+  // Clear the context so user can select a new one
+  sessionStorage.removeItem("adminContext");
+  navigate("/admin/school-selection");
+}, [navigate]);
 
-  const canAssignProjectToPanel = (projectId, panelFacultyIds) => {
+
+  // Conflict checking functions
+  const canAssignProjectToPanel = useCallback((projectId, panelFacultyIds) => {
     const projectGuide = allGuideProjects.find(
       (rel) => rel.projectId === projectId
     );
@@ -263,16 +287,17 @@ const AdminPanelManagement = () => {
     }
 
     return { canAssign: true, reason: "" };
-  };
+  }, [allGuideProjects]);
 
-  const getAvailableTeamsForPanel = (panelFacultyIds) => {
+  const getAvailableTeamsForPanel = useCallback((panelFacultyIds) => {
     return unassignedTeams.filter((team) => {
       const check = canAssignProjectToPanel(team._id, panelFacultyIds);
       return check.canAssign;
     });
-  };
+  }, [unassignedTeams, canAssignProjectToPanel]);
 
-  const handleAddPanel = async () => {
+  // Panel management functions
+  const handleAddPanel = useCallback(async () => {
     const { f1, f2 } = selectedPair;
     if (!f1 || !f2 || f1 === f2) {
       showNotification("error", "Invalid Selection", "Please select two different faculty members");
@@ -296,10 +321,10 @@ const AdminPanelManagement = () => {
       console.error("Panel creation error:", error);
       showNotification("error", "Creation Failed", "Failed to create panel. Please try again.");
     }
-  };
+  }, [selectedPair, panels, fetchData, showNotification]);
 
   // ✅ UPDATED: Enhanced Auto Assign with mutual exclusion
-  const handleAutoAssign = async () => {
+  const handleAutoAssign = useCallback(async () => {
     // Prevent auto assign when auto create is running
     if (isAutoCreating) {
       showNotification("error", "Operation in Progress", "Cannot start auto assignment while auto panel creation is running. Please wait for it to complete.");
@@ -320,10 +345,10 @@ const AdminPanelManagement = () => {
     
     // If no existing assignments, proceed directly
     await executeAutoAssign();
-  };
+  }, [isAutoCreating, panels, showNotification]);
 
   // ✅ UPDATED: Enhanced Auto Create with mutual exclusion
-  const handleAutoCreatePanel = async () => {
+  const handleAutoCreatePanel = useCallback(async () => {
     // Prevent auto create when auto assign is running
     if (isAutoAssigning) {
       showNotification("error", "Operation in Progress", "Cannot start auto panel creation while auto assignment is running. Please wait for it to complete.");
@@ -342,10 +367,10 @@ const AdminPanelManagement = () => {
     
     // If no existing panels, proceed directly
     await executeAutoCreate();
-  };
+  }, [isAutoAssigning, panels.length, showNotification]);
 
   // Execute auto assign with notification instead of alert
-  const executeAutoAssign = async () => {
+  const executeAutoAssign = useCallback(async () => {
     try {
       setIsAutoAssigning(true);
       await autoAssignPanelsToProjects();
@@ -357,10 +382,10 @@ const AdminPanelManagement = () => {
     } finally {
       setIsAutoAssigning(false);
     }
-  };
+  }, [fetchData, showNotification]);
 
   // Execute auto create with notification instead of alert
-  const executeAutoCreate = async () => {
+  const executeAutoCreate = useCallback(async () => {
     try {
       setIsAutoCreating(true);
       await autoCreatePanelManual();
@@ -372,11 +397,12 @@ const AdminPanelManagement = () => {
     } finally {
       setIsAutoCreating(false);
     }
-  };
+  }, [fetchData, showNotification]);
 
   // Handle auto operation confirmation
-  const handleAutoConfirm = async () => {
+  const handleAutoConfirm = useCallback(async () => {
     // Close the popup immediately when user confirms
+    const currentType = autoConfirmation.type;
     setAutoConfirmation({
       type: "",
       isOpen: false,
@@ -385,24 +411,24 @@ const AdminPanelManagement = () => {
     });
 
     // Then execute the operation
-    if (autoConfirmation.type === "assign") {
+    if (currentType === "assign") {
       await executeAutoAssign();
-    } else if (autoConfirmation.type === "create") {
+    } else if (currentType === "create") {
       await executeAutoCreate();
     }
-  };
+  }, [autoConfirmation.type, executeAutoAssign, executeAutoCreate]);
 
   // Handle auto operation cancellation
-  const handleAutoCancel = () => {
+  const handleAutoCancel = useCallback(() => {
     setAutoConfirmation({
       type: "",
       isOpen: false,
       message: "",
       existingCount: 0,
     });
-  };
+  }, []);
 
-  const handleManualAssign = async (panelIndex, projectId) => {
+  const handleManualAssign = useCallback(async (panelIndex, projectId) => {
     try {
       const panel = panels[panelIndex];
       if (!panel) return;
@@ -420,9 +446,9 @@ const AdminPanelManagement = () => {
       console.error("Assignment error:", error);
       showNotification("error", "Assignment Failed", "Failed to assign team. Please try again.");
     }
-  };
+  }, [panels, canAssignProjectToPanel, fetchData, showNotification]);
 
-  const handleConfirmRemove = async () => {
+  const handleConfirmRemove = useCallback(async () => {
     const { type, panelId, teamId } = confirmRemove;
     try {
       if (type === "panel") {
@@ -438,23 +464,25 @@ const AdminPanelManagement = () => {
       showNotification("error", "Operation Failed", "Failed to complete the operation. Please try again.");
     }
     setConfirmRemove({ type: "", panelId: null, teamId: null });
-  };
+  }, [confirmRemove, fetchData, showNotification]);
 
   // Calculate used faculty IDs from actual panels
-  const usedFacultyIds = React.useMemo(
+  const usedFacultyIds = useMemo(
     () => panels.flatMap((p) => p.facultyIds || []),
     [panels]
   );
 
-  const availableFaculty = React.useMemo(
+  const availableFaculty = useMemo(
     () => facultyList.filter((f) => !usedFacultyIds.includes(f._id)),
     [facultyList, usedFacultyIds]
   );
 
-  const filterMatches = (str) =>
+  const filterMatches = useCallback((str) =>
     str &&
     typeof str === "string" &&
-    str.toLowerCase().includes(searchQuery.toLowerCase());
+    str.toLowerCase().includes(searchQuery.toLowerCase()),
+    [searchQuery]
+  );
 
   if (loading) {
     return (
@@ -485,26 +513,37 @@ const AdminPanelManagement = () => {
                 </h2>
                 <p className="text-gray-600">Manage evaluation panels and team assignments</p>
               </div>
+              
+              {/* ✅ UPDATED: Context display that handles both modes */}
               {adminContext && (
                 <div className="flex items-center gap-4 mt-4 lg:mt-0">
                   <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                     <h3 className="font-semibold text-gray-800 mb-2">Current Context:</h3>
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-blue-600" />
-                        <span className="text-gray-700">School: <strong>{adminContext.school}</strong></span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <GraduationCap className="h-4 w-4 text-purple-600" />
-                        <span className="text-gray-700">Department: <strong>{adminContext.department}</strong></span>
-                      </div>
+                      {adminContext.skipped ? (
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-orange-600" />
+                          <span className="text-gray-700">Mode: <strong className="text-orange-600">All Schools & Departments</strong></span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-blue-600" />
+                            <span className="text-gray-700">School: <strong>{adminContext.school}</strong></span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <GraduationCap className="h-4 w-4 text-purple-600" />
+                            <span className="text-gray-700">Department: <strong>{adminContext.department}</strong></span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                   <button
                     onClick={handleChangeSchoolDepartment}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
                   >
-                    Change School/Department
+                    Change Context
                   </button>
                 </div>
               )}

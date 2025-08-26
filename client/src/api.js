@@ -1,12 +1,11 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL; // Define base URL constant
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const API = axios.create({
-  baseURL: `${API_BASE_URL}`, // Use the constant
+  baseURL: `${API_BASE_URL}`,
 });
 
-// Helper function to build query parameters for school/department filtering
 const buildAdminContextParams = (school = null, department = null) => {
   const params = new URLSearchParams();
   if (school) params.append('school', school);
@@ -14,7 +13,6 @@ const buildAdminContextParams = (school = null, department = null) => {
   return params.toString();
 };
 
-// Add authorization token to all requests if available
 API.interceptors.request.use((config) => {
   const token = sessionStorage.getItem("token");
   if (token) {
@@ -40,16 +38,12 @@ export const getAllGuideProjects = (school = null, department = null) => {
 // Faculty endpoint
 export const getAllFaculty = () => API.get("/admin/getAllFaculty");
 
-// Get faculty filtered by school and department
 export const getFacultyBySchoolAndDept = (school, department) => {
   if (!school || !department) {
-    // If no school/department provided, get all faculty
     return API.get("/admin/getAllFaculty");
   }
-  // Use the correct endpoint with path parameters (not query parameters)
   return API.get(`/admin/faculty/${school}/${department}`);
 };
-
 
 export const getGuideTeams = () => API.get("/project/guide");
 export const getPanelTeams = () => API.get("/project/panel");
@@ -58,31 +52,17 @@ export const getAllPanels = (school = null, department = null) => {
   const queryString = buildAdminContextParams(school, department);
   return API.get(`/admin/getAllPanels${queryString ? `?${queryString}` : ''}`);
 };
+
 export const createPanelManual = (data) => API.post("/admin/createPanel", data);
-
-// Auto create panels from the faculty list
-export const autoCreatePanelManual = () =>
-  API.post("/admin/autoCreatePanels", { force: true });
-
-export const deletePanel = (panelId) =>
-  API.delete(`/admin/${panelId}/deletePanel`);
-
-export const assignPanelToProject = (data) =>
-  API.post("/admin/assignPanel", data);
-
-// FIX: Added missing slash
-export const autoAssignPanelsToProjects = () =>
-  API.post("/admin/autoAssignPanel");
-
-// FIX: Added missing slash
+export const autoCreatePanelManual = () => API.post("/admin/autoCreatePanels", { force: true });
+export const deletePanel = (panelId) => API.delete(`/admin/${panelId}/deletePanel`);
+export const assignPanelToProject = (data) => API.post("/admin/assignPanel", data);
+export const autoAssignPanelsToProjects = () => API.post("/admin/autoAssignPanel");
 export const getAllRequests = () => API.get("/admin/getAllRequests");
-
-// Get all requests for guide or panel
 
 export const fetchRequests = async (type, school = null, department = null) => {
   try {
     const queryString = buildAdminContextParams(school, department);
-    // ✅ Fixed: Use type as path parameter, not route segment
     const res = await API.get(`/admin/getAllRequests/${type}${queryString ? `?${queryString}` : ''}`);
     const all = res.data.data || [];
     const unresolved = all.filter((req) => !req.resolvedAt);
@@ -92,13 +72,9 @@ export const fetchRequests = async (type, school = null, department = null) => {
   }
 };
 
-
 export const updateRequestStatus = async (facultyType, data) => {
   try {
-    const response = await API.post(
-      `/admin/${facultyType}/updateRequest`,
-      data
-    );
+    const response = await API.post(`/admin/${facultyType}/updateRequest`, data);
     return response.data;
   } catch (error) {
     console.error("Error updating request status:", error);
@@ -108,7 +84,6 @@ export const updateRequestStatus = async (facultyType, data) => {
     };
   }
 };
-
 
 export const getDefaultDeadline = (school = null, department = null) => {
   const queryString = buildAdminContextParams(school, department);
@@ -123,14 +98,9 @@ export const createOrUpdateMarkingSchema = (payload) => {
   return API.post("/admin/MarkingSchema", payload);
 };
 
-
-
-// Request functions
-
 export const getFacultyMarkingSchema = () => {
-  return API.get("/faculty/getMarkingSchema"); // Uses your existing faculty controller endpoint
+  return API.get("/faculty/getMarkingSchema");
 };
-
 
 export async function createReviewRequest(facultyType, requestData) {
   try {
@@ -154,28 +124,43 @@ export async function checkRequestStatus(facultyType, regNo, reviewType) {
   }
 }
 
+// ✅ FIXED: Completely removed hardcoded values
 export async function checkAllRequestStatuses(teamsList) {
   const statuses = {};
   
   for (const team of teamsList) {
+    // ✅ Only process teams with valid schemas
+    if (!team.markingSchema?.reviews) {
+      console.log(`⚠️ [API] No schema for team ${team.title}, skipping request status check`);
+      continue;
+    }
+    
+    const isPanel = team.panel !== undefined;
+    const facultyType = isPanel ? 'panel' : 'guide';
+    
+    // ✅ Get review types from schema only
+    const reviewTypes = team.markingSchema.reviews
+      .filter(review => review.facultyType === facultyType)
+      .map(review => review.reviewName);
+    
+    console.log(`📋 [API] Schema-based ${facultyType} reviews for ${team.title}:`, reviewTypes);
+    
+    if (reviewTypes.length === 0) {
+      console.log(`⚠️ [API] No ${facultyType} reviews found in schema for ${team.title}`);
+      continue;
+    }
+    
     for (const student of team.students) {
-      const isPanel = team.panel !== undefined;
-      const facultyType = isPanel ? 'panel' : 'guide';
-      const reviewTypes = isPanel ? ['review2', 'review3'] : ['review0', 'draftReview', 'review1'];
-      
-      console.log(`Checking ${facultyType} request statuses for team ${team.title}`);
-      
       for (const reviewType of reviewTypes) {
         try {
           const status = await checkRequestStatus(facultyType, student.regNo, reviewType);
-          
-          if (status && status.status && status.status !== 'none') {
+          if (status?.status && status.status !== 'none') {
             const key = `${student.regNo}_${reviewType}`;
             statuses[key] = status;
-            console.log(`Found ${facultyType} request status for ${student.regNo} ${reviewType}:`, status);
+            console.log(`✅ [API] Found status for ${student.regNo} ${reviewType}:`, status);
           }
         } catch (error) {
-          console.error(`Error checking ${facultyType} request status:`, error);
+          console.error(`❌ [API] Error checking status:`, error);
         }
       }
     }
@@ -206,40 +191,24 @@ export const createProjectsBulk = (payload) => {
   return API.post("/project/createProjectsBulk", payload);
 };
 
-export const createProject = (projectData) => 
-  API.post("/project/create", projectData);
+export const createProject = (projectData) => API.post("/project/create", projectData);
+export const createProjects = (data) => API.post("/project/createProjects", data);
+export const deleteProject = (projectId) => API.delete(`/project/${projectId}`);
+export const getGuideProjects = () => API.get("/project/guide");
+export const getPanelProjects = () => API.get("/project/panel");
+export const updateProject = (updatePayload) => API.put("/project/update", updatePayload);
+export const getProjectDetails = (projectId) => API.get(`/project/${projectId}`);
 
-export const createProjects = (data) => 
-  API.post("/project/createProjects", data); // New endpoint for batch creation
-
-export const deleteProject = (projectId) =>
-  API.delete(`/project/${projectId}`);
-
-export const getGuideProjects = () => 
-  API.get("/project/guide");
-
-export const getPanelProjects = () =>
-  API.get("/project/panel");
-
-export const updateProject = (updatePayload) =>
-  API.put("/project/update", updatePayload);
-
-export const getProjectDetails = (projectId) =>
-  API.get(`/project/${projectId}`);
-
-// FIX: OTP endpoints - Use API instance instead of raw axios
+// OTP endpoints
 export const sendOTP = async (emailId) => {
   try {
-    const response = await API.post("/otp/sendOtp", {
-      emailId
-    });
+    const response = await API.post("/otp/sendOtp", { emailId });
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-// Verify OTP and reset password
 export const verifyOTPAndResetPassword = async (emailId, otp, newPassword, confirmPassword) => {
   try {
     const response = await API.post("/otp/verifyOtpReset", {
@@ -254,12 +223,9 @@ export const verifyOTPAndResetPassword = async (emailId, otp, newPassword, confi
   }
 };
 
-// Resend OTP
 export const resendOTP = async (emailId) => {
   try {
-    const response = await API.post("/otp/resendOtp", {
-      emailId
-    });
+    const response = await API.post("/otp/resendOtp", { emailId });
     return response.data;
   } catch (error) {
     throw error;
@@ -267,12 +233,10 @@ export const resendOTP = async (emailId) => {
 };
 
 export const createFaculty = async (facultyData) => {
-  
-    const response = await API.post("/admin/createFaculty", facultyData);
-    return response.data;
-  
+  const response = await API.post("/admin/createFaculty", facultyData);
+  return response.data;
 };
-// Add this new function to your api.js
+
 export const createFacultyBulk = async (bulkData) => {
   try {
     const response = await API.post("/admin/createFacultyBulk", bulkData);
@@ -282,12 +246,9 @@ export const createFacultyBulk = async (bulkData) => {
   }
 };
 
-
 export const createAdmin = async (adminData) => {
-
-    const response = await API.post("/admin/createAdmin", adminData);
-    return response.data;
-  
+  const response = await API.post("/admin/createAdmin", adminData);
+  return response.data;
 };
 
 export default API;

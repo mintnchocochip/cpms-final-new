@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import Navbar from '../Components/UniversalNavbar';
 import axios from 'axios';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Mail, Hash } from 'lucide-react';
 import { adminLogin } from '../api';
 
 const FacultyLogin = () => {
-  const [loginEmail, setLoginEmail] = useState('');
-  const [emailError, setEmailError] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState(''); // Changed from loginEmail
+  const [identifierError, setIdentifierError] = useState(''); // Changed from emailError
   const [loginPassword, setLoginPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -19,26 +19,38 @@ const FacultyLogin = () => {
     setShowPassword(!showPassword);
   };
 
-  const validateEmail = (email) => {
+  // Updated validation function to handle both email and employee ID
+  const validateIdentifier = (identifier) => {
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+    const empIdRegex = /^[A-Za-z0-9]+$/; // Based on your schema pattern
     
-    if (!email) {
-      setEmailError('Email is required');
+    if (!identifier) {
+      setIdentifierError('Email or Employee ID is required');
       return false;
     }
     
-    if (!emailRegex.test(email)) {
-      setEmailError('Please enter a valid email address');
+    // Check if it's an email or employee ID
+    const isEmail = emailRegex.test(identifier);
+    const isEmpId = empIdRegex.test(identifier);
+    
+    if (!isEmail && !isEmpId) {
+      setIdentifierError('Please enter a valid email address or employee ID');
       return false;
     }
     
-    setEmailError('');
+    setIdentifierError('');
     return true;
+  };
+
+  // Detect input type for better UX
+  const detectInputType = (value) => {
+    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+    return emailRegex.test(value) ? 'email' : 'employeeId';
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!validateEmail(loginEmail)) return;
+    if (!validateIdentifier(loginIdentifier)) return;
     
     try {
       setLoading(true);
@@ -48,19 +60,19 @@ const FacultyLogin = () => {
       const endpoint = "/auth/login";
 
       const response = await adminLogin({
-        emailId: loginEmail,
+        emailId: loginIdentifier, // Backend will handle both email and empId
         password: loginPassword,
         expectedRole: "faculty"
       });
 
       console.log('Login response:', response.data);
 
-      // FIX: Store both token AND faculty data
+      // Store both token AND faculty data
       sessionStorage.setItem("token", response.data.token);
-      sessionStorage.setItem("faculty", JSON.stringify(response.data.faculty)); // Add this line
+      sessionStorage.setItem("faculty", JSON.stringify(response.data.faculty));
       
       if (rememberMe) {
-        sessionStorage.setItem("faculty_email", loginEmail);
+        sessionStorage.setItem("faculty_identifier", loginIdentifier); // Changed from faculty_email
       }
       
       setMessage("Login Successful!");
@@ -81,6 +93,22 @@ const FacultyLogin = () => {
 
   const handleNavigate = (path) => {
     window.location.href = path;
+  };
+
+  // Get placeholder text based on input
+  const getPlaceholder = () => {
+    if (!loginIdentifier) return "Email or Employee ID";
+    const type = detectInputType(loginIdentifier);
+    return type === 'email' ? "faculty@vit.ac.in" : "EMP001";
+  };
+
+  // Get icon based on input type
+  const getInputIcon = () => {
+    if (!loginIdentifier) return <Mail className="h-5 w-5 text-gray-400" />;
+    const type = detectInputType(loginIdentifier);
+    return type === 'email' ? 
+      <Mail className="h-5 w-5 text-gray-400" /> : 
+      <Hash className="h-5 w-5 text-gray-400" />;
   };
 
   return (
@@ -125,30 +153,52 @@ const FacultyLogin = () => {
           
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+              <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-1">
+                Email Address or Employee ID
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                  </svg>
+                  {getInputIcon()}
                 </div>
                 <input 
-                  id="email"
-                  type="email" 
-                  placeholder="faculty@vit.edu"
-                  value={loginEmail}
+                  id="identifier"
+                  type="text" 
+                  placeholder={getPlaceholder()}
+                  value={loginIdentifier}
                   onChange={(e) => {
-                    setLoginEmail(e.target.value);
-                    if (emailError) validateEmail(e.target.value);
+                    setLoginIdentifier(e.target.value);
+                    if (identifierError) validateIdentifier(e.target.value);
                   }}
-                  onBlur={() => validateEmail(loginEmail)}
-                  className={`pl-10 w-full p-2 border rounded-md transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                    ${emailError ? 'border-red-500' : 'border-gray-300'}`}
+                  onBlur={() => validateIdentifier(loginIdentifier)}
+                  className={`pl-10 w-full p-3 border rounded-md transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                    ${identifierError ? 'border-red-500' : 'border-gray-300'}`}
                   disabled={loading}
                 />
               </div>
-              {emailError && (
-                <p className="text-red-500 text-sm mt-1">{emailError}</p>
+              {identifierError && (
+                <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {identifierError}
+                </p>
+              )}
+              
+              {/* Helper text to show what format is detected */}
+              {loginIdentifier && !identifierError && (
+                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                  {detectInputType(loginIdentifier) === 'email' ? (
+                    <>
+                      <Mail className="h-3 w-3" />
+                      Detected as email address
+                    </>
+                  ) : (
+                    <>
+                      <Hash className="h-3 w-3" />
+                      Detected as employee ID
+                    </>
+                  )}
+                </p>
               )}
             </div>
             
@@ -166,7 +216,7 @@ const FacultyLogin = () => {
                   placeholder="••••••••"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  className="pl-10 pr-10 w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  className="pl-10 pr-10 w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                   disabled={loading}
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
@@ -203,7 +253,7 @@ const FacultyLogin = () => {
               <div>
                 <button 
                   type="button" 
-                  onClick={() => Navigatehandle('/forgot-password')}
+                  onClick={() => handleNavigate('/forgot-password')}
                   className="text-sm font-medium text-blue-600 hover:text-blue-500"
                 >
                   Forgot password?
@@ -213,7 +263,7 @@ const FacultyLogin = () => {
 
             <button 
               type="submit" 
-              className="w-full flex justify-center items-center bg-blue-700 text-white py-2 px-4 rounded-md hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:opacity-75"
+              className="w-full flex justify-center items-center bg-blue-700 text-white py-3 px-4 rounded-md hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:opacity-75"
               disabled={loading}
             >
               {loading ? (
@@ -222,16 +272,17 @@ const FacultyLogin = () => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Logging in...
+                  Signing in...
                 </>
               ) : 'Sign In'}
             </button>
           </form>
+          
           <div className="mt-4">
             <button
               type="button"
-              onClick={() => handleNavigate("/admin/login")} // adjust path if different
-              className="w-full text-center text-blue-600 hover:text-blue-800 font-semibold"
+              onClick={() => handleNavigate("/admin/login")}
+              className="w-full text-center text-blue-600 hover:text-blue-800 font-semibold py-2 px-4 rounded-md border border-blue-200 hover:border-blue-300 transition"
             >
               Are you an administrator? Login here
             </button>
@@ -248,6 +299,14 @@ const FacultyLogin = () => {
             </div>
           </div>
 
+          {/* Help text */}
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+            <p className="text-xs text-gray-600 text-center">
+              <strong>Login Options:</strong><br/>
+              • Email: faculty@vit.ac.in<br/>
+              • Employee ID: EMP001
+            </p>
+          </div>
         </div>
       </div>
     </div>

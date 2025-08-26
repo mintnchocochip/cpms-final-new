@@ -43,8 +43,24 @@ const facultySchema = new mongoose.Schema({
   },
   specialization: {
     type: [String],
-    required: true,
-    validate: [arrayLimit, "{PATH} must have at least one specialization"],
+    required: function() {
+      return this.role === 'faculty'; // Only required if role is faculty
+    },
+    validate: {
+      validator: function(val) {
+        // If role is admin, specialization can be empty
+        if (this.role === 'admin') {
+          return true;
+        }
+        // If role is faculty, must have at least one specialization
+        return arrayLimit(val);
+      },
+      message: "Faculty must have at least one specialization"
+    },
+    default: function() {
+      // Default to empty array for admins, or require input for faculty
+      return this.role === 'admin' ? [] : undefined;
+    }
   },
 });
 
@@ -52,6 +68,6 @@ function arrayLimit(val) {
   return val.length > 0;
 }
 
-const Faculty =  mongoose.model("Faculty", facultySchema);
+const Faculty = mongoose.model("Faculty", facultySchema);
 
 export default Faculty;

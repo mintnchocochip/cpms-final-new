@@ -4,121 +4,222 @@ import { setHours, setMinutes } from "date-fns";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { getDefaultDeadline, createOrUpdateMarkingSchema } from "../api";
-import { Plus, Minus, Building2, GraduationCap, CheckCircle, AlertCircle } from "lucide-react";
-import { useAdminContext } from '../hooks/useAdminContext';
-import { useNavigate } from "react-router-dom";
+import { Plus, Minus, Building2, GraduationCap, CheckCircle, AlertCircle, Users, Trash2, Calculator, Target, TrendingUp } from "lucide-react";
 
 function Schedule() {
-  const { school, department, getDisplayString, clearContext, loading: contextLoading, error: contextError } = useAdminContext();
-
-  // State for each review's from/to dates
-  const handleChangeSchoolDepartment = () => {
-    sessionStorage.removeItem("adminContext");
-    window.location.reload(); 
-  };
-  
   const defaultDate = setHours(setMinutes(new Date(), 30), 16);
-  const navigate = useNavigate();
   
-  const [reviewData, setReviewData] = useState({
-    draftReview: { from: defaultDate, to: defaultDate },
-    review0: { from: defaultDate, to: defaultDate },
-    review1: { from: defaultDate, to: defaultDate },
-    review2: { from: defaultDate, to: defaultDate },
-    review3: { from: defaultDate, to: defaultDate },
-    review4: { from: defaultDate, to: defaultDate },
-  });
+  // School and Department options
+  const schoolOptions = ['SCOPE', 'SENSE', 'SELECT', 'SMEC', 'SCE'];
+  const departmentOptions = ['BTech', 'MTech (Integrated)', 'MCA'];
 
-  const [loading, setLoading] = useState(true);
+  const [selectedSchool, setSelectedSchool] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+
+  // State for Guide Reviews
+  const [guideReviews, setGuideReviews] = useState([
+    {
+      id: 'guide-draftReview',
+      reviewName: 'draftReview',
+      displayName: 'Draft Review',
+      facultyType: 'guide',
+      from: defaultDate,
+      to: defaultDate,
+      components: [{ name: "", weight: "" }],
+      requiresPPT: false
+    }
+  ]);
+
+  // State for Panel Reviews
+  const [panelReviews, setPanelReviews] = useState([
+    {
+      id: 'panel-review0',
+      reviewName: 'review0',
+      displayName: 'Review 0',
+      facultyType: 'panel',
+      from: defaultDate,
+      to: defaultDate,
+      components: [{ name: "", weight: "" }],
+      requiresPPT: false
+    }
+  ]);
+
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const [message, setMessage] = useState("");
-  const [validationErrors, setValidationErrors] = useState({}); // ✅ NEW: For validation errors
+  const [validationErrors, setValidationErrors] = useState({});
 
-  const [components, setComponents] = useState({
-    draftReview: [{ name: "", points: "" }],
-    review0: [{ name: "", points: "" }],
-    review1: [{ name: "", points: "" }],
-    review2: [{ name: "", points: "" }],
-    review3: [{ name: "", points: "" }],
-    review4: [{ name: "", points: "" }],
-  });
-
-  // PPT requirement state for each review
-  const [pptRequirements, setPptRequirements] = useState({
-    draftReview: false,
-    review0: false,
-    review1: false,
-    review2: false,
-    review3: false,
-    review4: false,
-  });
-
-  const addComponent = (task) => {
-    setComponents((prev) => ({
-      ...prev,
-      [task]: [...prev[task], { name: "", points: "" }],
-    }));
-    
-    // Clear validation error when adding component
-    setValidationErrors(prev => ({ ...prev, [task]: false }));
+  // Calculate total weight across all reviews and components
+  const calculateTotalWeight = () => {
+    const allReviews = [...guideReviews, ...panelReviews];
+    return allReviews.reduce((total, review) => {
+      return total + review.components.reduce((reviewTotal, component) => {
+        return reviewTotal + (parseInt(component.weight) || 0);
+      }, 0);
+    }, 0);
   };
 
-  // ✅ UPDATED: Prevent removing the last component
-  const removeComponent = (task, index) => {
-    if (components[task].length <= 1) {
+  const totalWeight = calculateTotalWeight();
+  const canAddReview = totalWeight < 100;
+  const canSave = totalWeight === 100;
+  
+  // Show weight tracker only when school and department are selected
+  const shouldShowWeightTracker = selectedSchool && selectedDepartment;
+
+  // Calculate weights for each review type
+  const guideWeight = guideReviews.reduce((total, review) => {
+    return total + review.components.reduce((reviewTotal, component) => {
+      return reviewTotal + (parseInt(component.weight) || 0);
+    }, 0);
+  }, 0);
+
+  const panelWeight = panelReviews.reduce((total, review) => {
+    return total + review.components.reduce((reviewTotal, component) => {
+      return reviewTotal + (parseInt(component.weight) || 0);
+    }, 0);
+  }, 0);
+
+  // Add new guide review
+  const addGuideReview = () => {
+    if (!canAddReview) {
+      setMessage("Cannot add more reviews. Total weight would exceed 100 marks.");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+    
+    const newReview = {
+      id: `guide-${Date.now()}`,
+      reviewName: `guideReview${guideReviews.length}`,
+      displayName: `Guide Review ${guideReviews.length + 1}`,
+      facultyType: 'guide',
+      from: defaultDate,
+      to: defaultDate,
+      components: [{ name: "", weight: "" }],
+      requiresPPT: false
+    };
+    setGuideReviews([...guideReviews, newReview]);
+  };
+
+  // Add new panel review
+  const addPanelReview = () => {
+    if (!canAddReview) {
+      setMessage("Cannot add more reviews. Total weight would exceed 100 marks.");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+    
+    const newReview = {
+      id: `panel-${Date.now()}`,
+      reviewName: `panelReview${panelReviews.length}`,
+      displayName: `Panel Review ${panelReviews.length + 1}`,
+      facultyType: 'panel',
+      from: defaultDate,
+      to: defaultDate,
+      components: [{ name: "", weight: "" }],
+      requiresPPT: false
+    };
+    setPanelReviews([...panelReviews, newReview]);
+  };
+
+  // Remove guide review
+  const removeGuideReview = (reviewId) => {
+    if (guideReviews.length <= 1) {
+      setMessage("Must have at least one guide review.");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+    setGuideReviews(guideReviews.filter(review => review.id !== reviewId));
+  };
+
+  // Remove panel review
+  const removePanelReview = (reviewId) => {
+    if (panelReviews.length <= 1) {
+      setMessage("Must have at least one panel review.");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+    setPanelReviews(panelReviews.filter(review => review.id !== reviewId));
+  };
+
+  // Update review field
+  const updateReview = (reviewType, reviewId, field, value) => {
+    const updateFunction = reviewType === 'guide' ? setGuideReviews : setPanelReviews;
+    const reviews = reviewType === 'guide' ? guideReviews : panelReviews;
+    
+    updateFunction(reviews.map(review => 
+      review.id === reviewId ? { ...review, [field]: value } : review
+    ));
+  };
+
+  // Add component to review
+  const addComponent = (reviewType, reviewId) => {
+    const updateFunction = reviewType === 'guide' ? setGuideReviews : setPanelReviews;
+    const reviews = reviewType === 'guide' ? guideReviews : panelReviews;
+    
+    updateFunction(reviews.map(review => 
+      review.id === reviewId 
+        ? { ...review, components: [...review.components, { name: "", weight: "" }] }
+        : review
+    ));
+  };
+
+  // Remove component from review
+  const removeComponent = (reviewType, reviewId, componentIndex) => {
+    const updateFunction = reviewType === 'guide' ? setGuideReviews : setPanelReviews;
+    const reviews = reviewType === 'guide' ? guideReviews : panelReviews;
+    
+    const review = reviews.find(r => r.id === reviewId);
+    if (review.components.length <= 1) {
       setMessage("Each review must have at least one component.");
       setTimeout(() => setMessage(""), 3000);
       return;
     }
-
-    setComponents((prev) => ({
-      ...prev,
-      [task]: prev[task].filter((_, i) => i !== index),
-    }));
-  };
-
-  const updateComponent = (task, index, field, value) => {
-    console.log(`Updating ${task}[${index}].${field} = ${value}`);
     
-    setComponents((prev) => {
-      const updatedComponents = [...prev[task]];
-      updatedComponents[index] = { ...updatedComponents[index], [field]: value };
-      
-      console.log(`Updated ${task} components:`, updatedComponents);
-      
-      return { ...prev, [task]: updatedComponents };
-    });
-
-    // Clear validation error when updating component name
-    if (field === 'name' && value.trim()) {
-      setValidationErrors(prev => ({ ...prev, [task]: false }));
-    }
+    updateFunction(reviews.map(review => 
+      review.id === reviewId 
+        ? { ...review, components: review.components.filter((_, i) => i !== componentIndex) }
+        : review
+    ));
   };
 
-  // Handle PPT requirement changes
-  const handlePPTRequirementChange = (reviewKey, requiresPPT) => {
-    setPptRequirements(prev => ({
-      ...prev,
-      [reviewKey]: requiresPPT
-    }));
+  // Update component in review with validation for weight
+  const updateComponent = (reviewType, reviewId, componentIndex, field, value) => {
+    const updateFunction = reviewType === 'guide' ? setGuideReviews : setPanelReviews;
+    const reviews = reviewType === 'guide' ? guideReviews : panelReviews;
+    
+    // Validate weight field
+    if (field === 'weight') {
+      const numValue = parseInt(value);
+      // Don't allow values above 100 or negative values
+      if (value && (numValue > 100 || numValue < 0)) {
+        setMessage(`Weight cannot exceed 100 or be negative. Current value: ${numValue}`);
+        setTimeout(() => setMessage(""), 3000);
+        return;
+      }
+    }
+    
+    updateFunction(reviews.map(review => 
+      review.id === reviewId 
+        ? { 
+            ...review, 
+            components: review.components.map((comp, i) => 
+              i === componentIndex ? { ...comp, [field]: value } : comp
+            ) 
+          }
+        : review
+    ));
   };
 
+  // Fetch deadlines when school and department are selected
   useEffect(() => {
-    if (!contextLoading && (!school || !department)) {
-      console.log("Admin context missing, redirecting to school selection");
-      navigate("/admin/school-selection");
+    if (selectedSchool && selectedDepartment) {
+      fetchDeadlines(selectedSchool, selectedDepartment);
     }
-  }, [contextLoading, school, department, navigate]);
-
-  // Fetch deadlines when admin context is available
-  useEffect(() => {
-    if (school && department) {
-      fetchDeadlines();
-    }
-  }, [school, department]);
+  }, [selectedSchool, selectedDepartment]);
 
   // Data fetching function
-  const fetchDeadlines = async () => {
+  const fetchDeadlines = async (school, department) => {
     setLoading(true);
     try {
       console.log(`Fetching deadlines for ${school} - ${department}`);
@@ -130,104 +231,49 @@ function Schedule() {
         const data = res.data.data;
         console.log('Processing data:', data);
 
-        const newReviewData = { ...reviewData };
-        const newComponents = {};
-        const newPptRequirements = { ...pptRequirements };
-
-        Object.keys(components).forEach(reviewType => {
-          newComponents[reviewType] = [{ name: "", points: "" }];
-        });
-
         if (data.reviews && Array.isArray(data.reviews)) {
-          console.log("Processing full marking schema with components:", data.reviews);
+          console.log("Processing reviews:", data.reviews);
+          
+          const newGuideReviews = [];
+          const newPanelReviews = [];
           
           data.reviews.forEach((review) => {
-            const reviewName = review.reviewName;
-            console.log(`Processing review: ${reviewName}`, review);
-            
-            if (newReviewData.hasOwnProperty(reviewName)) {
-              if (review.deadline) {
-                newReviewData[reviewName] = {
-                  from: new Date(review.deadline.from),
-                  to: new Date(review.deadline.to),
-                };
-                console.log(`Updated deadline for ${reviewName}:`, newReviewData[reviewName]);
-              }
-
-              if (review.components && Array.isArray(review.components) && review.components.length > 0) {
-                console.log(`Processing ${review.components.length} components for ${reviewName}:`, review.components);
-                
-                newComponents[reviewName] = review.components.map((comp, index) => {
-                  console.log(`Component ${index}:`, comp);
-                  
-                  let points = "";
-                  if (comp.weight !== undefined && comp.weight !== null) {
-                    points = comp.weight.toString();
-                  } else if (comp.points !== undefined && comp.points !== null) {
-                    points = comp.points.toString();
-                  }
-                  
-                  console.log(`Mapped component: name="${comp.name}", points="${points}"`);
-                  
-                  return {
+            const reviewData = {
+              id: `${review.facultyType || 'guide'}-${review.reviewName}`,
+              reviewName: review.reviewName,
+              displayName: review.displayName || review.reviewName,
+              facultyType: review.facultyType || 'guide',
+              from: review.deadline ? new Date(review.deadline.from) : defaultDate,
+              to: review.deadline ? new Date(review.deadline.to) : defaultDate,
+              components: review.components && review.components.length > 0 
+                ? review.components.map(comp => ({
                     name: comp.name || "",
-                    points: points
-                  };
-                });
-                
-                console.log(`Final components for ${reviewName}:`, newComponents[reviewName]);
-              } else {
-                console.log(`No components found for ${reviewName}, using default empty component`);
-                newComponents[reviewName] = [{ name: "", points: "" }];
-              }
+                    weight: comp.weight ? comp.weight.toString() : ""
+                  }))
+                : [{ name: "", weight: "" }],
+              requiresPPT: Boolean(review.requiresPPT)
+            };
 
-              if (review.hasOwnProperty('requiresPPT')) {
-                newPptRequirements[reviewName] = Boolean(review.requiresPPT);
-                console.log(`PPT requirement for ${reviewName}: ${newPptRequirements[reviewName]}`);
-              }
+            if (review.facultyType === 'panel') {
+              newPanelReviews.push(reviewData);
             } else {
-              console.log(`Skipping unknown review type: ${reviewName}`);
+              newGuideReviews.push(reviewData);
             }
           });
+          
+          if (newGuideReviews.length > 0) setGuideReviews(newGuideReviews);
+          if (newPanelReviews.length > 0) setPanelReviews(newPanelReviews);
           
           setMessage("Existing marking schema loaded successfully!");
-        } 
-        else if (data.deadlines && Array.isArray(data.deadlines)) {
-          console.log("Processing deadlines-only data:", data.deadlines);
-          
-          data.deadlines.forEach(item => {
-            if (newReviewData.hasOwnProperty(item.reviewName) && item.deadline) {
-              newReviewData[item.reviewName] = {
-                from: new Date(item.deadline.from),
-                to: new Date(item.deadline.to),
-              };
-            }
-          });
-          
-          setMessage("Existing deadlines loaded successfully!");
+        } else {
+          setMessage("No existing marking schema found. You can create new ones.");
         }
-
-        console.log('=== FINAL PROCESSED DATA ===');
-        console.log('Review Data:', newReviewData);
-        console.log('Components:', newComponents);
-        console.log('PPT Requirements:', newPptRequirements);
-
-        setReviewData(newReviewData);
-        setComponents(newComponents);
-        setPptRequirements(newPptRequirements);
-        
-      } else {
-        console.log("No existing data found or API returned empty data");
-        setMessage("No existing marking schema found. You can create new ones.");
       }
     } catch (err) {
       console.error("Error fetching deadlines:", err);
-      
       if (err.response?.status === 404) {
-        console.log("404 - No marking schema found, this is normal for first time setup");
         setMessage("No existing marking schema found. You can create new ones.");
       } else {
-        console.error("Actual error fetching data:", err);
         setMessage("Error loading existing data. You can still create a new marking schema.");
       }
     } finally {
@@ -235,89 +281,66 @@ function Schedule() {
     }
   };
 
-  // ✅ UPDATED: Enhanced validation for components
+  // Save marking schema
   const handleSaveDeadlines = async () => {
-    if (!school || !department) {
-      setMessage("Admin context is required. Please select school and department.");
+    if (!selectedSchool || !selectedDepartment) {
+      setMessage("Please select both school and department.");
+      return;
+    }
+
+    if (!canSave) {
+      setMessage(`Total weight must be exactly 100. Current total: ${totalWeight}`);
       return;
     }
 
     setSaving(true);
     setMessage("");
-    setValidationErrors({}); // Clear previous validation errors
-
-    // Validate dates
-    const dateValidation = Object.entries(reviewData).every(([reviewName, dates]) => {
-      return dates.to > dates.from;
-    });
-
-    if (!dateValidation) {
-      setMessage("Please ensure all 'To' dates are after their corresponding 'From' dates.");
-      setSaving(false);
-      return;
-    }
-
-    // ✅ NEW: Validate that each review has at least one component with a name
-    const componentValidation = {};
-    let hasValidationErrors = false;
-
-    Object.entries(components).forEach(([reviewName, reviewComponents]) => {
-      const validComponents = reviewComponents.filter(comp => comp.name && comp.name.trim());
-      
-      if (validComponents.length === 0) {
-        componentValidation[reviewName] = true;
-        hasValidationErrors = true;
-      }
-    });
-
-    if (hasValidationErrors) {
-      setValidationErrors(componentValidation);
-      setMessage("Each review must have at least one component with a name. Please check the highlighted reviews.");
-      setSaving(false);
-      return;
-    }
+    setValidationErrors({});
 
     try {
       console.log("=== SAVING COMPLETE MARKING SCHEMA ===");
 
-      const reviews = Object.entries(reviewData).map(([reviewName, dates]) => {
-        const reviewComponents = components[reviewName] || [];
-        
-        const processedComponents = reviewComponents
+      const allReviews = [...guideReviews, ...panelReviews];
+      
+      const reviews = allReviews.map(review => ({
+        reviewName: review.reviewName,
+        displayName: review.displayName,
+        facultyType: review.facultyType,
+        components: review.components
           .filter(comp => comp.name && comp.name.trim())
-          .map(comp => {
-            const weight = parseInt(comp.points) || 0;
-            console.log(`Component: "${comp.name.trim()}" -> Weight: ${weight}`);
-            return {
-              name: comp.name.trim(),
-              weight: weight
-            };
-          });
-
-        return {
-          reviewName,
-          components: processedComponents,
-          deadline: {
-            from: dates.from.toISOString(),
-            to: dates.to.toISOString(),
-          },
-          requiresPPT: pptRequirements[reviewName] || false,
-        };
-      });
+          .map(comp => ({
+            name: comp.name.trim(),
+            weight: parseInt(comp.weight) || 0
+          })),
+        deadline: {
+          from: review.from.toISOString(),
+          to: review.to.toISOString(),
+        },
+        requiresPPT: review.requiresPPT || false,
+      }));
 
       console.log("Final reviews payload:", JSON.stringify(reviews, null, 2));
 
       const response = await createOrUpdateMarkingSchema({ 
-        school, 
-        department, 
+        school: selectedSchool, 
+        department: selectedDepartment, 
         reviews 
       });
 
       if (response.data?.success) {
-        setMessage(`Complete marking schema saved successfully for ${getDisplayString()}!`);
+        // Show success state on button
+        setSaving(false);
+        setJustSaved(true);
+        
+        setMessage(`Complete marking schema saved successfully for ${selectedSchool} - ${selectedDepartment}!`);
+        
+        // Reset success state after 2 seconds
+        setTimeout(() => {
+          setJustSaved(false);
+        }, 2000);
         
         setTimeout(() => {
-          fetchDeadlines();
+          fetchDeadlines(selectedSchool, selectedDepartment);
         }, 1000);
       } else {
         throw new Error(response.data?.message || "Failed to save");
@@ -326,305 +349,418 @@ function Schedule() {
     } catch (error) {
       console.error("Save error:", error);
       setMessage(error.response?.data?.message || "Failed to save marking schema. Please try again.");
+      setSaving(false);
     }
-
-    setSaving(false);
   };
 
-  // Update review date handler
-  const updateReviewDate = (reviewName, field, value) => {
-    setReviewData(prev => ({
-      ...prev,
-      [reviewName]: {
-        ...prev[reviewName],
-        [field]: value,
-      }
-    }));
+  // Render review section
+  const renderReviewSection = (reviews, reviewType, addFunction, removeFunction, title, icon, sectionWeight) => {
+    const disabled = !selectedSchool || !selectedDepartment;
+
+    return (
+      <div className="mb-8">
+        <div className={`flex items-center justify-between mb-6 p-6 bg-gradient-to-r ${
+          reviewType === 'guide' 
+            ? 'from-blue-50 via-blue-25 to-indigo-50 border-blue-200' 
+            : 'from-purple-50 via-purple-25 to-pink-50 border-purple-200'
+        } rounded-xl border shadow-sm ${disabled ? 'opacity-50' : ''}`}>
+          <div className="flex items-center gap-4">
+            <div className={`p-3 rounded-xl ${
+              reviewType === 'guide' ? 'bg-blue-100' : 'bg-purple-100'
+            }`}>
+              {icon}
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+              <div className="flex items-center gap-4 mt-1">
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  reviewType === 'guide' 
+                    ? 'bg-blue-100 text-blue-800' 
+                    : 'bg-purple-100 text-purple-800'
+                }`}>
+                  {reviews.length} review{reviews.length !== 1 ? 's' : ''}
+                </span>
+                {shouldShowWeightTracker && (
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    sectionWeight > 0 
+                      ? reviewType === 'guide' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-orange-100 text-orange-800'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    <TrendingUp className="h-4 w-4 inline mr-1" />
+                    {sectionWeight} marks
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={addFunction}
+            disabled={disabled || !canAddReview}
+            className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl ${
+              disabled || !canAddReview
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : reviewType === 'guide'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
+                  : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
+            }`}
+            title={!canAddReview ? `Cannot add more reviews. Total weight: ${totalWeight}/100` : ''}
+          >
+            <Plus className="h-4 w-4" />
+            Add {reviewType === 'guide' ? 'Guide' : 'Panel'} Review
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          {reviews.map((review) => (
+            <div key={review.id} className={`bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-200 ${disabled ? 'opacity-50' : ''}`}>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <input
+                    type="text"
+                    value={review.displayName}
+                    onChange={(e) => updateReview(reviewType, review.id, 'displayName', e.target.value)}
+                    disabled={disabled}
+                    className="text-lg font-bold text-gray-800 border-2 border-gray-200 px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
+                    placeholder="Review Name"
+                  />
+                  <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-lg">
+                    <input
+                      type="checkbox"
+                      checked={review.requiresPPT}
+                      onChange={(e) => updateReview(reviewType, review.id, 'requiresPPT', e.target.checked)}
+                      disabled={disabled}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
+                    />
+                    <span className="text-sm font-medium text-gray-700">PPT Required</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => removeFunction(review.id)}
+                  disabled={disabled || reviews.length <= 1}
+                  className="text-red-600 hover:text-red-800 hover:bg-red-50 p-3 rounded-lg transition-colors disabled:text-gray-400 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">From Date</label>
+                  <DatePicker
+                    selected={review.from}
+                    onChange={(date) => updateReview(reviewType, review.id, 'from', date)}
+                    disabled={disabled}
+                    showTimeSelect
+                    timeIntervals={15}
+                    dateFormat="MMMM d, yyyy h:mm aa"
+                    className="w-full border-2 border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">To Date</label>
+                  <DatePicker
+                    selected={review.to}
+                    onChange={(date) => updateReview(reviewType, review.id, 'to', date)}
+                    disabled={disabled}
+                    showTimeSelect
+                    timeIntervals={15}
+                    dateFormat="MMMM d, yyyy h:mm aa"
+                    className="w-full border-2 border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Target className="h-4 w-4" />
+                    Components
+                  </label>
+                  <button
+                    onClick={() => addComponent(reviewType, review.id)}
+                    disabled={disabled}
+                    className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-lg transition-colors disabled:text-gray-400 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {review.components.map((component, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                      <input
+                        type="text"
+                        value={component.name}
+                        onChange={(e) => updateComponent(reviewType, review.id, index, 'name', e.target.value)}
+                        disabled={disabled}
+                        placeholder="Component Name"
+                        className="flex-1 border-2 border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
+                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={component.weight}
+                          onChange={(e) => updateComponent(reviewType, review.id, index, 'weight', e.target.value)}
+                          disabled={disabled}
+                          placeholder="Weight"
+                          min="0"
+                          max="100"
+                          className="w-20 border-2 border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-center font-bold"
+                          style={{ 
+                            MozAppearance: 'textfield',
+                            WebkitAppearance: 'none'
+                          }}
+                        />
+                        <span className="text-sm font-medium text-gray-500">marks</span>
+                      </div>
+                      <button
+                        onClick={() => removeComponent(reviewType, review.id, index)}
+                        disabled={disabled || review.components.length === 1}
+                        className={`p-2 rounded-lg transition-colors ${
+                          disabled || review.components.length === 1
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : 'text-red-600 hover:text-red-800 hover:bg-red-50'
+                        }`}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
-
-  // Context loading and error handling
-  if (contextLoading) {
-    return (
-      <>
-        <Navbar userType="admin" />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-xl">Loading admin context...</div>
-        </div>
-      </>
-    );
-  }
-
-  if (contextError) {
-    return (
-      <>
-        <Navbar userType="admin" />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-xl text-red-600">Context Error: {contextError}</div>
-        </div>
-      </>
-    );
-  }
-
-  const reviewTypes = [
-    { key: 'draftReview', label: 'Draft Review' },
-    { key: 'review0', label: 'Review 0' },
-    { key: 'review1', label: 'Review 1' },
-    { key: 'review2', label: 'Review 2' },
-    { key: 'review3', label: 'Review 3' },
-    { key: 'review4', label: 'Review 4' },
-  ];
 
   return (
     <>
       <Navbar userType="admin" />
-      <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
-          {/* Header with Admin Context */}
-          <div className="mb-8 pt-10">
-            <div className="flex justify-stretch items-center gap-96">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">Schedule Management</h1>
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <div className="flex items-center justify-between gap-5">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-blue-600" />
-                    <span className="font-medium text-blue-900">
-                      {getDisplayString()}
-                    </span>
-                  </div>
-                  <button
-                    onClick={handleChangeSchoolDepartment}
-                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-                  >
-                    Change School/Department
-                  </button>
-                </div>
-              </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="container mx-auto px-4 pt-24 pb-8 max-w-7xl">
+
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                Schedule Management
+              </h1>
+              <p className="text-gray-600 text-lg">Configure review schedules and marking components</p>
             </div>
-
-            {/* Loading State */}
-            {loading && (
-              <div className="text-center py-4 mb-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                <div className="text-lg text-gray-600">Loading existing marking schema...</div>
-              </div>
-            )}
-
-            {/* Error/Success Messages */}
-            {message && (
-              <div className={`p-4 rounded-lg mb-6 border ${
-                message.includes('successfully') 
-                  ? 'bg-green-50 text-green-700 border-green-200' 
-                  : message.includes('Error') || message.includes('Failed') || message.includes('must have at least one')
-                  ? 'bg-red-50 text-red-700 border-red-200'
-                  : 'bg-blue-50 text-blue-700 border-blue-200'
-              }`}>
-                <div className="flex items-center">
-                  {message.includes('successfully') ? (
-                    <CheckCircle className="h-5 w-5 mr-3 flex-shrink-0 text-green-600" />
-                  ) : message.includes('Error') || message.includes('Failed') || message.includes('must have at least one') ? (
-                    <AlertCircle className="h-5 w-5 mr-3 flex-shrink-0 text-red-600" />
-                  ) : (
-                    <CheckCircle className="h-5 w-5 mr-3 flex-shrink-0 text-blue-600" />
-                  )}
-                  <span className="font-medium">{message}</span>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Schedule Configuration Table */}
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div className="px-6 py-4 bg-gray-50 border-b">
-              <h2 className="text-xl font-semibold text-gray-800">Review Deadlines & Marking Components</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Configure deadlines, marking components, and PPT requirements for {getDisplayString()}
-              </p>
-            </div>
-
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-max">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Task</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">From Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">To Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-80">Components</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">PPT Required</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {reviewTypes.map((review) => (
-                    <tr key={review.key} className={`hover:bg-gray-50 ${
-                      validationErrors[review.key] ? 'bg-red-50 border-l-4 border-red-400' : ''
-                    }`}>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        <div className="flex items-center gap-2">
-                          {validationErrors[review.key] && (
-                            <AlertCircle className="h-4 w-4 text-red-500" />
-                          )}
-                          {review.label}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <DatePicker
-                          selected={reviewData[review.key].from}
-                          onChange={(date) => updateReviewDate(review.key, 'from', date)}
-                          showTimeSelect
-                          timeIntervals={15}
-                          dateFormat="MMMM d, yyyy h:mm aa"
-                          className="border-2 border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm w-full"
-                        />
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <DatePicker
-                          selected={reviewData[review.key].to}
-                          onChange={(date) => updateReviewDate(review.key, 'to', date)}
-                          showTimeSelect
-                          timeIntervals={15}
-                          dateFormat="MMMM d, yyyy h:mm aa"
-                          className="border-2 border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm w-full"
-                        />
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="space-y-2">
-                          {components[review.key].map((comp, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={comp.name}
-                                onChange={(e) => updateComponent(review.key, index, "name", e.target.value)}
-                                placeholder="Component Name"
-                                className={`flex-1 border-2 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm ${
-                                  validationErrors[review.key] && !comp.name.trim() 
-                                    ? 'border-red-300 focus:border-red-500' 
-                                    : 'border-gray-300 focus:border-blue-500'
-                                }`}
-                              />
-                              <input
-                                type="number"
-                                value={comp.points}
-                                onChange={(e) => {
-                                  console.log(`Points input changed for ${review.key}[${index}]: ${e.target.value}`);
-                                  updateComponent(review.key, index, "points", e.target.value);
-                                }}
-                                placeholder="Points"
-                                className="w-20 border-2 border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                              />
-                              <button
-                                onClick={() => removeComponent(review.key, index)}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  components[review.key].length === 1
-                                    ? 'text-gray-300 cursor-not-allowed'
-                                    : 'text-red-600 hover:text-red-800 hover:bg-red-50'
-                                }`}
-                                disabled={components[review.key].length === 1}
-                                title={components[review.key].length === 1 ? 'Cannot remove the last component' : 'Remove component'}
-                              >
-                                <Minus size={16} />
-                              </button>
-                            </div>
-                          ))}
-                          {validationErrors[review.key] && (
-                            <div className="text-red-600 text-xs mt-1 flex items-center gap-1">
-                              <AlertCircle size={12} />
-                              At least one component with a name is required
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      {/* PPT Requirement Column */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center justify-center">
-                          <label className="flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={pptRequirements[review.key] || false}
-                              onChange={(e) => handlePPTRequirementChange(review.key, e.target.checked)}
-                              className="sr-only"
-                            />
-                            <div className={`relative inline-flex items-center justify-center w-11 h-6 bg-gray-200 rounded-full transition-colors duration-200 ease-in-out ${
-                              pptRequirements[review.key] ? 'bg-green-500' : 'bg-gray-300'
-                            }`}>
-                              <div className={`inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ease-in-out ${
-                                pptRequirements[review.key] ? 'translate-x-3' : 'translate-x-1'
-                              }`} />
-                            </div>
-                            {pptRequirements[review.key] && (
-                              <CheckCircle size={16} className="ml-2 text-green-600" />
-                            )}
-                          </label>
-                        </div>
-                        <div className="text-center mt-1">
-                          <span className={`text-xs font-medium ${
-                            pptRequirements[review.key] ? 'text-green-600' : 'text-gray-500'
-                          }`}>
-                            {pptRequirements[review.key] ? 'Required' : 'Optional'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <button
-                          onClick={() => addComponent(review.key)}
-                          className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
-                        >
-                          <Plus size={16} />
-                        </button>
-                      </td>
-                    </tr>
+          {/* School/Department Selector */}
+          <div className="mb-8 p-8 bg-white border border-gray-200 rounded-2xl shadow-lg">
+            <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+              <Building2 className="h-6 w-6 text-blue-600" />
+              Select School & Department
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  School <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedSchool}
+                  onChange={(e) => setSelectedSchool(e.target.value)}
+                  className="block w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-lg"
+                  required
+                >
+                  <option value="">Select School</option>
+                  {schoolOptions.map(option => (
+                    <option key={option} value={option}>{option}</option>
                   ))}
-                </tbody>
-              </table>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Department <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedDepartment}
+                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  className="block w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-lg"
+                  required
+                >
+                  <option value="">Select Department</option>
+                  {departmentOptions.map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+          </div>
 
-            {/* Save Button Section */}
-            <div className="px-6 py-4 bg-gray-50 border-t">
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-600">
-                  <p className="flex items-center gap-2">
-                    <CheckCircle size={16} className="text-green-600" />
-                    <span>PPT Required: Reviews marked will show PPT approval section in Guide interface</span>
-                  </p>
-                  <p className="flex items-center gap-2 mt-1">
-                    <AlertCircle size={16} className="text-orange-600" />
-                    <span>Each review must have at least one component with a name</span>
-                  </p>
+          {/* Conditional Weight Summary - Only show when school & department selected */}
+          {shouldShowWeightTracker && (
+            <div className="fixed top-6 right-6 z-50">
+              <div className={`px-6 py-4 rounded-2xl shadow-2xl border-2 backdrop-blur-sm transition-all duration-300 ${
+                totalWeight === 100 
+                  ? 'bg-green-50/90 border-green-300 text-green-800'
+                  : totalWeight > 100 
+                    ? 'bg-red-50/90 border-red-300 text-red-800'
+                    : 'bg-blue-50/90 border-blue-300 text-blue-800'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-xl ${
+                    totalWeight === 100 
+                      ? 'bg-green-100' 
+                      : totalWeight > 100 
+                        ? 'bg-red-100' 
+                        : 'bg-blue-100'
+                  }`}>
+                    <Calculator className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-lg">Total Weight: {totalWeight}/100</div>
+                    <div className="text-sm opacity-80">
+                      Guide: {guideWeight} • Panel: {panelWeight}
+                    </div>
+                  </div>
                 </div>
+                {totalWeight !== 100 && (
+                  <div className="text-sm mt-2 opacity-90">
+                    {totalWeight < 100 ? `Need ${100 - totalWeight} more marks` : `Exceeded by ${totalWeight - 100} marks`}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {loading && (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <div className="text-xl text-gray-600">Loading existing marking schema...</div>
+            </div>
+          )}
+
+          {/* Selection Prompt */}
+          {!selectedSchool || !selectedDepartment ? (
+            <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200 shadow-lg">
+              <Building2 className="h-20 w-20 mx-auto mb-6 text-gray-300" />
+              <div className="text-3xl font-bold text-gray-600 mb-4">Choose School & Department</div>
+              <div className="text-lg text-gray-500">Please select a school and department above to configure schedules</div>
+            </div>
+          ) : (
+            <>
+              {/* Messages */}
+              {message && (
+                <div className={`p-6 rounded-2xl mb-8 border shadow-lg ${
+                  message.includes('successfully') 
+                    ? 'bg-green-50 text-green-700 border-green-200' 
+                    : message.includes('Error') || message.includes('Failed') || message.includes('Cannot') || message.includes('exceed') || message.includes('negative')
+                    ? 'bg-red-50 text-red-700 border-red-200'
+                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                }`}>
+                  <div className="flex items-center">
+                    {message.includes('successfully') ? (
+                      <CheckCircle className="h-6 w-6 mr-4 flex-shrink-0 text-green-600" />
+                    ) : message.includes('Error') || message.includes('Failed') || message.includes('Cannot') || message.includes('exceed') || message.includes('negative') ? (
+                      <AlertCircle className="h-6 w-6 mr-4 flex-shrink-0 text-red-600" />
+                    ) : (
+                      <CheckCircle className="h-6 w-6 mr-4 flex-shrink-0 text-blue-600" />
+                    )}
+                    <span className="font-semibold text-lg">{message}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Guide Reviews Section */}
+              {renderReviewSection(
+                guideReviews,
+                'guide',
+                addGuideReview,
+                removeGuideReview,
+                'Guide Reviews',
+                <GraduationCap className="h-6 w-6 text-blue-600" />,
+                guideWeight
+              )}
+
+              {/* Panel Reviews Section */}
+              {renderReviewSection(
+                panelReviews,
+                'panel',
+                addPanelReview,
+                removePanelReview,
+                'Panel Reviews',
+                <Users className="h-6 w-6 text-purple-600" />,
+                panelWeight
+              )}
+
+              {/* Save Button with Success State */}
+              <div className="flex justify-center">
                 <button
                   onClick={handleSaveDeadlines}
-                  disabled={saving || loading}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                  disabled={saving || loading || !canSave || justSaved}
+                  className={`px-12 py-5 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300 font-bold text-xl shadow-2xl hover:shadow-3xl ${
+                    justSaved
+                      ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white transform scale-105'
+                      : canSave && !saving && !loading
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
+                      : 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                  }`}
+                  title={!canSave ? `Total weight must be exactly 100. Current: ${totalWeight}` : ''}
                 >
                   {saving ? (
                     <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Saving...
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-4"></div>
+                      Saving Schema...
+                    </div>
+                  ) : justSaved ? (
+                    <div className="flex items-center">
+                      <CheckCircle className="h-6 w-6 mr-4 animate-pulse" />
+                      Saved Successfully!
                     </div>
                   ) : (
-                    "Save Marking Schema"
+                    `Save Complete Schema (${totalWeight}/100)`
                   )}
                 </button>
               </div>
-            </div>
-          </div>
 
-          {/* Info Panel */}
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-blue-900 mb-2">Marking Schema Configuration</h3>
-            <div className="text-sm text-blue-800">
-              <p className="mb-2">Configure your marking schema:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li><strong>Components:</strong> Define what gets marked in each review (e.g., "Presentation", "Demo")</li>
-                <li><strong>Points:</strong> Set the maximum points for each component</li>
-                <li><strong>PPT Required:</strong> Enable PPT approval section for specific reviews</li>
-                <li><strong>Deadlines:</strong> Set when each review period is active</li>
-                <li><strong>Validation:</strong> Each review must have at least one component with a name</li>
-                <li><strong>Auto-refresh:</strong> Data is reloaded after successful save to verify changes</li>
-              </ul>
-            </div>
-          </div>
+              {/* Enhanced Weight Distribution Info */}
+              <div className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-8 shadow-lg">
+                <h3 className="text-2xl font-bold text-blue-900 mb-4 flex items-center gap-3">
+                  <Target className="h-6 w-6" />
+                  Weight Distribution Rules
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-blue-800">
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                      <div><strong>Total Weight:</strong> Must equal exactly 100 marks across all components</div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                      <div><strong>Weight Limits:</strong> Individual component weights must be between 0-100</div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                      <div><strong>Components:</strong> Each review must have at least one component with a name</div>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>
+                      <div><strong>Review Limits:</strong> Cannot add new reviews if total weight reaches/exceeds 100</div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>
+                      <div><strong>PPT Required:</strong> Enable PPT approval section for specific reviews</div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>
+                      <div><strong>Faculty Types:</strong> Reviews are mapped to either 'guide' or 'panel' faculty</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </>

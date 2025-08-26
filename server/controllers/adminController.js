@@ -8,6 +8,7 @@ import Panel from "../models/panelSchema.js";
 import MarkingSchema from "../models/markingSchema.js";
 
 // for updating the structure of the marks
+// Updated createOrUpdateMarkingSchema function
 export async function createOrUpdateMarkingSchema(req, res) {
   const { school, department, reviews } = req.body;
 
@@ -22,16 +23,90 @@ export async function createOrUpdateMarkingSchema(req, res) {
       .json({ success: false, message: "Missing or invalid fields." });
   }
 
-  const updated = await MarkingSchema.findOneAndUpdate(
-    { school, department },
-    { reviews },
-    { new: true, upsert: true }
-  );
+  // Validate reviews structure
+  for (const review of reviews) {
+    if (!review.reviewName || !review.facultyType || !['guide', 'panel'].includes(review.facultyType)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Each review must have reviewName and facultyType (guide or panel)" 
+      });
+    }
+    
+    if (!review.deadline || !review.deadline.from || !review.deadline.to) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Each review must have valid deadline with from and to dates" 
+      });
+    }
+  }
 
-  res
-    .status(200)
-    .json({ success: true, message: "Marking schema saved.", data: updated });
+  try {
+    const updated = await MarkingSchema.findOneAndUpdate(
+      { school, department },
+      { reviews },
+      { new: true, upsert: true }
+    );
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Marking schema saved successfully.", 
+      data: updated 
+    });
+  } catch (error) {
+    console.error("Error saving marking schema:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error while saving marking schema" 
+    });
+  }
 }
+
+// Updated getDefaultDeadline function
+export async function getDefaultDeadline(req, res) {
+  try {
+    const { school, department } = req.query;
+
+    if (!school || !department) {
+      return res.status(400).json({
+        success: false,
+        message: "school and department query parameters are required.",
+      });
+    }
+
+    const markingSchema = await MarkingSchema.findOne({ school, department });
+
+    if (!markingSchema) {
+      return res.status(404).json({
+        success: false,
+        message: "No marking schema found for this school and department.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        school: markingSchema.school,
+        department: markingSchema.department,
+        reviews: markingSchema.reviews.map(review => ({
+          reviewName: review.reviewName,
+          displayName: review.displayName || review.reviewName,
+          facultyType: review.facultyType || 'guide',
+          components: review.components || [],
+          deadline: review.deadline || null,
+          requiresPPT: review.requiresPPT || false
+        }))
+      },
+    });
+  } catch (error) {
+    console.error("Error in getDefaultDeadline:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+}
+
 
 export async function createFaculty(req, res) {
   const {
@@ -108,8 +183,8 @@ export async function updateFaculty(req, res) {
       name,
       emailId,
       password,
-      schools,
-      departments,
+      school,
+      department,
       specialization,
       role,
       imageUrl,
@@ -169,9 +244,9 @@ export async function updateFaculty(req, res) {
     if (name) faculty.name = name;
     if (emailId) faculty.emailId = emailId.trim().toLowerCase();
     if (role && ["admin", "faculty"].includes(role)) faculty.role = role;
-    if (Array.isArray(schools) && schools.length > 0) faculty.schools = schools;
-    if (Array.isArray(departments) && departments.length > 0)
-      faculty.departments = departments;
+    if (Array.isArray(school) && school.length > 0) faculty.school = school;
+    if (Array.isArray(department) && department.length > 0)
+      faculty.department = department;
     if (Array.isArray(specialization) && specialization.length > 0)
       faculty.specialization = specialization;
     if (imageUrl !== undefined) faculty.imageUrl = imageUrl;
@@ -212,30 +287,30 @@ export async function createFacultyBulk(req, res) {
       const faculty = facultyList[i];
 
       try {
-        // Validate required fields including arrays for schools, departments and specialization
+        // Validate required fields including arrays for school, department and specialization
         if (
           !faculty.name ||
           !faculty.emailId ||
           !faculty.password ||
           !faculty.employeeId ||
-          !faculty.schools ||
-          !faculty.departments ||
+          !faculty.school ||
+          !faculty.department ||
           !faculty.specialization
         ) {
           results.errors++;
           results.details.push({
             row: i + 1,
             error:
-              "Missing required fields including schools, departments, or specialization",
+              "Missing required fields including school, department, or specialization",
           });
           continue;
         }
 
         if (
-          !Array.isArray(faculty.schools) ||
-          faculty.schools.length === 0 ||
-          !Array.isArray(faculty.departments) ||
-          faculty.departments.length === 0 ||
+          !Array.isArray(faculty.school) ||
+          faculty.school.length === 0 ||
+          !Array.isArray(faculty.department) ||
+          faculty.department.length === 0 ||
           !Array.isArray(faculty.specialization) ||
           faculty.specialization.length === 0
         ) {
@@ -243,7 +318,7 @@ export async function createFacultyBulk(req, res) {
           results.details.push({
             row: i + 1,
             error:
-              "Schools, departments, and specialization must be non-empty arrays",
+              "school, department, and specialization must be non-empty arrays",
           });
           continue;
         }
@@ -286,8 +361,8 @@ export async function createFacultyBulk(req, res) {
           password: hashedPassword,
           employeeId: faculty.employeeId.trim().toUpperCase(),
           role: faculty.role || "faculty",
-          schools: faculty.schools.map((s) => s.trim()),
-          departments: faculty.departments.map((d) => d.trim()),
+          school: faculty.school.map((s) => s.trim()),
+          department: faculty.department.map((d) => d.trim()),
           specialization: faculty.specialization.map((sp) => sp.trim()),
         });
 
@@ -342,51 +417,37 @@ export async function getAllFaculty(req, res) {
 
   try {
     // Build dynamic query based on provided params
-    let query = {};
-    if (school) query.schools = school;
-    if (department) query.departments = department;
-    if (specialization) query.specialization = specialization;
-
-    if (Object.keys(query).length === 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "At least one of school, department, or specialization must be provided",
-      });
+    let query = { role: "faculty" }; // Always filter by faculty role
+    
+    // ✅ FIXED: Handle "all" parameters and array fields
+    if (school && school !== "all") {
+      query.school = school; // Since schema uses array, this will match if school is in the array
+    }
+    if (department && department !== "all") {
+      query.department = department; // Since schema uses array, this will match if department is in the array
+    }
+    if (specialization && specialization !== "all") {
+      query.specialization = specialization; // Since schema uses array, this will match if specialization is in the array
     }
 
-    // Allowed sorting fields (only from the ones present in query if any)
-    const validSortFields = ["schools", "departments", "specialization"];
-    // Determine default sort priority based on which params are provided
-    // e.g., sort by school if only school given,
-    // by school then department if both given,
-    // by school then department then specialization if all given
+    // ✅ FIXED: Sorting logic updated for array fields
+    const validSortFields = ["school", "department", "specialization"];
     const sortFieldsPriority = [];
-    if (school) sortFieldsPriority.push("schools");
-    if (department) sortFieldsPriority.push("departments");
-    if (specialization) sortFieldsPriority.push("specialization");
+    if (school && school !== "all") sortFieldsPriority.push("school");
+    if (department && department !== "all") sortFieldsPriority.push("department");
+    if (specialization && specialization !== "all") sortFieldsPriority.push("specialization");
 
     let sortOption = {};
 
     if (sortBy && validSortFields.includes(sortBy)) {
-      // Use user provided sorting if valid
       const order = sortOrder && sortOrder.toLowerCase() === "desc" ? -1 : 1;
       sortOption[sortBy] = order;
     } else {
-      // Otherwise, default sort order based on presence in priority array ascending
-      sortFieldsPriority.forEach((field) => {
-        sortOption[field] = 1;
-      });
+      // Default sort by name if no specific field sorting
+      sortOption.name = 1;
     }
 
     const faculty = await Faculty.find(query).sort(sortOption);
-
-    if (!faculty.length) {
-      return res.status(404).json({
-        success: false,
-        message: "No faculty found matching the given criteria.",
-      });
-    }
 
     res.status(200).json({
       success: true,
@@ -397,8 +458,8 @@ export async function getAllFaculty(req, res) {
         employeeId: f.employeeId,
         emailId: f.emailId,
         role: f.role,
-        schools: f.schools,
-        departments: f.departments,
+        school: f.school, // Return as arrays since that's what schema defines
+        department: f.department,
         specialization: f.specialization,
       })),
     });
@@ -406,6 +467,7 @@ export async function getAllFaculty(req, res) {
     res.status(500).json({ success: false, message: error.message });
   }
 }
+
 
 // without dept and school, can be used for getting all the details
 // export async function getAllGuideWithProjects(req, res) {
@@ -465,8 +527,8 @@ export async function getAllGuideWithProjects(req, res) {
 
     // Build dynamic query for faculties by role and optional school and department
     const facultyQuery = { role: "faculty" };
-    if (school) facultyQuery.schools = school;
-    if (department) facultyQuery.departments = department;
+    if (school) facultyQuery.school = school;
+    if (department) facultyQuery.department = department;
 
     const faculties = await Faculty.find(facultyQuery);
 
@@ -487,8 +549,8 @@ export async function getAllGuideWithProjects(req, res) {
             employeeId: faculty.employeeId,
             name: faculty.name,
             emailId: faculty.emailId,
-            schools: faculty.schools,
-            departments: faculty.departments,
+            school: faculty.school,
+            department: faculty.department,
           },
           guidedProjects,
         };
@@ -508,8 +570,8 @@ export async function getAllPanelsWithProjects(req, res) {
 
     // Find all panels with populated faculties
     const panels = await Panel.find()
-      .populate("faculty1", "employeeId name emailId schools departments")
-      .populate("faculty2", "employeeId name emailId schools departments")
+      .populate("faculty1", "employeeId name emailId school department")
+      .populate("faculty2", "employeeId name emailId school department")
       .lean();
 
     // Filter panels based on school and department if provided
@@ -520,13 +582,13 @@ export async function getAllPanelsWithProjects(req, res) {
 
       if (school) {
         schoolMatch =
-          panel.faculty1.schools?.includes(school) &&
-          panel.faculty2.schools?.includes(school);
+          panel.faculty1.school?.includes(school) &&
+          panel.faculty2.school?.includes(school);
       }
       if (department) {
         departmentMatch =
-          panel.faculty1.departments?.includes(department) &&
-          panel.faculty2.departments?.includes(department);
+          panel.faculty1.department?.includes(department) &&
+          panel.faculty2.department?.includes(department);
       }
       return schoolMatch && departmentMatch;
     });
@@ -642,48 +704,7 @@ export async function createAdmin(req, res) {
   });
 }
 
-export async function getDefaultDeadline(req, res) {
-  try {
-    const { school, department } = req.query;
 
-    if (!school || !department) {
-      return res.status(400).json({
-        success: false,
-        message: "school and department query parameters are required.",
-      });
-    }
-
-    const markingSchema = await MarkingSchema.findOne({ school, department });
-
-    if (!markingSchema) {
-      return res.status(404).json({
-        success: false,
-        message: "No marking schema found for this school and department.",
-      });
-    }
-
-    // ✅ FIXED: Return the complete marking schema instead of just deadlines
-    res.status(200).json({
-      success: true,
-      data: {
-        school: markingSchema.school,
-        department: markingSchema.department,
-        reviews: markingSchema.reviews, // ✅ Return full reviews with components and weights
-        deadlines: markingSchema.reviews.map((review) => ({
-          reviewName: review.reviewName,
-          deadline: review.deadline || null,
-        })),
-      },
-    });
-  } catch (error) {
-    console.error("Error in getDefaultDeadline:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message,
-    });
-  }
-}
 
 export async function setDefaultDeadline(req, res) {
   try {
@@ -1024,23 +1045,23 @@ export async function createPanelManually(req, res) {
       });
     }
 
-    // Ensure same school and department for panel members
-    if (
-      faculty1.school !== faculty2.school ||
-      faculty1.department !== faculty2.department
-    ) {
+    // ✅ FIXED: Handle array fields - check if they have common school and department
+    const commonschool = faculty1.school.filter(s => faculty2.school.includes(s));
+    const commondepartment = faculty1.department.filter(d => faculty2.department.includes(d));
+
+    if (commonschool.length === 0 || commondepartment.length === 0) {
       return res.status(400).json({
         success: false,
-        message:
-          "Faculty members belong to different schools or departments. Panel must be within the same school and department.",
+        message: "Faculty members must have at least one common school and department.",
       });
     }
 
+    // Use the first common school and department
     const panel = new Panel({
       faculty1: faculty1Id,
       faculty2: faculty2Id,
-      school: faculty1.school,
-      department: faculty1.department,
+      school: commonschool[0],
+      department: commondepartment[0],
     });
 
     await panel.save();
@@ -1059,6 +1080,7 @@ export async function createPanelManually(req, res) {
     });
   }
 }
+
 
 export async function autoCreatePanels(req, res) {
   try {
@@ -1325,15 +1347,15 @@ export async function assignExistingPanelToProject(req, res) {
     }
 
     // Optionally validate same school and department
-    if (
-      panel.school !== project.school ||
-      panel.department !== project.department
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Panel and project belong to different school or department.",
-      });
-    }
+    // if (
+    //   panel.school !== project.school ||
+    //   panel.department !== project.department
+    // ) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Panel and project belong to different school or department.",
+    //   });
+    // }
 
     const updatedProject = await Project.findByIdAndUpdate(
       projectId,
