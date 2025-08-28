@@ -258,12 +258,13 @@ export async function createProject(req, res, next) {
 
 export async function createProjectsBulk(req, res) {
   const session = await mongoose.startSession();
-
   try {
     session.startTransaction();
 
-    const { schools, departments, projects, guideFacultyEmpId } = req.body;
+    // Destructure request body with singular school and department keys
+    const { school, department, projects, guideFacultyEmpId } = req.body;
 
+    // Validate required fields
     if (!school || !department) {
       await session.abortTransaction();
       return res.status(400).json({
@@ -271,7 +272,6 @@ export async function createProjectsBulk(req, res) {
         message: "School and department are required.",
       });
     }
-
     if (!Array.isArray(projects) || projects.length === 0) {
       await session.abortTransaction();
       return res.status(400).json({
@@ -279,7 +279,6 @@ export async function createProjectsBulk(req, res) {
         message: "Projects array is required and must be non-empty.",
       });
     }
-
     if (!guideFacultyEmpId) {
       await session.abortTransaction();
       return res.status(400).json({
@@ -288,7 +287,7 @@ export async function createProjectsBulk(req, res) {
       });
     }
 
-    // Verify MarkingSchema for school/department in transaction session
+    // Verify MarkingSchema for school and department in transaction session
     const markingSchema = await MarkingSchema.findOne({
       school,
       department,
@@ -304,8 +303,8 @@ export async function createProjectsBulk(req, res) {
     // Verify guide faculty existence within the school and department
     const guideFacultyDoc = await Faculty.findOne({
       employeeId: guideFacultyEmpId,
-      schools: school,
-      departments: department,
+      school,       // singular key here
+      department,   // singular key here
     }).session(session);
     if (!guideFacultyDoc) {
       await session.abortTransaction();
@@ -315,7 +314,7 @@ export async function createProjectsBulk(req, res) {
       });
     }
 
-    // Prepare review keys and default deadlines map from markingSchema
+    // Prepare reviews and deadlines from marking schema
     const reviewKeys = markingSchema.reviews.map((review) => review.reviewName);
     const defaultDeadlinesMap = new Map();
     markingSchema.reviews.forEach((review) => {
@@ -334,14 +333,8 @@ export async function createProjectsBulk(req, res) {
     // Process projects sequentially for transactional safety
     for (let i = 0; i < projects.length; i++) {
       const project = projects[i];
-
       try {
-        // Validate project name and students array
-        if (
-          !project.name ||
-          !Array.isArray(project.students) ||
-          project.students.length === 0
-        ) {
+        if (!project.name || !Array.isArray(project.students) || project.students.length === 0) {
           results.errors++;
           results.details.push({
             project: project.name || `Project ${i + 1}`,
@@ -350,13 +343,12 @@ export async function createProjectsBulk(req, res) {
           continue;
         }
 
-        // Check if project already exists with the same name, school, and department
+        // Check if project already exists with same name, school, and department
         const existingProject = await Project.findOne({
           name: project.name,
           school,
           department,
         }).session(session);
-
         if (existingProject) {
           results.errors++;
           results.details.push({
@@ -368,14 +360,13 @@ export async function createProjectsBulk(req, res) {
 
         const studentIds = [];
 
-        // Process each student in this project
         for (const studentObj of project.students) {
           const {
             regNo,
             name: studentName,
             emailId,
             school: studSchool,
-            department: studDept,
+            department: studDepartment,
           } = studentObj;
 
           if (!regNo || !studentName || !emailId) {
@@ -385,34 +376,30 @@ export async function createProjectsBulk(req, res) {
           }
 
           // Verify student's school and department match the provided ones
-          if (studSchool !== school || studDept !== department) {
+          if (studSchool !== school || studDepartment !== department) {
             throw new Error(
               `Student ${regNo} has mismatched school or department`
             );
           }
 
           // Check if student already exists
-          const existingStudent = await Student.findOne({ regNo }).session(
-            session
-          );
+          const existingStudent = await Student.findOne({ regNo }).session(session);
           if (existingStudent) {
             throw new Error(`Student already exists with regNo ${regNo}`);
           }
 
-          // Build default reviews map with zeros and defaults
+          // Build reviews map with defaults
           const reviewsMap = new Map();
           for (const reviewKey of reviewKeys) {
             const reviewDef = markingSchema.reviews.find(
               (rev) => rev.reviewName === reviewKey
             );
             const marks = {};
-
             if (reviewDef && Array.isArray(reviewDef.components)) {
               for (const comp of reviewDef.components) {
                 marks[comp.name] = 0;
               }
             }
-
             reviewsMap.set(reviewKey, {
               marks,
               comments: "",
@@ -421,7 +408,7 @@ export async function createProjectsBulk(req, res) {
             });
           }
 
-          // Create student with default deadlines and school/department
+          // Create student document
           const student = new Student({
             regNo,
             name: studentName,
@@ -432,7 +419,6 @@ export async function createProjectsBulk(req, res) {
             school,
             department,
           });
-
           await student.save({ session });
           studentIds.push(student._id);
         }
@@ -445,10 +431,10 @@ export async function createProjectsBulk(req, res) {
           panel: null,
           school,
           department,
-          specialization: project.specialization || "", // if specialization is required, validate as needed
+          specialization: project.specialization || "",
         });
-
         await newProject.save({ session });
+
         results.created++;
       } catch (error) {
         results.errors++;
@@ -460,7 +446,6 @@ export async function createProjectsBulk(req, res) {
     }
 
     await session.commitTransaction();
-
     return res.status(201).json({
       success: true,
       message: `Bulk project creation completed. ${results.created} created, ${results.errors} errors.`,
@@ -469,7 +454,6 @@ export async function createProjectsBulk(req, res) {
   } catch (error) {
     await session.abortTransaction();
     console.error("Error in bulk project creation:", error);
-
     return res.status(500).json({
       success: false,
       message: "Server error during bulk project creation",
@@ -479,6 +463,7 @@ export async function createProjectsBulk(req, res) {
     session.endSession();
   }
 }
+
 
 export async function deleteProject(req, res) {
   try {
