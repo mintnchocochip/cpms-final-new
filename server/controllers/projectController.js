@@ -262,7 +262,7 @@ export async function createProjectsBulk(req, res) {
   try {
     session.startTransaction();
 
-    const { school, department, projects, guideFacultyEmpId } = req.body;
+    const { schools, departments, projects, guideFacultyEmpId } = req.body;
 
     if (!school || !department) {
       await session.abortTransaction();
