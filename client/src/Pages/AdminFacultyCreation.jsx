@@ -5,30 +5,56 @@ import Navbar from '../Components/UniversalNavbar';
 import { createFaculty, createAdmin, createFacultyBulk } from '../api';
 import * as XLSX from 'xlsx';
 
+// -------------------- Specialization Normalization Logic -----------------------
+
+const specializationOptionsRaw = [
+  'AI/ML', 'Data Science', 'Cyber Security', 'IoT', 'Blockchain', 'Cloud Computing', 'VLSI', 'Software Engineering', 'General'
+];
+
+const normalizeSpecialization = (spec) => {
+  if (!spec) return '';
+  return String(spec)
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[^a-z0-9]/g, '');
+};
+
+const specializationMap = {
+  aiml: 'AI/ML',
+  datascience: 'Data Science',
+  cybersecurity: 'Cyber Security',
+  iot: 'IoT',
+  blockchain: 'Blockchain',
+  cloudcomputing: 'Cloud Computing',
+  vlsi: 'VLSI',
+  softwareengineering: 'Software Engineering',
+  general: 'General'
+};
+
+const specializationOptions = specializationOptionsRaw.map(normalizeSpecialization); // ['aiml', 'datascience', ...]
+// ------------------------------------------------------------------------------
+
 const FacultyManagement = () => {
   const navigate = useNavigate();
-  
+
   const getAdminContext = () => {
     try {
       const context = sessionStorage.getItem('adminContext');
       return context ? JSON.parse(context) : null;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   };
 
-  const [adminContext, setAdminContext] = useState(getAdminContext());
+  const [adminContext] = useState(getAdminContext());
   const schoolFromContext = adminContext?.school || '';
   const departmentFromContext = adminContext?.department || '';
   const hasContext = Boolean(schoolFromContext && departmentFromContext);
-  
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('single');
-  
-  // ✅ IMPROVED: Simple form structure with single school/department selection
+
   const [formData, setFormData] = useState({
     imageUrl: '',
     employeeId: '',
@@ -44,10 +70,8 @@ const FacultyManagement = () => {
   const [bulkData, setBulkData] = useState([]);
   const [fileName, setFileName] = useState('');
 
-  // Available options for dropdowns
   const schoolOptions = ['SCOPE', 'SENSE'];
-  const departmentOptions = ['BTech','MTech(integrated)','MCA'];
-  const specializationOptions = ['AI/ML', 'Data Science', 'Cyber Security', 'IoT', 'Blockchain', 'Cloud Computing', 'General'];
+  const departmentOptions = ['BTech', 'MTech(integrated)', 'MCA'];
 
   useEffect(() => {
     if (success) {
@@ -56,7 +80,6 @@ const FacultyManagement = () => {
     }
   }, [success]);
 
-  // ✅ FIXED: Update form when context changes
   useEffect(() => {
     if (hasContext) {
       setFormData(prev => ({
@@ -82,7 +105,6 @@ const FacultyManagement = () => {
     setError('');
     setShowPassword(false);
   };
-
   const resetBulkData = () => {
     setBulkData([]);
     setFileName('');
@@ -90,39 +112,16 @@ const FacultyManagement = () => {
     setSuccess('');
   };
 
-
-const handleSelectContext = () => {
-  console.log('🔵 SELECT CONTEXT CLICKED');
-  
-  const hasUnsavedChanges = formData.name || formData.employeeId || formData.emailId || formData.password;
-  
-  if (hasUnsavedChanges) {
-    const userConfirmed = window.confirm('You have unsaved changes. Are you sure you want to leave this page?');
-    if (!userConfirmed) {
-      console.log('❌ Navigation cancelled by user');
-      return;
+  const handleSelectContext = () => {
+    const hasUnsavedChanges = formData.name || formData.employeeId || formData.emailId || formData.password;
+    if (hasUnsavedChanges) {
+      const userConfirmed = window.confirm('You have unsaved changes. Are you sure you want to leave this page?');
+      if (!userConfirmed) return;
     }
-  }
-  
-  console.log('✅ Proceeding with navigation');
-  
-  try {
-    // ✅ Clear context and store return path before navigating
     sessionStorage.removeItem('adminContext');
     sessionStorage.setItem('adminReturnPath', window.location.pathname);
-    
-    console.log('🚀 Attempting navigate() call to /admin/school-selection');
     navigate('/admin/school-selection');
-    console.log('✅ Navigate function called successfully');
-  } catch (error) {
-    console.error('❌ Error during navigation:', error);
-    window.location.href = '/admin/school-selection';
-  }
-};
-
-
-
-
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -131,95 +130,50 @@ const handleSelectContext = () => {
       [name]: value
     }));
   };
-
-  // ✅ IMPROVED: Handle specialization multi-select
   const handleSpecializationChange = (e) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+    // Always store normalized values in specializations array
+    const selectedOptions = Array.from(e.target.selectedOptions, option => normalizeSpecialization(option.value));
     setFormData(prev => ({
       ...prev,
       specializations: selectedOptions
     }));
   };
 
+  // Ensure all specializations are normalized before submit
   const validateForm = () => {
-    if (!formData.name.trim()) {
-      throw new Error('Name is required');
-    }
-    
-    if (!formData.employeeId.trim()) {
-      throw new Error('Employee ID is required');
-    }
-    
-    if (!formData.employeeId.match(/^[A-Za-z0-9]+$/)) {
-      throw new Error('Employee ID must contain only letters and numbers');
-    }
-    
-    if (!formData.emailId.trim()) {
-      throw new Error('Email is required');
-    }
-    
-    if (!formData.emailId.endsWith('@vit.ac.in')) {
-      throw new Error('Only VIT email addresses are allowed (@vit.ac.in)');
-    }
-    
-    if (!formData.password) {
-      throw new Error('Password is required');
-    }
-    
-    if (formData.password.length < 8) {
-      throw new Error('Password must be at least 8 characters long');
-    }
-    
-    if (!/[A-Z]/.test(formData.password)) {
-      throw new Error('Password must contain at least one uppercase letter');
-    }
-    
-    if (!/[a-z]/.test(formData.password)) {
-      throw new Error('Password must contain at least one lowercase letter');
-    }
-    
-    if (!/[0-9]/.test(formData.password)) {
-      throw new Error('Password must contain at least one number');
-    }
-    
-    if (!/[^A-Za-z0-9]/.test(formData.password)) {
-      throw new Error('Password must contain at least one special character');
-    }
-
-    if (!formData.school) {
-      throw new Error('School selection is required');
-    }
-    
-    if (!formData.department) {
-      throw new Error('Department selection is required');
-    }
-    
-    if (!formData.specializations || formData.specializations.length === 0) {
-      throw new Error('At least one specialization must be selected');
-    }
+    if (!formData.name.trim()) throw new Error('Name is required');
+    if (!formData.employeeId.trim()) throw new Error('Employee ID is required');
+    if (!formData.employeeId.match(/^[A-Za-z0-9]+$/)) throw new Error('Employee ID must contain only letters and numbers');
+    if (!formData.emailId.trim()) throw new Error('Email is required');
+    if (!formData.emailId.endsWith('@vit.ac.in')) throw new Error('Only VIT email addresses are allowed (@vit.ac.in)');
+    if (!formData.password) throw new Error('Password is required');
+    if (formData.password.length < 8) throw new Error('Password must be at least 8 characters long');
+    if (!/[A-Z]/.test(formData.password)) throw new Error('Password must contain at least one uppercase letter');
+    if (!/[a-z]/.test(formData.password)) throw new Error('Password must contain at least one lowercase letter');
+    if (!/[0-9]/.test(formData.password)) throw new Error('Password must contain at least one number');
+    if (!/[^A-Za-z0-9]/.test(formData.password)) throw new Error('Password must contain at least one special character');
+    if (!formData.school) throw new Error('School selection is required');
+    if (!formData.department) throw new Error('Department selection is required');
+    if (!formData.specializations || formData.specializations.length === 0) throw new Error('At least one specialization must be selected');
   };
 
   const handleSingleSubmit = async () => {
     setError('');
     setSuccess('');
     setIsLoading(true);
-
     try {
       validateForm();
-
-      // ✅ FIXED: Convert single selections to arrays for backend
+      // Send only normalized specializations
       const apiData = {
         name: String(formData.name.trim()),
         emailId: String(formData.emailId.trim().toLowerCase()),
         password: String(formData.password),
         employeeId: String(formData.employeeId.trim().toUpperCase()),
         imageUrl: String(formData.imageUrl.trim()),
-        // ✅ FIXED: Send as arrays to match backend schema
         school: [formData.school],
         department: [formData.department],
-        specialization: formData.specializations
+        specialization: formData.specializations.map(normalizeSpecialization) // always normalized!
       };
-
       let response;
       if (formData.role === 'faculty') {
         response = await createFaculty(apiData);
@@ -228,31 +182,45 @@ const handleSelectContext = () => {
       } else {
         throw new Error('Invalid role selected');
       }
+setSuccess(
+  response.message && response.message.trim().length > 0
+    ? response.message
+    : `${formData.role === "faculty" ? "Faculty" : "Admin"} account for "${formData.name}" (${formData.employeeId}) created successfully! (Total created: 1)`
+);
 
-      setSuccess(response.message || `${formData.role === 'faculty' ? 'Faculty' : 'Admin'} created successfully!`);
       resetForm();
-      
     } catch (err) {
-      if (err.response && err.response.data) {
-        setError(err.response.data.message || 'Server validation failed');
-      } else if (err.message) {
-        setError(err.message);
-      } else {
-        setError('Failed to create user. Please try again.');
-      }
+      if (err.response && err.response.data) setError(err.response.data.message || 'Server validation failed');
+      else if (err.message) setError(err.message);
+      else setError('Failed to create user. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Bulk helpers: normalization and parsing Excel/CSV
+  const cleanText = (value) => {
+    if (value === null || value === undefined) return '';
+    return String(value)
+      .trim()
+      .replace(/[\r\n\t]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, '')
+      .trim();
+  };
+
+  const parseArrayField = (field) => {
+    if (!field) return [];
+    const cleaned = cleanText(field);
+    return cleaned.split(',')
+      .map(s => normalizeSpecialization(s))
+      .filter(s => s.length > 0);
+  };
+
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
-    setFileName(file.name);
-    setError('');
-    setSuccess('');
-
+    setFileName(file.name); setError(''); setSuccess('');
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -261,28 +229,8 @@ const handleSelectContext = () => {
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(sheet);
-
         const formattedData = [];
         const errorDetails = [];
-        
-        const cleanText = (value) => {
-          if (value === null || value === undefined) return '';
-          return String(value)
-            .trim()
-            .replace(/[\r\n\t]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, '')
-            .trim();
-        };
-
-        const parseArrayField = (field) => {
-          if (!field) return [];
-          const cleaned = cleanText(field);
-          return cleaned.includes(',') 
-            ? cleaned.split(',').map(s => s.trim()).filter(s => s.length > 0)
-            : [cleaned].filter(s => s.length > 0);
-        };
-        
         jsonData.forEach((row, index) => {
           try {
             const name = cleanText(row.name);
@@ -291,10 +239,7 @@ const handleSelectContext = () => {
             const password = row.password ? String(row.password).trim() : '';
             const role = cleanText(row.role);
             const imageUrl = cleanText(row.imageUrl) || '';
-
-            // ✅ FIXED: Handle school/department based on context
             let school, department, specializations;
-            
             if (hasContext) {
               school = schoolFromContext;
               department = departmentFromContext;
@@ -304,50 +249,30 @@ const handleSelectContext = () => {
               department = cleanText(row.department);
               specializations = parseArrayField(row.specializations || row.specialization);
             }
-
             const rowErrors = [];
-
             if (!name) rowErrors.push('Missing name');
             if (!employeeId) rowErrors.push('Missing employee ID');
             if (!emailId) rowErrors.push('Missing email');
             if (!password || password === '0') rowErrors.push('Missing password');
-
             const cleanEmployeeId = employeeId.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-            if (employeeId && !cleanEmployeeId) {
-              rowErrors.push('Invalid employee ID');
-            }
-
+            if (employeeId && !cleanEmployeeId) rowErrors.push('Invalid employee ID');
             if (emailId) {
               const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-              if (!emailRegex.test(emailId)) {
-                rowErrors.push('Invalid email format');
-              } else if (!emailId.endsWith('@vit.ac.in')) {
-                rowErrors.push('Email must end with @vit.ac.in');
-              }
+              if (!emailRegex.test(emailId)) rowErrors.push('Invalid email format');
+              else if (!emailId.endsWith('@vit.ac.in')) rowErrors.push('Email must end with @vit.ac.in');
             }
-
             if (!school) rowErrors.push('Missing school');
             if (!department) rowErrors.push('Missing department');
             if (specializations.length === 0) rowErrors.push('Missing specializations');
-
             const cleanRole = role.toLowerCase();
             const validRole = cleanRole === 'admin' ? 'admin' : 'faculty';
-
             let cleanPassword = password;
             if (password && (password.includes('\n') || password.includes('\r') || password.includes('\t'))) {
               cleanPassword = password.replace(/[\r\n\t]/g, '').trim();
             }
-
-            if (rowErrors.length > 0) {
-              errorDetails.push({
-                row: index + 2,
-                name: name || 'N/A',
-                employeeId: employeeId || 'N/A',
-                emailId: emailId || 'N/A',
-                errors: rowErrors
-              });
-            }
-
+            if (rowErrors.length > 0) errorDetails.push({
+              row: index + 2, name: name || 'N/A', employeeId: employeeId || 'N/A', emailId: emailId || 'N/A', errors: rowErrors
+            });
             formattedData.push({
               name: name || '',
               employeeId: cleanEmployeeId || employeeId || '',
@@ -357,21 +282,16 @@ const handleSelectContext = () => {
               imageUrl: imageUrl,
               school: school,
               department: department,
-              specializations: specializations,
+              specializations: specializations, // already normalized
               originalRow: index + 2,
               hasErrors: rowErrors.length > 0,
               errors: rowErrors
             });
-
           } catch (rowError) {
             errorDetails.push({
-              row: index + 2,
-              name: 'Error processing row',
-              employeeId: 'N/A',
-              emailId: 'N/A',
+              row: index + 2, name: 'Error processing row', employeeId: 'N/A', emailId: 'N/A',
               errors: [`Row processing error: ${rowError.message}`]
             });
-            
             formattedData.push({
               name: 'ERROR',
               employeeId: 'ERROR',
@@ -388,39 +308,27 @@ const handleSelectContext = () => {
             });
           }
         });
-
         setBulkData(formattedData);
-
         const validEntries = formattedData.filter(entry => !entry.hasErrors);
         const invalidEntries = formattedData.filter(entry => entry.hasErrors);
-
         if (invalidEntries.length > 0) {
           const errorSummary = errorDetails
             .slice(0, 5)
-            .map(detail => 
-              `Row ${detail.row}: ${detail.errors.join(', ')}`
-            ).join('\n');
-          
+            .map(detail => `Row ${detail.row}: ${detail.errors.join(', ')}`).join('\n');
           setError(`Found ${invalidEntries.length} problematic entries:\n\n${errorSummary}${invalidEntries.length > 5 ? `\n... and ${invalidEntries.length - 5} more errors` : ''}\n\nFix issues before submitting.`);
         }
-
         if (validEntries.length > 0) {
           setSuccess(`${formattedData.length} faculty records loaded. ${validEntries.length} are valid, ${invalidEntries.length} have issues.`);
         } else {
           setSuccess(`${formattedData.length} faculty records loaded, but all have issues.`);
         }
-
       } catch (err) {
         console.error('File processing error:', err);
         setError(`Error processing file: ${err.message}. Please ensure the file format is correct.`);
         setBulkData([]);
       }
     };
-
-    reader.onerror = () => {
-      setError('Error reading file. Please try again.');
-    };
-
+    reader.onerror = () => setError('Error reading file. Please try again.');
     reader.readAsArrayBuffer(file);
   };
 
@@ -429,30 +337,23 @@ const handleSelectContext = () => {
       setError('No faculty data to upload. Please select a valid Excel file.');
       return;
     }
-
     const validEntries = bulkData.filter(entry => !entry.hasErrors);
     const invalidEntries = bulkData.filter(entry => entry.hasErrors);
-
     if (validEntries.length === 0) {
       setError('No valid faculty entries to submit. Please fix the errors first.');
       return;
     }
-
     if (invalidEntries.length > 0) {
       const confirmSubmit = window.confirm(
         `You have ${invalidEntries.length} invalid entries that will be skipped. Continue with creating ${validEntries.length} valid accounts?`
       );
-      if (!confirmSubmit) {
-        return;
-      }
+      if (!confirmSubmit) return;
     }
-
     setError('');
     setSuccess('');
     setIsLoading(true);
-
     try {
-      // ✅ FIXED: Map data to match backend bulk controller expectations
+      // ALWAYS send normalized specializations for backend
       const validatedData = validEntries.map(faculty => ({
         name: String(faculty.name).trim(),
         emailId: String(faculty.emailId).trim().toLowerCase(),
@@ -462,25 +363,29 @@ const handleSelectContext = () => {
         imageUrl: String(faculty.imageUrl || '').trim(),
         schools: [faculty.school],
         departments: [faculty.department],
-        specialization: faculty.specializations
+        specialization: faculty.specializations.map(normalizeSpecialization)
       }));
-
-      const response = await createFacultyBulk({
-        facultyList: validatedData
-      });
-
+      const response = await createFacultyBulk({ facultyList: validatedData });
       const successCount = response.data?.created || 0;
       const errorCount = response.data?.errors || 0;
-      
       if (successCount > 0) {
-        setSuccess(`Successfully created ${successCount} faculty members!${errorCount > 0 ? ` ${errorCount} errors occurred.` : ''}${invalidEntries.length > 0 ? ` ${invalidEntries.length} entries were skipped.` : ''}`);
-        if (errorCount === 0 && invalidEntries.length === 0) {
-          resetBulkData();
-        }
-      } else {
-        setError('No faculty members were created. Please check the data and try again.');
-      }
-      
+if (successCount > 0) {
+  const createdNames = validEntries.slice(0, 5).map(e => `"${e.name}" (${e.employeeId})`).join(', ');
+  setSuccess(
+    `Successfully created ${successCount} faculty member${successCount > 1 ? "s" : ""}${
+      createdNames ? ": " + createdNames : ""
+    }${validEntries.length > 5 ? `, ...and ${validEntries.length - 5} more` : ""}. (Total created: ${successCount})`
+    + (errorCount > 0 ? ` (${errorCount} errors occurred)` : "")
+    + (invalidEntries.length > 0 ? ` (${invalidEntries.length} entries were skipped)` : "")
+  );
+  if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
+} else {
+  setError('No faculty members were created. Please check the data and try again.');
+}
+
+
+if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
+      } else setError('No faculty members were created. Please check the data and try again.');
     } catch (err) {
       console.error('Bulk creation error:', err);
       setError(err.response?.data?.message || 'Failed to create faculty in bulk. Please try again.');
@@ -490,7 +395,6 @@ const handleSelectContext = () => {
   };
 
   const downloadTemplate = () => {
-    // ✅ FIXED: Different templates based on context
     const template = hasContext ? [
       {
         name: 'Dr. John Smith',
@@ -498,16 +402,16 @@ const handleSelectContext = () => {
         emailId: 'john.smith@vit.ac.in',
         password: 'TempPass@123',
         role: 'faculty',
-        specializations: 'AI/ML,Data Science',
+        specializations: 'aiml,datascience', // Use normalized codes in template
         imageUrl: ''
       },
       {
         name: 'Dr. Jane Admin',
-        employeeId: 'ADM001', 
+        employeeId: 'ADM001',
         emailId: 'jane.admin@vit.ac.in',
         password: 'AdminPass@456',
         role: 'admin',
-        specializations: 'General',
+        specializations: 'general',
         imageUrl: 'https://example.com/profile.jpg'
       }
     ] : [
@@ -519,31 +423,33 @@ const handleSelectContext = () => {
         role: 'faculty',
         school: 'SCOPE',
         department: 'CSE',
-        specializations: 'AI/ML,Data Science',
+        specializations: 'aiml,datascience', // Use normalized codes in template
         imageUrl: ''
       },
       {
         name: 'Dr. Jane Admin',
-        employeeId: 'ADM001', 
+        employeeId: 'ADM001',
         emailId: 'jane.admin@vit.ac.in',
         password: 'AdminPass@456',
         role: 'admin',
         school: 'SCOPE',
         department: 'CSE',
-        specializations: 'General',
+        specializations: 'general',
         imageUrl: 'https://example.com/profile.jpg'
       }
     ];
-
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Faculty Template');
-    const fileName = hasContext 
-      ? `faculty_template_${schoolFromContext}_${departmentFromContext}.xlsx`
-      : 'faculty_template_all.xlsx';
-    XLSX.writeFile(wb, fileName);
+    XLSX.writeFile(
+      wb,
+      hasContext
+        ? `faculty_template_${schoolFromContext}_${departmentFromContext}.xlsx`
+        : 'faculty_template_all.xlsx'
+    );
   };
 
+  
   if (isLoading) {
     return (
       <>

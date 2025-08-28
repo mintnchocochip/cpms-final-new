@@ -1,5 +1,5 @@
 import express from "express";
-import Faculty from "../models/facultySchema.js";  // ✅ ADD THIS LINE
+import Faculty from "../models/facultySchema.js";
 import {
   getAllFaculty,
   getDefaultDeadline,
@@ -18,30 +18,24 @@ import {
   getAllGuideWithProjects,
   getAllPanelsWithProjects,
   createOrUpdateMarkingSchema,
+  updateFaculty,
+  deleteFacultyByEmployeeId,
 } from "../controllers/adminController.js";
 import { adminMiddleware } from "../middlewares/adminMiddleware.js";
 
 const adminRouter = express.Router();
 
-// ... rest of your routes
+// Marking schema routes
+adminRouter.post("/markingSchema", adminMiddleware, createOrUpdateMarkingSchema);
 
-adminRouter.post(
-  "/markingSchema",
-  adminMiddleware,
-  createOrUpdateMarkingSchema
-);
-
+// Admin creation
 adminRouter.post("/createAdmin", adminMiddleware, createAdmin);
 
-// Admin should create faculty accounts
+// Faculty creation
 adminRouter.post("/createFaculty", adminMiddleware, createFaculty);
+adminRouter.post("/createFacultyBulk", adminMiddleware, createFacultyBulk);
 
-// ✅ FIXED: Faculty routes - Handle both all and specific filtering
-adminRouter.get(
-  "/faculty/:school/:department/:specialization",
-  adminMiddleware,
-  getAllFaculty
-);
+// ✅ FIXED: Faculty management routes
 adminRouter.get("/getAllFaculty", adminMiddleware, async (req, res) => {
   try {
     console.log("=== getAllFaculty Route Called ===");
@@ -91,50 +85,38 @@ adminRouter.get("/getAllFaculty", adminMiddleware, async (req, res) => {
   }
 });
 
+// ✅ FIXED: Use adminRouter instead of router
+adminRouter.get('/getAllFaculty/:school', adminMiddleware, getAllFaculty); // Filter by school
+adminRouter.get('/getAllFaculty/:school/:department', adminMiddleware, getAllFaculty); // Filter by school and department
+adminRouter.get('/getAllFaculty/:school/:department/:specialization', adminMiddleware, getAllFaculty); // Filter by all three
 
-// ✅ FIXED: Correct route names to match controller functions
-// get all the guide faculties with their projects
+// Faculty update and delete routes
+adminRouter.put('/faculty/:employeeId', adminMiddleware, updateFaculty); // Update faculty
+adminRouter.delete('/faculty/:employeeId', adminMiddleware, deleteFacultyByEmployeeId); // Delete faculty
+
+// Project routes
 adminRouter.get("/getAllGuideProjects", adminMiddleware, getAllGuideWithProjects);
-
-// get all the panel faculties with their projects - FIXED NAME
 adminRouter.get("/getAllPanelProjects", adminMiddleware, getAllPanelsWithProjects);
 
-// retrieving all the requests with faculty type as
-adminRouter.get(
-  "/getAllRequests/:facultyType",  
-  adminMiddleware,
-  getAllRequests
-);
+// Request routes
+adminRouter.get("/getAllRequests/:facultyType", adminMiddleware, getAllRequests);
 
-adminRouter.post("/createFacultyBulk", adminMiddleware, createFacultyBulk);
-
-// GET /admin/getDefaultDeadline
+// Deadline routes
 adminRouter.get('/getDefaultDeadline', adminMiddleware, getDefaultDeadline);
-
-// Update the default Deadline i.e. the systemconfig
 adminRouter.post("/setDefaultDeadline", adminMiddleware, setDefaultDeadline);
 
-// approving and rejecting the request
+// Request approval routes
 adminRouter.post("/panel/updateRequest", adminMiddleware, updateRequestStatus);
 adminRouter.post("/guide/updateRequest", adminMiddleware, updateRequestStatus);
 
-// panel creation, deletion and assignment
+// Panel routes
 adminRouter.post("/createPanel", adminMiddleware, createPanelManually);
 adminRouter.post("/autoCreatePanels", adminMiddleware, autoCreatePanels);
 adminRouter.delete("/:panelId/deletePanel", adminMiddleware, deletePanel);
 adminRouter.get("/getAllPanels", adminMiddleware, getAllPanels);
 
-// assigning panels from the list of created panels
-adminRouter.post(
-  "/assignPanel",
-  adminMiddleware,
-  assignExistingPanelToProject
-);
-
-adminRouter.post(
-  "/autoAssignPanel",
-  adminMiddleware,
-  autoAssignPanelsToProjects
-);
+// Panel assignment routes
+adminRouter.post("/assignPanel", adminMiddleware, assignExistingPanelToProject);
+adminRouter.post("/autoAssignPanel", adminMiddleware, autoAssignPanelsToProjects);
 
 export default adminRouter;

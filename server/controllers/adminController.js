@@ -109,71 +109,244 @@ export async function getDefaultDeadline(req, res) {
 
 
 export async function createFaculty(req, res) {
-  const {
-    name,
-    emailId,
-    password,
-    employeeId,
-    school,
-    department,
-    specialization,
-  } = req.body;
+  try {
+    const {
+      name,
+      emailId,
+      password,
+      employeeId,
+      school,
+      department,
+      specialization,
+      imageUrl,
+      role = "faculty"
+    } = req.body;
 
-  // for otp testing used gmail - need some profs mail id for checking with vit.ac.in
-  // Only allow college emails
-  if (!emailId.endsWith("@vit.ac.in")) {
-    return res.status(400).json({
+    // Validate required fields
+    if (!name || !emailId || !password || !employeeId) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email, password, and employee ID are required",
+      });
+    }
+
+    // Only allow college emails
+    if (!emailId.endsWith("@vit.ac.in")) {
+      return res.status(400).json({
+        success: false,
+        message: "Only college emails allowed!",
+      });
+    }
+
+    // Password validation
+    if (
+      password.length < 8 ||
+      !/[A-Z]/.test(password) ||
+      !/[a-z]/.test(password) ||
+      !/[0-9]/.test(password) ||
+      !/[^A-Za-z0-9]/.test(password)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be at least 8 characters and include uppercase, lowercase, number, and special character",
+      });
+    }
+
+    // Validate school, department, and specialization arrays
+    if (!school || !Array.isArray(school) || school.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "School must be a non-empty array",
+      });
+    }
+
+    if (!department || !Array.isArray(department) || department.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Department must be a non-empty array",
+      });
+    }
+
+    if (!specialization || !Array.isArray(specialization) || specialization.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Specialization must be a non-empty array",
+      });
+    }
+
+    // Check if email is already registered
+    const existingFaculty = await Faculty.findOne({ 
+      $or: [
+        { emailId: emailId.trim().toLowerCase() },
+        { employeeId: employeeId.trim().toUpperCase() }
+      ]
+    });
+    
+    if (existingFaculty) {
+      return res.status(400).json({
+        success: false,
+        message: "Faculty with this email or employee ID already exists!",
+      });
+    }
+
+    // Hash password before saving
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create faculty with correct field names matching schema
+    const newFaculty = new Faculty({
+      imageUrl: imageUrl || "",
+      name: name.trim(),
+      emailId: emailId.trim().toLowerCase(),
+      password: hashedPassword,
+      employeeId: employeeId.trim().toUpperCase(),
+      role: role,
+      school: school.map(s => s.trim()), // Array field
+      department: department.map(d => d.trim()), // Array field
+      specialization: specialization.map(sp => sp.trim()), // Array field
+    });
+
+    await newFaculty.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Faculty created successfully!",
+    });
+
+  } catch (error) {
+    console.error("Error creating faculty:", error);
+    return res.status(500).json({
       success: false,
-      message: "Only college emails allowed!",
+      message: "Server error while creating faculty",
+      error: error.message,
     });
   }
+}
 
-  // Password validation
-  if (
-    password.length < 8 ||
-    !/[A-Z]/.test(password) ||
-    !/[a-z]/.test(password) ||
-    !/[0-9]/.test(password) ||
-    !/[^A-Za-z0-9]/.test(password)
-  ) {
-    return res.status(400).json({
+export async function createFacultyBulk(req, res) {
+  try {
+    const { facultyList } = req.body;
+    if (!Array.isArray(facultyList) || facultyList.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Faculty list is required and must be a non-empty array",
+      });
+    }
+
+    const results = {
+      created: 0,
+      errors: 0,
+      details: [],
+    };
+
+    for (let i = 0; i < facultyList.length; i++) {
+      const faculty = facultyList[i];
+      try {
+        // Validate required fields including arrays for schools, departments and specialization
+        if (
+          !faculty.name ||
+          !faculty.emailId ||
+          !faculty.password ||
+          !faculty.employeeId ||
+          !faculty.schools ||
+          !faculty.departments ||
+          !faculty.specialization
+        ) {
+          results.errors++;
+          results.details.push({
+            row: i + 1,
+            error:
+              "Missing required fields including schools, departments, or specialization",
+          });
+          continue;
+        }
+
+        if (
+          !Array.isArray(faculty.schools) ||
+          faculty.schools.length === 0 ||
+          !Array.isArray(faculty.departments) ||
+          faculty.departments.length === 0 ||
+          !Array.isArray(faculty.specialization) ||
+          faculty.specialization.length === 0
+        ) {
+          results.errors++;
+          results.details.push({
+            row: i + 1,
+            error:
+              "Schools, departments, and specialization must be non-empty arrays",
+          });
+          continue;
+        }
+
+        if (!faculty.emailId.endsWith("@vit.ac.in")) {
+          results.errors++;
+          results.details.push({
+            row: i + 1,
+            error: "Invalid email domain",
+          });
+          continue;
+        }
+
+        // Check existing faculty by email or employeeId (case normalized)
+        const existingFaculty = await Faculty.findOne({
+          $or: [
+            { emailId: faculty.emailId.trim().toLowerCase() },
+            { employeeId: faculty.employeeId.trim().toUpperCase() },
+          ],
+        });
+        
+        if (existingFaculty) {
+          results.errors++;
+          results.details.push({
+            row: i + 1,
+            error: "Faculty with this email or employee ID already exists",
+          });
+          continue;
+        }
+
+        // Hash password securely
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(faculty.password, salt);
+
+        // Create new faculty record with array fields and other details
+        const newFaculty = new Faculty({
+          imageUrl: faculty.imageUrl || "",
+          name: faculty.name.trim(),
+          emailId: faculty.emailId.trim().toLowerCase(),
+          password: hashedPassword,
+          employeeId: faculty.employeeId.trim().toUpperCase(),
+          role: faculty.role || "faculty",
+          school: faculty.schools.map((s) => s.trim()), // Note: frontend sends 'schools' but schema expects 'school'
+          department: faculty.departments.map((d) => d.trim()), // Note: frontend sends 'departments' but schema expects 'department'
+          specialization: faculty.specialization.map((sp) => sp.trim()),
+        });
+
+        await newFaculty.save();
+        console.log(newFaculty)
+        results.created++;
+      } catch (error) {
+        results.errors++;
+        results.details.push({
+          row: i + 1,
+          error: error.message,
+        });
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: `Bulk faculty creation completed. ${results.created} created, ${results.errors} errors.`,
+      data: results,
+    });
+  } catch (error) {
+    console.error("Error in bulk faculty creation:", error);
+    return res.status(500).json({
       success: false,
-      message:
-        "Password must be at least 8 characters and include uppercase, lowercase, number, and special character",
+      message: "Server error during bulk creation",
+      error: error.message,
     });
   }
-
-  // Check if email is already registered
-  const existingFaculty = await Faculty.findOne({ emailId });
-  if (existingFaculty) {
-    return res.status(400).json({
-      success: false,
-      message: "Faculty already registered!",
-    });
-  }
-
-  // Hash password before saving
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(password, salt);
-
-  // Create faculty
-  const newFaculty = new Faculty({
-    name,
-    emailId,
-    password: hashedPassword,
-    employeeId,
-    role: "faculty",
-    school,
-    department,
-    specialization,
-  });
-
-  await newFaculty.save();
-
-  return res.status(201).json({
-    success: true,
-    message: "Faculty created successfully!",
-  });
 }
 
 export async function updateFaculty(req, res) {
@@ -252,6 +425,7 @@ export async function updateFaculty(req, res) {
     if (imageUrl !== undefined) faculty.imageUrl = imageUrl;
 
     await faculty.save();
+    console.log(faculty)
 
     return res.status(200).json({
       success: true,
@@ -262,132 +436,6 @@ export async function updateFaculty(req, res) {
     return res.status(500).json({
       success: false,
       message: "Server error while updating faculty",
-    });
-  }
-}
-
-export async function createFacultyBulk(req, res) {
-  try {
-    const { facultyList } = req.body;
-
-    if (!Array.isArray(facultyList) || facultyList.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Faculty list is required and must be a non-empty array",
-      });
-    }
-
-    const results = {
-      created: 0,
-      errors: 0,
-      details: [],
-    };
-
-    for (let i = 0; i < facultyList.length; i++) {
-      const faculty = facultyList[i];
-
-      try {
-        // Validate required fields including arrays for school, department and specialization
-        if (
-          !faculty.name ||
-          !faculty.emailId ||
-          !faculty.password ||
-          !faculty.employeeId ||
-          !faculty.school ||
-          !faculty.department ||
-          !faculty.specialization
-        ) {
-          results.errors++;
-          results.details.push({
-            row: i + 1,
-            error:
-              "Missing required fields including school, department, or specialization",
-          });
-          continue;
-        }
-
-        if (
-          !Array.isArray(faculty.school) ||
-          faculty.school.length === 0 ||
-          !Array.isArray(faculty.department) ||
-          faculty.department.length === 0 ||
-          !Array.isArray(faculty.specialization) ||
-          faculty.specialization.length === 0
-        ) {
-          results.errors++;
-          results.details.push({
-            row: i + 1,
-            error:
-              "school, department, and specialization must be non-empty arrays",
-          });
-          continue;
-        }
-
-        if (!faculty.emailId.endsWith("@vit.ac.in")) {
-          results.errors++;
-          results.details.push({
-            row: i + 1,
-            error: "Invalid email domain",
-          });
-          continue;
-        }
-
-        // Check existing faculty by email or employeeId (case normalized)
-        const existingFaculty = await Faculty.findOne({
-          $or: [
-            { emailId: faculty.emailId.trim().toLowerCase() },
-            { employeeId: faculty.employeeId.trim().toUpperCase() },
-          ],
-        });
-
-        if (existingFaculty) {
-          results.errors++;
-          results.details.push({
-            row: i + 1,
-            error: "Faculty with this email or employee ID already exists",
-          });
-          continue;
-        }
-
-        // Hash password securely
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(faculty.password, salt);
-
-        // Create new faculty record with array fields and other details
-        const newFaculty = new Faculty({
-          imageUrl: faculty.imageUrl || "",
-          name: faculty.name.trim(),
-          emailId: faculty.emailId.trim().toLowerCase(),
-          password: hashedPassword,
-          employeeId: faculty.employeeId.trim().toUpperCase(),
-          role: faculty.role || "faculty",
-          school: faculty.school.map((s) => s.trim()),
-          department: faculty.department.map((d) => d.trim()),
-          specialization: faculty.specialization.map((sp) => sp.trim()),
-        });
-
-        await newFaculty.save();
-        results.created++;
-      } catch (error) {
-        results.errors++;
-        results.details.push({
-          row: i + 1,
-          error: error.message,
-        });
-      }
-    }
-
-    return res.status(201).json({
-      success: true,
-      message: `Bulk faculty creation completed. ${results.created} created, ${results.errors} errors.`,
-      data: results,
-    });
-  } catch (error) {
-    console.error("Error in bulk faculty creation:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error during bulk creation",
-      error: error.message,
     });
   }
 }
@@ -412,42 +460,34 @@ export async function createFacultyBulk(req, res) {
 
 // controller for getAllFaculty based on school, dept or specilization 
 
+// ✅ FIXED: Use query parameters instead of path parameters
 export async function getAllFaculty(req, res) {
-  const { school, department, specialization, sortBy, sortOrder } = req.params;
+  const { school, department, specialization, sortBy, sortOrder } = req.query; // Changed from req.params to req.query
 
   try {
     // Build dynamic query based on provided params
-    let query = { role: "faculty" }; // Always filter by faculty role
+    let query = {};
     
-    // ✅ FIXED: Handle "all" parameters and array fields
-    if (school && school !== "all") {
-      query.school = school; // Since schema uses array, this will match if school is in the array
-    }
-    if (department && department !== "all") {
-      query.department = department; // Since schema uses array, this will match if department is in the array
-    }
-    if (specialization && specialization !== "all") {
-      query.specialization = specialization; // Since schema uses array, this will match if specialization is in the array
-    }
+    if (school && school !== 'all') query.schools = school;
+    if (department && department !== 'all') query.departments = department;
+    if (specialization && specialization !== 'all') query.specialization = specialization;
 
-    // ✅ FIXED: Sorting logic updated for array fields
-    const validSortFields = ["school", "department", "specialization"];
-    const sortFieldsPriority = [];
-    if (school && school !== "all") sortFieldsPriority.push("school");
-    if (department && department !== "all") sortFieldsPriority.push("department");
-    if (specialization && specialization !== "all") sortFieldsPriority.push("specialization");
+    // If no filters provided, return all faculty
+    // Remove the restriction that required at least one filter
 
+    // Allowed sorting fields
+    const validSortFields = ["schools", "departments", "specialization", "name", "employeeId"];
+    
     let sortOption = {};
-
     if (sortBy && validSortFields.includes(sortBy)) {
       const order = sortOrder && sortOrder.toLowerCase() === "desc" ? -1 : 1;
       sortOption[sortBy] = order;
     } else {
-      // Default sort by name if no specific field sorting
+      // Default sort by name
       sortOption.name = 1;
     }
 
-    const faculty = await Faculty.find(query).sort(sortOption);
+    const faculty = await Faculty.find(query).sort(sortOption).select('-password');
 
     res.status(200).json({
       success: true,
@@ -458,15 +498,21 @@ export async function getAllFaculty(req, res) {
         employeeId: f.employeeId,
         emailId: f.emailId,
         role: f.role,
-        school: f.school, // Return as arrays since that's what schema defines
-        department: f.department,
+        school: f.schools, // Note: using schools (array) from schema
+        department: f.departments, // Note: using departments (array) from schema
         specialization: f.specialization,
       })),
+      count: faculty.length
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Error in getAllFaculty:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
   }
 }
+
 
 
 // without dept and school, can be used for getting all the details

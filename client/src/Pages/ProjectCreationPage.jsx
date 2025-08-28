@@ -68,13 +68,98 @@ const ProjectCreationPage = () => {
   // Individual field validation errors
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // School and Department options for All Mode
-  const schoolOptions = ['SCOPE', 'SENSE', 'SELECT', 'SMEC', 'SCE'];
-  const departmentOptions = ['BTech', 'MTech (Integrated)', 'MCA'];
-  const specializationOptions = [
-    'AI/ML', 'Data Science', 'Cyber Security', 'IoT', 
-    'Blockchain', 'Cloud Computing', 'VLSI', 'Software Engineering', 'General'
+  // ✅ FIXED: Updated options with correct formats
+  const schoolOptions = ['SCOPE', 'SENSE', 'SELECT', 'SMEC', 'SCE', 'VITSOL'];
+  const departmentOptions = [
+    'BTech', 
+    'MTech (Integrated)', 
+    'MCA', 
+    'MSc', 
+    'BBA', 
+    'MBA', 
+    'BDes',
+    'MDes'
   ];
+
+  // ✅ FIXED: Backend storage format (lowercase)
+  const specializationOptionsBackend = [
+    'ai/ml',
+    'data science',
+    'cyber security',
+    'iot',
+    'blockchain',
+    'cloud computing',
+    'vlsi',
+    'software engineering',
+    'general',
+    'web development',
+    'mobile development',
+    'devops',
+    'database management'
+  ];
+
+  // ✅ FIXED: Frontend display format (proper case)
+  const specializationOptionsDisplay = [
+    'AI/ML',
+    'Data Science',
+    'Cyber Security',
+    'IoT',
+    'Blockchain',
+    'Cloud Computing',
+    'VLSI',
+    'Software Engineering',
+    'General',
+    'Web Development',
+    'Mobile Development',
+    'DevOps',
+    'Database Management'
+  ];
+
+  // ✅ Helper function to normalize specialization for backend
+  const normalizeSpecialization = (spec) => {
+    if (!spec) return '';
+    
+    const displayMap = {
+      'AI/ML': 'ai/ml',
+      'Data Science': 'data science',
+      'Cyber Security': 'cyber security',
+      'IoT': 'iot',
+      'Blockchain': 'blockchain',
+      'Cloud Computing': 'cloud computing',
+      'VLSI': 'vlsi',
+      'Software Engineering': 'software engineering',
+      'General': 'general',
+      'Web Development': 'web development',
+      'Mobile Development': 'mobile development',
+      'DevOps': 'devops',
+      'Database Management': 'database management'
+    };
+    
+    return displayMap[spec] || spec.toLowerCase().trim();
+  };
+
+  // ✅ Helper function to display specialization for frontend
+  const displaySpecialization = (spec) => {
+    if (!spec) return '';
+    
+    const backendMap = {
+      'ai/ml': 'AI/ML',
+      'data science': 'Data Science',
+      'cyber security': 'Cyber Security',
+      'iot': 'IoT',
+      'blockchain': 'Blockchain',
+      'cloud computing': 'Cloud Computing',
+      'vlsi': 'VLSI',
+      'software engineering': 'Software Engineering',
+      'general': 'General',
+      'web development': 'Web Development',
+      'mobile development': 'Mobile Development',
+      'devops': 'DevOps',
+      'database management': 'Database Management'
+    };
+    
+    return backendMap[spec.toLowerCase()] || spec;
+  };
 
   // Single project states
   const [singleProject, setSingleProject] = useState({
@@ -168,39 +253,63 @@ const ProjectCreationPage = () => {
     clearFieldError(name);
   };
 
-  // Check for duplicate students
+  // ✅ FIXED: Enhanced duplicate validation with stricter checks
   const isDuplicateStudent = (students, currentIndex, field, value) => {
     if (!value.trim()) return false;
     
+    const normalizedValue = value.toLowerCase().trim();
     return students.some((student, index) => 
       index !== currentIndex && 
-      student[field].toLowerCase().trim() === value.toLowerCase().trim()
+      student[field] && 
+      student[field].toLowerCase().trim() === normalizedValue
     );
   };
 
   const handleStudentChange = (index, field, value) => {
     const fieldKey = `student_${index}_${field}`;
     
-    // Check for duplicates before updating
-    if (value.trim() && isDuplicateStudent(singleProject.students, index, field, value)) {
-      if (field === 'regNo') {
-        setFieldError(fieldKey, `Registration number "${value}" is already used by another student.`);
-      } else if (field === 'emailId') {
-        setFieldError(fieldKey, `Email "${value}" is already used by another student.`);
+    // ✅ FIXED: Enhanced validation for student fields
+    if (field === 'regNo' && value.trim()) {
+      // Registration number format validation (assuming format like 21BCE1001)
+      const regNoPattern = /^[0-9]{2}[A-Z]{3}[0-9]{4}$/;
+      if (!regNoPattern.test(value.trim().toUpperCase())) {
+        setFieldError(fieldKey, 'Registration number format should be like 21BCE1001');
+        return;
       }
-      return;
+      
+      // Check for duplicates
+      if (isDuplicateStudent(singleProject.students, index, field, value)) {
+        setFieldError(fieldKey, `Registration number "${value}" is already used by another student.`);
+        return;
+      }
     }
 
-    // Validate email format
     if (field === 'emailId' && value.trim()) {
-      if (!value.endsWith('@vitstudent.ac.in')) {
-        setFieldError(fieldKey, 'Email must end with @vitstudent.ac.in');
-      } else {
-        clearFieldError(fieldKey);
+      // Email format validation
+      const emailPattern = /^[a-zA-Z0-9._%+-]+@vitstudent\.ac\.in$/;
+      if (!emailPattern.test(value.trim())) {
+        setFieldError(fieldKey, 'Email must be in format: username@vitstudent.ac.in');
+        return;
       }
-    } else {
-      clearFieldError(fieldKey);
+      
+      // Check for duplicates
+      if (isDuplicateStudent(singleProject.students, index, field, value)) {
+        setFieldError(fieldKey, `Email "${value}" is already used by another student.`);
+        return;
+      }
     }
+
+    if (field === 'name' && value.trim()) {
+      // Name validation - only alphabets and spaces
+      const namePattern = /^[a-zA-Z\s]+$/;
+      if (!namePattern.test(value.trim())) {
+        setFieldError(fieldKey, 'Name should contain only alphabets and spaces');
+        return;
+      }
+    }
+
+    // Clear error if validation passes
+    clearFieldError(fieldKey);
 
     const updatedStudents = [...singleProject.students];
     updatedStudents[index] = {
@@ -272,14 +381,20 @@ const ProjectCreationPage = () => {
       return;
     }
 
-    // Validation with inline errors
+    // ✅ FIXED: Enhanced validation with proper error handling
     if (!singleProject.name.trim()) {
       setFieldError('name', 'Project name is required.');
+      hasValidationErrors = true;
+    } else if (singleProject.name.trim().length < 5) {
+      setFieldError('name', 'Project name must be at least 5 characters long.');
       hasValidationErrors = true;
     }
 
     if (!singleProject.guideFacultyEmpId.trim()) {
       setFieldError('guideFacultyEmpId', 'Guide faculty employee ID is required.');
+      hasValidationErrors = true;
+    } else if (!/^[A-Z0-9]{5,10}$/i.test(singleProject.guideFacultyEmpId.trim())) {
+      setFieldError('guideFacultyEmpId', 'Faculty ID should be 5-10 alphanumeric characters.');
       hasValidationErrors = true;
     }
 
@@ -293,6 +408,7 @@ const ProjectCreationPage = () => {
       hasValidationErrors = true;
     }
 
+    // ✅ FIXED: Enhanced student validation
     const validStudents = singleProject.students.filter(student => 
       student.name.trim() && student.regNo.trim() && student.emailId.trim()
     );
@@ -302,9 +418,10 @@ const ProjectCreationPage = () => {
       return;
     }
 
-    // Check for duplicates in final validation
+    // Enhanced duplicate checks
     const regNos = validStudents.map(s => s.regNo.toLowerCase().trim());
     const emails = validStudents.map(s => s.emailId.toLowerCase().trim());
+    const names = validStudents.map(s => s.name.toLowerCase().trim());
     
     if (new Set(regNos).size !== regNos.length) {
       setError("Duplicate registration numbers found. Each student must have a unique registration number.");
@@ -316,15 +433,34 @@ const ProjectCreationPage = () => {
       return;
     }
 
-    // Check email validation
+    if (new Set(names).size !== names.length) {
+      setError("Duplicate student names found. Please ensure all student names are unique.");
+      return;
+    }
+
+    // Final validation for each student
     for (const [index, student] of validStudents.entries()) {
-      if (!student.emailId.endsWith('@vitstudent.ac.in')) {
+      const regNoPattern = /^[0-9]{2}[A-Z]{3}[0-9]{4}$/;
+      if (!regNoPattern.test(student.regNo.trim().toUpperCase())) {
+        setFieldError(`student_${index}_regNo`, 'Invalid registration number format (e.g., 21BCE1001)');
+        hasValidationErrors = true;
+      }
+
+      const emailPattern = /^[a-zA-Z0-9._%+-]+@vitstudent\.ac\.in$/;
+      if (!emailPattern.test(student.emailId.trim())) {
         setFieldError(`student_${index}_emailId`, 'Email must end with @vitstudent.ac.in');
+        hasValidationErrors = true;
+      }
+
+      const namePattern = /^[a-zA-Z\s]+$/;
+      if (!namePattern.test(student.name.trim())) {
+        setFieldError(`student_${index}_name`, 'Name should contain only alphabets and spaces');
         hasValidationErrors = true;
       }
     }
 
     if (hasValidationErrors) {
+      setError("Please fix all validation errors before submitting.");
       return;
     }
 
@@ -339,13 +475,13 @@ const ProjectCreationPage = () => {
         name: singleProject.name.trim(),
         students: validStudents.map(student => ({
           name: student.name.trim(),
-          regNo: student.regNo.trim(),
+          regNo: student.regNo.trim().toUpperCase(),
           emailId: student.emailId.trim().toLowerCase(),
           school: projectSchool,
           department: projectDepartment
         })),
-        guideFacultyEmpId: singleProject.guideFacultyEmpId.trim(),
-        specialization: projectSpecialization,
+        guideFacultyEmpId: singleProject.guideFacultyEmpId.trim().toUpperCase(),
+        specialization: normalizeSpecialization(projectSpecialization), // ✅ Normalize for backend
         school: projectSchool,
         department: projectDepartment
       };
@@ -353,7 +489,7 @@ const ProjectCreationPage = () => {
       const response = await createProject(projectData);
 
       if (response.data?.success) {
-        setSuccess(`Project "${singleProject.name}" created successfully for ${projectSchool} - ${projectDepartment}!`);
+        setSuccess(`✅ Project "${singleProject.name}" created successfully for ${projectSchool} - ${projectDepartment}! (${validStudents.length} students enrolled)`);
         resetSingleForm();
       } else {
         setError(response.data?.message || "Failed to create project");
@@ -378,49 +514,219 @@ const ProjectCreationPage = () => {
     }
   };
 
-  // Bulk upload functions
+  // ✅ FIXED: Dynamic template generation based on mode
   const downloadTemplate = () => {
-    const template = [
-      [
-        "Project Name", "Guide Faculty Employee ID", "Specialization", "School", "Department", 
-        "Student Name 1", "Student RegNo 1", "Student Email 1",
-        "Student Name 2", "Student RegNo 2", "Student Email 2",
-        "Student Name 3", "Student RegNo 3", "Student Email 3"
-      ]
-    ];
+    console.log('🔽 Template download requested');
+    console.log('Mode:', isAllMode ? 'All Mode' : 'Context Mode');
+    console.log('Context:', { schoolFromContext, departmentFromContext, specializationFromContext });
 
-    if (!isAllMode && hasContext) {
-      // Add example row with context values
+    let template;
+    let filename;
+
+    if (isAllMode) {
+      // ✅ ALL MODE: Include all columns
+      console.log('📊 Generating ALL MODE template with full columns');
+      
+      template = [
+        [
+          "Project Name", 
+          "Guide Faculty Employee ID", 
+          "School", 
+          "Department", 
+          "Specialization", 
+          "Student Name 1", 
+          "Student RegNo 1", 
+          "Student Email 1",
+          "Student Name 2", 
+          "Student RegNo 2", 
+          "Student Email 2",
+          "Student Name 3", 
+          "Student RegNo 3", 
+          "Student Email 3"
+        ],
+        [
+          "AI Based Healthcare System", 
+          "FAC12345", 
+          "SCOPE", 
+          "BTech", 
+          "AI/ML",
+          "John Doe", 
+          "21BCE1001", 
+          "john.doe@vitstudent.ac.in",
+          "Jane Smith", 
+          "21BCE1002", 
+          "jane.smith@vitstudent.ac.in",
+          "Mike Johnson", 
+          "21BCE1003", 
+          "mike.johnson@vitstudent.ac.in"
+        ],
+        [
+          "E-Commerce Web Platform", 
+          "FAC67890", 
+          "SENSE", 
+          "MCA", 
+          "Web Development",
+          "Alice Brown", 
+          "21MCA2001", 
+          "alice.brown@vitstudent.ac.in",
+          "Bob Wilson", 
+          "21MCA2002", 
+          "bob.wilson@vitstudent.ac.in",
+          "", 
+          "", 
+          ""
+        ]
+      ];
+      
+      filename = "project_bulk_template_ALL_MODES.xlsx";
+
+    } else if (hasContext) {
+      // ✅ CONTEXT MODE: Limited columns (school/dept pre-filled)
+      console.log('📊 Generating CONTEXT MODE template for:', schoolFromContext, departmentFromContext);
+      
+      template = [
+        [
+          "Project Name", 
+          "Guide Faculty Employee ID", 
+          "Specialization", 
+          "Student Name 1", 
+          "Student RegNo 1", 
+          "Student Email 1",
+          "Student Name 2", 
+          "Student RegNo 2", 
+          "Student Email 2",
+          "Student Name 3", 
+          "Student RegNo 3", 
+          "Student Email 3"
+        ]
+      ];
+
+      // Add example rows based on context
+      const contextSpecialization = specializationFromContext && specializationFromContext.length > 0 
+        ? displaySpecialization(specializationFromContext[0]) // ✅ Display format for template
+        : "AI/ML";
+
       template.push([
-        "Sample AI Project", 
-        "FAC101", 
-        specializationFromContext[0] || "AI/ML", 
-        schoolFromContext, 
-        departmentFromContext,
-        "John Doe", "21BCE1001", "john.doe@vitstudent.ac.in",
-        "Jane Smith", "21BCE1002", "jane.smith@vitstudent.ac.in",
-        "", "", "" // Third student optional
+        "Smart Campus Management System", 
+        "FAC11111", 
+        contextSpecialization,
+        "Raj Patel", 
+        "21BCE3001", 
+        "raj.patel@vitstudent.ac.in",
+        "Priya Sharma", 
+        "21BCE3002", 
+        "priya.sharma@vitstudent.ac.in",
+        "Arjun Kumar", 
+        "21BCE3003", 
+        "arjun.kumar@vitstudent.ac.in"
       ]);
+
+      template.push([
+        "IoT Weather Monitoring", 
+        "FAC22222", 
+        contextSpecialization,
+        "Neha Singh", 
+        "21BCE4001", 
+        "neha.singh@vitstudent.ac.in",
+        "Rohit Verma", 
+        "21BCE4002", 
+        "rohit.verma@vitstudent.ac.in",
+        "", 
+        "", 
+        ""
+      ]);
+
+      filename = `project_bulk_template_${schoolFromContext}_${departmentFromContext}.xlsx`;
+
     } else {
-      // Add example row for All Mode
-      template.push([
-        "Sample AI Project", 
-        "FAC101", 
-        "AI/ML", 
-        "SCOPE", 
-        "BTech",
-        "John Doe", "21BCE1001", "john.doe@vitstudent.ac.in",
-        "Jane Smith", "21BCE1002", "jane.smith@vitstudent.ac.in",
-        "", "", ""
-      ]);
+      // ✅ FALLBACK: Generic template
+      console.log('📊 Generating FALLBACK template');
+      
+      template = [
+        [
+          "Project Name", 
+          "Guide Faculty Employee ID", 
+          "School", 
+          "Department", 
+          "Specialization", 
+          "Student Name 1", 
+          "Student RegNo 1", 
+          "Student Email 1",
+          "Student Name 2", 
+          "Student RegNo 2", 
+          "Student Email 2",
+          "Student Name 3", 
+          "Student RegNo 3", 
+          "Student Email 3"
+        ],
+        [
+          "Sample Project 1", 
+          "FAC123", 
+          "SCOPE", 
+          "BTech", 
+          "AI/ML",
+          "Student One", 
+          "21BCE0001", 
+          "student.one@vitstudent.ac.in",
+          "", 
+          "", 
+          "",
+          "", 
+          "", 
+          ""
+        ]
+      ];
+      
+      filename = "project_bulk_template_generic.xlsx";
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(template);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "ProjectsTemplate");
-    XLSX.writeFile(wb, "project_bulk_template.xlsx");
+    // ✅ Generate and download Excel file
+    try {
+      const ws = XLSX.utils.aoa_to_sheet(template);
+      
+      // Set column widths for better readability
+      const colWidths = [
+        { wch: 25 }, // Project Name
+        { wch: 20 }, // Guide Faculty ID
+      ];
+
+      if (isAllMode || !hasContext) {
+        colWidths.push(
+          { wch: 15 }, // School
+          { wch: 15 }  // Department
+        );
+      }
+
+      colWidths.push(
+        { wch: 18 }, // Specialization
+        { wch: 20 }, // Student Name 1
+        { wch: 15 }, // RegNo 1
+        { wch: 25 }, // Email 1
+        { wch: 20 }, // Student Name 2
+        { wch: 15 }, // RegNo 2
+        { wch: 25 }, // Email 2
+        { wch: 20 }, // Student Name 3
+        { wch: 15 }, // RegNo 3
+        { wch: 25 }  // Email 3
+      );
+
+      ws['!cols'] = colWidths;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "ProjectsTemplate");
+      XLSX.writeFile(wb, filename);
+
+      console.log('✅ Template generated and downloaded:', filename);
+      setSuccess(`Template downloaded: ${filename}`);
+      setTimeout(() => setSuccess(''), 3000);
+
+    } catch (error) {
+      console.error('❌ Template generation failed:', error);
+      setError('Failed to generate template. Please try again.');
+    }
   };
 
+  // ✅ FIXED: Enhanced file upload with strict validation
   const handleFileUpload = (e) => {
     setError("");
     setSuccess("");
@@ -431,100 +737,268 @@ const ProjectCreationPage = () => {
     if (!e.target.files || e.target.files.length === 0) return;
     
     const file = e.target.files[0];
+    
+    // ✅ File type validation
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv'
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      setError("❌ Invalid file type. Please upload an Excel file (.xlsx, .xls) or CSV file (.csv).");
+      e.target.value = '';
+      return;
+    }
+
+    // ✅ File size validation (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      setError("❌ File size too large. Please upload a file smaller than 5MB.");
+      e.target.value = '';
+      return;
+    }
+
     setFileName(file.name);
+    console.log('📁 Processing file:', file.name, 'Size:', file.size, 'Type:', file.type);
     
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
         const data = new Uint8Array(evt.target.result);
         const workbook = XLSX.read(data, { type: "array" });
+        
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          throw new Error("No sheets found in the Excel file");
+        }
+
         const sheetName = workbook.SheetNames[0];
         const ws = workbook.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        
+        if (!ws) {
+          throw new Error("Unable to read the first sheet");
+        }
+
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        
+        console.log('📊 Raw rows from Excel:', rows.length);
+        console.log('📊 First few rows:', rows.slice(0, 3));
         
         if (rows.length < 2) {
-          setError("File is empty or missing data rows.");
+          setError("❌ File is empty or missing data rows. Please ensure you have at least one project row after the header.");
           return;
         }
 
-        // Skip header row and parse projects
-        const parsedProjects = rows.slice(1).map((row, idx) => {
-          let students = [];
+        // ✅ FIXED: Enhanced parsing with proper column detection
+        const headerRow = rows[0];
+        console.log('📋 Header row:', headerRow);
+
+        let expectedColumns;
+        let columnMapping;
+
+        if (isAllMode) {
+          // All Mode: Expect all columns
+          expectedColumns = [
+            "Project Name", "Guide Faculty Employee ID", "School", "Department", "Specialization",
+            "Student Name 1", "Student RegNo 1", "Student Email 1",
+            "Student Name 2", "Student RegNo 2", "Student Email 2",
+            "Student Name 3", "Student RegNo 3", "Student Email 3"
+          ];
+          columnMapping = {
+            projectName: 0, guideFacultyId: 1, school: 2, department: 3, specialization: 4,
+            student1Name: 5, student1RegNo: 6, student1Email: 7,
+            student2Name: 8, student2RegNo: 9, student2Email: 10,
+            student3Name: 11, student3RegNo: 12, student3Email: 13
+          };
+        } else {
+          // Context Mode: Expect fewer columns
+          expectedColumns = [
+            "Project Name", "Guide Faculty Employee ID", "Specialization",
+            "Student Name 1", "Student RegNo 1", "Student Email 1",
+            "Student Name 2", "Student RegNo 2", "Student Email 2",
+            "Student Name 3", "Student RegNo 3", "Student Email 3"
+          ];
+          columnMapping = {
+            projectName: 0, guideFacultyId: 1, specialization: 2,
+            student1Name: 3, student1RegNo: 4, student1Email: 5,
+            student2Name: 6, student2RegNo: 7, student2Email: 8,
+            student3Name: 9, student3RegNo: 10, student3Email: 11
+          };
+        }
+
+        // Validate header columns
+        const missingColumns = expectedColumns.filter(col => 
+          !headerRow.some(header => header && header.toString().trim().toLowerCase() === col.toLowerCase())
+        );
+
+        if (missingColumns.length > 0) {
+          setError(`❌ Invalid file format. Missing columns: ${missingColumns.join(', ')}. Please download and use the correct template.`);
+          return;
+        }
+
+        // Parse data rows
+        const dataRows = rows.slice(1).filter(row => 
+          row && row.length > 0 && row.some(cell => cell && cell.toString().trim())
+        );
+
+        console.log('📊 Data rows found:', dataRows.length);
+
+        if (dataRows.length === 0) {
+          setError("❌ No data rows found. Please add project data to your file.");
+          return;
+        }
+
+        const parsedProjects = dataRows.map((row, idx) => {
+          const rowNum = idx + 2; // Excel row number (header + 1-based)
           
-          // Parse up to 3 students
+          // Helper function to safely get cell value
+          const getCellValue = (colIndex) => {
+            const value = row[colIndex];
+            return value ? value.toString().trim() : "";
+          };
+
+          // Parse students
+          let students = [];
           for (let s = 0; s < 3; s++) {
-            const name = row[5 + s * 3]?.toString().trim() || "";
-            const regNo = row[6 + s * 3]?.toString().trim() || "";
-            const emailId = row[7 + s * 3]?.toString().trim() || "";
+            const nameCol = isAllMode ? 5 + s * 3 : 3 + s * 3;
+            const regNoCol = isAllMode ? 6 + s * 3 : 4 + s * 3;
+            const emailCol = isAllMode ? 7 + s * 3 : 5 + s * 3;
+
+            const name = getCellValue(nameCol);
+            const regNo = getCellValue(regNoCol);
+            const emailId = getCellValue(emailCol);
             
             if (name && regNo && emailId) {
               students.push({ name, regNo, emailId });
             }
           }
 
-          return {
-            idx: idx + 2, // Excel row number (accounting for header)
-            name: row[0]?.toString().trim() || "",
-            guideFacultyEmpId: row[1]?.toString().trim() || "",
-            specialization: row[2]?.toString().trim() || "",
-            school: row[3]?.toString().trim() || "",
-            department: row[4]?.toString().trim() || "",
+          const projectData = {
+            idx: rowNum,
+            name: getCellValue(columnMapping.projectName),
+            guideFacultyEmpId: getCellValue(columnMapping.guideFacultyId),
+            specialization: getCellValue(columnMapping.specialization),
             students
           };
-        }).filter(proj => proj.name); // Filter out empty rows
 
+          if (isAllMode) {
+            projectData.school = getCellValue(columnMapping.school);
+            projectData.department = getCellValue(columnMapping.department);
+          } else {
+            projectData.school = schoolFromContext;
+            projectData.department = departmentFromContext;
+          }
+
+          return projectData;
+        }).filter(proj => proj.name); // Filter out rows without project names
+
+        console.log('✅ Parsed projects:', parsedProjects.length);
         setBulkPreviewMode(true);
         setProjects(parsedProjects);
         setBulkFieldErrors({});
         
         if (parsedProjects.length === 0) {
-          setError("No valid projects found in the file.");
+          setError("❌ No valid projects found in the file. Please check the data format.");
+        } else {
+          setSuccess(`✅ Successfully loaded ${parsedProjects.length} projects for preview. Review the data below before uploading.`);
         }
+
       } catch (err) {
-        console.error("File parsing error:", err);
-        setError("Failed to parse the Excel file. Please check the format and try again.");
+        console.error("❌ File parsing error:", err);
+        setError(`❌ Failed to parse the Excel file: ${err.message}. Please check the file format and try again.`);
       }
     };
     
+    reader.onerror = () => {
+      setError("❌ Error reading file. Please try again.");
+    };
+
     reader.readAsArrayBuffer(file);
   };
 
+  // ✅ FIXED: Enhanced validation for bulk projects
   const validateBulkProjects = (projectsToValidate) => {
     let errorMap = {};
     let anyError = false;
+
+    // Global validation arrays for cross-project checks
+    const allProjectNames = [];
+    const allRegNos = [];
+    const allEmails = [];
 
     projectsToValidate.forEach((proj, idx) => {
       const errors = [];
 
       // Required field validation
-      if (!proj.name) errors.push("Missing project name");
-      if (!proj.guideFacultyEmpId) errors.push("Missing guide faculty ID");
-      if (!proj.specialization) errors.push("Missing specialization");
-      if (!proj.school) errors.push("Missing school");
-      if (!proj.department) errors.push("Missing department");
+      if (!proj.name || proj.name.length < 5) {
+        errors.push("Project name missing or too short (min 5 chars)");
+      } else {
+        allProjectNames.push({ name: proj.name.toLowerCase().trim(), idx });
+      }
+
+      if (!proj.guideFacultyEmpId) {
+        errors.push("Missing guide faculty ID");
+      } else if (!/^[A-Z0-9]{5,10}$/i.test(proj.guideFacultyEmpId.trim())) {
+        errors.push("Faculty ID should be 5-10 alphanumeric characters");
+      }
+
+      if (!proj.specialization) {
+        errors.push("Missing specialization");
+      } else if (!specializationOptionsDisplay.includes(proj.specialization)) {
+        errors.push(`Invalid specialization: ${proj.specialization}`);
+      }
+
+      if (isAllMode) {
+        if (!proj.school) errors.push("Missing school");
+        if (!proj.department) errors.push("Missing department");
+        
+        if (proj.school && !schoolOptions.includes(proj.school)) {
+          errors.push(`Invalid school: ${proj.school}`);
+        }
+        if (proj.department && !departmentOptions.includes(proj.department)) {
+          errors.push(`Invalid department: ${proj.department}`);
+        }
+      }
 
       // Student validation
       if (!proj.students || proj.students.length === 0) {
         errors.push("At least one student required");
       } else {
-        // Check for duplicate registration numbers within project
-        const regNos = proj.students.map(s => s.regNo.toLowerCase().trim());
-        if (new Set(regNos).size !== regNos.length) {
-          errors.push("Duplicate student registration numbers within project");
-        }
-
-        // Check for duplicate emails within project
-        const emails = proj.students.map(s => s.emailId.toLowerCase().trim());
-        if (new Set(emails).size !== emails.length) {
-          errors.push("Duplicate student emails within project");
-        }
-
-        // Validate email format
-        for (const student of proj.students) {
-          if (!student.emailId.endsWith("@vitstudent.ac.in")) {
-            errors.push(`Invalid email format: ${student.emailId}`);
-            break;
+        // Validate each student
+        proj.students.forEach((student, studentIdx) => {
+          // Name validation
+          if (!student.name || !/^[a-zA-Z\s]+$/.test(student.name.trim())) {
+            errors.push(`Student ${studentIdx + 1}: Invalid name format`);
           }
+
+          // Registration number validation
+          if (!student.regNo) {
+            errors.push(`Student ${studentIdx + 1}: Missing registration number`);
+          } else if (!/^[0-9]{2}[A-Z]{3}[0-9]{4}$/i.test(student.regNo.trim())) {
+            errors.push(`Student ${studentIdx + 1}: Invalid registration number format (e.g., 21BCE1001)`);
+          } else {
+            allRegNos.push({ regNo: student.regNo.toLowerCase().trim(), idx, studentIdx });
+          }
+
+          // Email validation
+          if (!student.emailId) {
+            errors.push(`Student ${studentIdx + 1}: Missing email`);
+          } else if (!/^[a-zA-Z0-9._%+-]+@vitstudent\.ac\.in$/.test(student.emailId.trim())) {
+            errors.push(`Student ${studentIdx + 1}: Invalid email format (must end with @vitstudent.ac.in)`);
+          } else {
+            allEmails.push({ email: student.emailId.toLowerCase().trim(), idx, studentIdx });
+          }
+        });
+
+        // Check for duplicate students within the same project
+        const projectRegNos = proj.students.map(s => s.regNo.toLowerCase().trim());
+        const projectEmails = proj.students.map(s => s.emailId.toLowerCase().trim());
+        
+        if (new Set(projectRegNos).size !== projectRegNos.length) {
+          errors.push("Duplicate registration numbers within project");
+        }
+        
+        if (new Set(projectEmails).size !== projectEmails.length) {
+          errors.push("Duplicate emails within project");
         }
       }
 
@@ -534,17 +1008,57 @@ const ProjectCreationPage = () => {
       }
     });
 
-    // Check for duplicate project names across all projects
-    const projectNames = projectsToValidate.map(p => p.name.toLowerCase().trim());
-    if (new Set(projectNames).size !== projectNames.length) {
-      projectsToValidate.forEach((proj, idx) => {
-        const duplicateCount = projectNames.filter(name => name === proj.name.toLowerCase().trim()).length;
-        if (duplicateCount > 1) {
-          errorMap[idx] = (errorMap[idx] ? errorMap[idx] + "; " : "") + "Duplicate project name in file";
+    // ✅ Cross-project validation
+    // Check for duplicate project names
+    const projectNameGroups = {};
+    allProjectNames.forEach(({ name, idx }) => {
+      if (!projectNameGroups[name]) projectNameGroups[name] = [];
+      projectNameGroups[name].push(idx);
+    });
+
+    Object.entries(projectNameGroups).forEach(([name, indices]) => {
+      if (indices.length > 1) {
+        indices.forEach(idx => {
+          const existingError = errorMap[idx] || "";
+          errorMap[idx] = existingError ? `${existingError}; Duplicate project name across file` : "Duplicate project name across file";
           anyError = true;
-        }
-      });
-    }
+        });
+      }
+    });
+
+    // Check for duplicate registration numbers across projects
+    const regNoGroups = {};
+    allRegNos.forEach(({ regNo, idx, studentIdx }) => {
+      if (!regNoGroups[regNo]) regNoGroups[regNo] = [];
+      regNoGroups[regNo].push({ idx, studentIdx });
+    });
+
+    Object.entries(regNoGroups).forEach(([regNo, occurrences]) => {
+      if (occurrences.length > 1) {
+        occurrences.forEach(({ idx, studentIdx }) => {
+          const existingError = errorMap[idx] || "";
+          errorMap[idx] = existingError ? `${existingError}; Student ${studentIdx + 1} regNo duplicated across projects` : `Student ${studentIdx + 1} regNo duplicated across projects`;
+          anyError = true;
+        });
+      }
+    });
+
+    // Check for duplicate emails across projects
+    const emailGroups = {};
+    allEmails.forEach(({ email, idx, studentIdx }) => {
+      if (!emailGroups[email]) emailGroups[email] = [];
+      emailGroups[email].push({ idx, studentIdx });
+    });
+
+    Object.entries(emailGroups).forEach(([email, occurrences]) => {
+      if (occurrences.length > 1) {
+        occurrences.forEach(({ idx, studentIdx }) => {
+          const existingError = errorMap[idx] || "";
+          errorMap[idx] = existingError ? `${existingError}; Student ${studentIdx + 1} email duplicated across projects` : `Student ${studentIdx + 1} email duplicated across projects`;
+          anyError = true;
+        });
+      }
+    });
 
     setBulkFieldErrors(errorMap);
     return !anyError;
@@ -556,40 +1070,43 @@ const ProjectCreationPage = () => {
     setBulkFieldErrors({});
 
     if (projects.length === 0) {
-      setError("No projects to upload. Please upload a file first.");
+      setError("❌ No projects to upload. Please upload a file first.");
       return;
     }
 
+    console.log('🚀 Starting bulk validation for', projects.length, 'projects');
     const valid = validateBulkProjects(projects);
+    
     if (!valid) {
-      setError("Please fix all validation errors before uploading.");
+      setError("❌ Please fix all validation errors before uploading.");
       return;
     }
 
     try {
       setLoading(true);
       
+      // ✅ FIXED: Ensure proper data format for API with normalized specialization
       const bulkPayload = projects.map(proj => ({
         name: proj.name.trim(),
-        guideFacultyEmpId: proj.guideFacultyEmpId.trim(),
-        specialization: proj.specialization.trim(),
+        guideFacultyEmpId: proj.guideFacultyEmpId.trim().toUpperCase(),
+        specialization: normalizeSpecialization(proj.specialization), // ✅ Normalize for backend
         school: proj.school.trim(),
         department: proj.department.trim(),
         students: proj.students.map(student => ({
           name: student.name.trim(),
-          regNo: student.regNo.trim(),
+          regNo: student.regNo.trim().toUpperCase(),
           emailId: student.emailId.trim().toLowerCase(),
           school: proj.school.trim(),
           department: proj.department.trim()
         }))
       }));
 
-      console.log("Submitting bulk projects:", bulkPayload);
+      console.log("📤 Submitting bulk projects:", bulkPayload.length, "projects");
 
       const response = await createProjectsBulk({ projects: bulkPayload });
 
       if (response.data?.success) {
-        setSuccess(`✅ Successfully uploaded ${projects.length} projects!`);
+        setSuccess(`✅ Successfully uploaded ${projects.length} projects! All projects have been created and students enrolled.`);
         setProjects([]);
         setBulkPreviewMode(false);
         setFileName("");
@@ -597,12 +1114,12 @@ const ProjectCreationPage = () => {
         const fileInput = document.getElementById('bulkfileinput');
         if (fileInput) fileInput.value = '';
       } else {
-        setError(response.data?.message || "Failed to upload bulk projects.");
+        setError(response.data?.message || "❌ Failed to upload bulk projects.");
       }
     } catch (err) {
-      console.error("Bulk upload error:", err);
+      console.error("❌ Bulk upload error:", err);
       const errMsg = err.response?.data?.message || err.message || "Unknown error occurred during bulk upload.";
-      setError("Bulk upload failed: " + errMsg);
+      setError("❌ Bulk upload failed: " + errMsg);
     } finally {
       setLoading(false);
     }
@@ -727,7 +1244,7 @@ const ProjectCreationPage = () => {
                     <div className="text-sm text-blue-700">
                       <strong>{schoolFromContext}</strong> • <strong>{departmentFromContext}</strong>
                       {specializationFromContext && specializationFromContext.length > 0 && (
-                        <> • <strong>{specializationFromContext.join(', ')}</strong></>
+                        <> • <strong>{specializationFromContext.map(spec => displaySpecialization(spec)).join(', ')}</strong></>
                       )}
                     </div>
                   </div>
@@ -821,9 +1338,33 @@ const ProjectCreationPage = () => {
                   <p className="text-gray-600">Add one project with its team members</p>
                   {!isAllMode && hasContext && specializationFromContext && specializationFromContext.length > 0 && (
                     <p className="text-sm text-blue-600 mt-2">
-                      Using specialization: <strong>{specializationFromContext.join(', ')}</strong>
+                      Using specialization: <strong>{specializationFromContext.map(spec => displaySpecialization(spec)).join(', ')}</strong>
                     </p>
                   )}
+                </div>
+
+                {/* ✅ SUBMIT BUTTON MOVED TO TOP */}
+                <div className="max-w-2xl mx-auto mb-8">
+                  <button
+                    onClick={handleSingleSubmit}
+                    disabled={loading}
+                    className="w-full flex justify-center items-center bg-blue-600 hover:bg-blue-700 text-white py-4 px-6 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                  >
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Creating Project...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={20} className="mr-2" />
+                        Create Project
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 <div className="max-w-2xl mx-auto space-y-6">
@@ -921,7 +1462,7 @@ const ProjectCreationPage = () => {
                     )}
                   </div>
 
-                  {/* Specialization Selection */}
+                  {/* ✅ FIXED: Specialization Selection with proper display */}
                   <div>
                     <label htmlFor="specialization" className="block text-sm font-medium text-gray-700 mb-2">
                       Specialization <span className="text-red-500">*</span>
@@ -929,7 +1470,9 @@ const ProjectCreationPage = () => {
                     {!isAllMode && specializationFromContext && specializationFromContext.length > 0 ? (
                       // Show context value if available (Context Mode)
                       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <span className="text-blue-800 font-medium">{specializationFromContext.join(', ')}</span>
+                        <span className="text-blue-800 font-medium">
+                          {specializationFromContext.map(spec => displaySpecialization(spec)).join(', ')}
+                        </span>
                         <p className="text-xs text-blue-600 mt-1">From admin context</p>
                       </div>
                     ) : (
@@ -946,7 +1489,7 @@ const ProjectCreationPage = () => {
                           required
                         >
                           <option value="">Select Specialization</option>
-                          {specializationOptions.map(option => (
+                          {specializationOptionsDisplay.map(option => (
                             <option key={option} value={option}>{option}</option>
                           ))}
                         </select>
@@ -1010,8 +1553,16 @@ const ProjectCreationPage = () => {
                                 value={student.name}
                                 onChange={(e) => handleStudentChange(index, 'name', e.target.value)}
                                 placeholder="John Doe"
-                                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                className={`w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
+                                  fieldErrors[`student_${index}_name`] ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                }`}
                               />
+                              {fieldErrors[`student_${index}_name`] && (
+                                <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  {fieldErrors[`student_${index}_name`]}
+                                </p>
+                              )}
                             </div>
                             
                             <div>
@@ -1061,7 +1612,7 @@ const ProjectCreationPage = () => {
                     </div>
                   </div>
 
-                  {/* Submit Button */}
+                  {/* ✅ DUPLICATE SUBMIT BUTTON AT BOTTOM FOR CONVENIENCE */}
                   <div className="pt-4">
                     <button
                       onClick={handleSingleSubmit}
@@ -1099,8 +1650,8 @@ const ProjectCreationPage = () => {
                   </p>
                 </div>
 
-                {/* Download Template & Upload Section */}
-                <div className="max-w-4xl mx-auto">
+                {/* Download Template & Upload Section - MOVED TO TOP */}
+                <div className="max-w-4xl mx-auto mb-6">
                   <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
                     <button
                       type="button"
@@ -1138,73 +1689,9 @@ const ProjectCreationPage = () => {
                     )}
                   </div>
 
-                  {/* Bulk Preview Table */}
+                  {/* ✅ MOVED UPLOAD BUTTON TO TOP */}
                   {bulkPreviewMode && projects.length > 0 && (
-                    <div className="mb-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-lg font-semibold text-gray-900">
-                          Preview ({projects.length} Projects)
-                        </h4>
-                        <div className="text-sm text-gray-600">
-                          {Object.keys(bulkFieldErrors).length > 0 && (
-                            <span className="text-red-600 font-medium">
-                              {Object.keys(bulkFieldErrors).length} error(s) found
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg">
-                        <table className="min-w-full">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Row</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Faculty ID</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">School/Dept</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Specialization</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {projects.map((proj, idx) => (
-                              <tr key={idx} className={bulkFieldErrors[idx] ? 'bg-red-50' : ''}>
-                                <td className="px-4 py-3 text-sm text-gray-900">{proj.idx}</td>
-                                <td className="px-4 py-3 text-sm font-medium text-gray-900">{proj.name}</td>
-                                <td className="px-4 py-3 text-sm text-gray-900">{proj.guideFacultyEmpId}</td>
-                                <td className="px-4 py-3 text-sm text-gray-900">{proj.school}/{proj.department}</td>
-                                <td className="px-4 py-3 text-sm text-gray-900">{proj.specialization}</td>
-                                <td className="px-4 py-3 text-sm text-gray-900">
-                                  <div className="space-y-1">
-                                    {proj.students.map((s, sidx) => (
-                                      <div key={sidx} className="text-xs">
-                                        <strong>{s.name}</strong> ({s.regNo})
-                                      </div>
-                                    ))}
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                  {bulkFieldErrors[idx] ? (
-                                    <div className="text-red-600 text-xs">
-                                      <AlertCircle className="inline h-4 w-4 mr-1" />
-                                      {bulkFieldErrors[idx]}
-                                    </div>
-                                  ) : (
-                                    <span className="text-green-600 text-xs">✓ Valid</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Upload Button */}
-                  {bulkPreviewMode && projects.length > 0 && (
-                    <div className="flex justify-center">
+                    <div className="flex justify-center mb-6">
                       <button
                         onClick={handleBulkSubmit}
                         disabled={loading || Object.keys(bulkFieldErrors).length > 0}
@@ -1231,23 +1718,94 @@ const ProjectCreationPage = () => {
                       </button>
                     </div>
                   )}
-
-                  {/* Instructions */}
-                  {!bulkPreviewMode && (
-                    <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-                      <h4 className="text-lg font-semibold text-blue-900 mb-3">📋 Instructions:</h4>
-                      <ul className="text-sm text-blue-800 space-y-2">
-                        <li>• Download the Excel template and fill in your project data</li>
-                        <li>• Each row represents one project (max 3 students per project)</li>
-                        <li>• Required fields: Project Name, Guide Faculty ID, School, Department, Specialization</li>
-                        <li>• At least one student is required per project</li>
-                        <li>• Student emails must end with @vitstudent.ac.in</li>
-                        <li>• Save as .xlsx format and upload the file</li>
-                        <li>• Preview will show validation errors before uploading</li>
-                      </ul>
-                    </div>
-                  )}
                 </div>
+
+                {/* Bulk Preview Table */}
+                {bulkPreviewMode && projects.length > 0 && (
+                  <div className="max-w-4xl mx-auto mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-lg font-semibold text-gray-900">
+                        Preview ({projects.length} Projects)
+                      </h4>
+                      <div className="text-sm text-gray-600">
+                        {Object.keys(bulkFieldErrors).length > 0 && (
+                          <span className="text-red-600 font-medium">
+                            {Object.keys(bulkFieldErrors).length} error(s) found
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg">
+                      <table className="min-w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Row</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Faculty ID</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">School/Dept</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Specialization</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {projects.map((proj, idx) => (
+                            <tr key={idx} className={bulkFieldErrors[idx] ? 'bg-red-50' : ''}>
+                              <td className="px-4 py-3 text-sm text-gray-900">{proj.idx}</td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{proj.name}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{proj.guideFacultyEmpId}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{proj.school}/{proj.department}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{proj.specialization}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">
+                                <div className="space-y-1">
+                                  {proj.students.map((s, sidx) => (
+                                    <div key={sidx} className="text-xs">
+                                      <strong>{s.name}</strong> ({s.regNo})
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {bulkFieldErrors[idx] ? (
+                                  <div className="text-red-600 text-xs">
+                                    <AlertCircle className="inline h-4 w-4 mr-1" />
+                                    {bulkFieldErrors[idx]}
+                                  </div>
+                                ) : (
+                                  <span className="text-green-600 text-xs">✓ Valid</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Instructions */}
+                {!bulkPreviewMode && (
+                  <div className="max-w-4xl mx-auto mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+                    <h4 className="text-lg font-semibold text-blue-900 mb-3">📋 Instructions:</h4>
+                    <ul className="text-sm text-blue-800 space-y-2">
+                      <li>• Download the Excel template and fill in your project data</li>
+                      <li>• Each row represents one project (max 3 students per project)</li>
+                      <li>• Required fields: Project Name, Guide Faculty ID{isAllMode ? ', School, Department' : ''}, Specialization</li>
+                      <li>• At least one student is required per project</li>
+                      <li>• Student emails must end with @vitstudent.ac.in</li>
+                      <li>• Registration numbers should follow format: 21BCE1001</li>
+                      <li>• Save as .xlsx format and upload the file</li>
+                      <li>• Preview will show validation errors before uploading</li>
+                      {!isAllMode && (
+                        <li>• <strong>Context Mode:</strong> School ({schoolFromContext}) and Department ({departmentFromContext}) are auto-filled</li>
+                      )}
+                      {isAllMode && (
+                        <li>• <strong>All Mode:</strong> You must specify School and Department for each project</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>

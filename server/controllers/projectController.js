@@ -527,12 +527,11 @@ export async function getAllGuideProjects(req, res) {
     .populate({
       path: "panel",
       model: "Panel", 
-      select: "name members school department", // ✅ Include panel details if exists
-      populate: {
-        path: "members",
-        model: "Faculty",
-        select: "name emailId employeeId"
-      }
+      select: "school department", // ✅ FIXED: Remove 'members' field that doesn't exist
+      populate: [
+        { path: "faculty1", model: "Faculty", select: "name emailId employeeId" },
+        { path: "faculty2", model: "Faculty", select: "name emailId employeeId" }
+      ]
     })
     .lean(); // ✅ Use lean() for better performance since we're converting to object anyway
 
@@ -658,6 +657,7 @@ export async function getAllGuideProjects(req, res) {
     });
   }
 }
+
 
 /**
  * ✅ UPDATED: Get all projects where the logged-in faculty is a panel member

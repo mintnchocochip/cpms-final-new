@@ -367,11 +367,11 @@ const Panel = () => {
     return (
       <>
         <Navbar userType="faculty" />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="flex flex-col items-center space-y-4">
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+          <div className="flex flex-col items-center space-y-4 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <div className="text-xl text-gray-600">Loading panel projects...</div>
-            <div className="text-sm text-gray-500">Fetching marking schema and deadlines</div>
+            <div className="text-lg sm:text-xl text-gray-600">Loading panel projects...</div>
+            <div className="text-xs sm:text-sm text-gray-500">Fetching marking schema and deadlines</div>
           </div>
         </div>
       </>
@@ -382,13 +382,13 @@ const Panel = () => {
     return (
       <>
         <Navbar userType="faculty" />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-xl text-red-600 mb-4">Error Loading Data</div>
-            <p className="text-gray-600 mb-4">{error}</p>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+          <div className="text-center max-w-md w-full">
+            <div className="text-lg sm:text-xl text-red-600 mb-4">Error Loading Data</div>
+            <p className="text-sm sm:text-base text-gray-600 mb-4">{error}</p>
             <button
               onClick={fetchData}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm sm:text-base"
             >
               Retry
             </button>
@@ -404,15 +404,15 @@ const Panel = () => {
     <>
       <Navbar userType="faculty" />
       <div className='min-h-screen bg-gray-50 overflow-x-hidden'>
-        <div className='p-24 items-center'>
-          <div className='flex justify-between items-center mb-4'>
+        <div className='p-4 sm:p-6 lg:p-24 pt-20 sm:pt-24 lg:pt-24'>
+          <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6 gap-4'>
             <div>
-              <h1 className="text-3xl font-bold text-gray-800">Panel Dashboard</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Panel Dashboard</h1>
             </div>
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors ${
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-white transition-colors text-sm sm:text-base ${
                 refreshing 
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-blue-600 hover:bg-blue-700'
@@ -420,109 +420,128 @@ const Panel = () => {
               title="Refresh request statuses and data"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Refreshing...' : 'Refresh Status'}
+              <span className="hidden sm:inline">{refreshing ? 'Refreshing...' : 'Refresh Status'}</span>
+              <span className="sm:hidden">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
             </button>
           </div>
 
           <div className="bg-white shadow-md rounded-md">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-semibold text-black pl-5 mt-2">Panel Review</h2>
+            <div className="flex justify-between items-center p-4 sm:p-5">
+              <h2 className="text-lg sm:text-2xl font-semibold text-black">Panel Review</h2>
             </div>
             {teams.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <div className="text-lg mb-2">No projects assigned as panel</div>
+              <div className="p-6 sm:p-8 text-center text-gray-500">
+                <div className="text-base sm:text-lg mb-2">No projects assigned as panel</div>
                 <p className="text-sm">Projects you review as panel will appear here</p>
               </div>
             ) : (
-              teams.map(team => (
-                <div key={team.id} className="bg-white rounded-lg shadow-sm mb-4">
-                  <div className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
-                            className="flex items-center"
-                          >
-                            <span className={`inline-block transition-transform duration-200 ${
-                              expandedTeam === team.id ? 'rotate-90' : ''
-                            }`}>
-                              <ChevronRight />
-                            </span>
-                            <span className="font-medium text-black">{team.title}</span>
-                          </button>
+              <div className="divide-y divide-gray-200">
+                {teams.map(team => (
+                  <div key={team.id} className="bg-white">
+                    <div className="p-4 sm:p-5">
+                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-2">
+                            <button
+                              onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
+                              className="flex items-center flex-shrink-0 mt-1"
+                            >
+                              <span className={`inline-block transition-transform duration-200 ${
+                                expandedTeam === team.id ? 'rotate-90' : ''
+                              }`}>
+                                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                              </span>
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-medium text-black text-sm sm:text-base lg:text-lg break-words">
+                                {team.title}
+                              </h3>
+                              <p className="text-xs sm:text-sm text-gray-600 mt-1">{team.description}</p>
+                              <p className="text-xs text-blue-600 mt-1">
+                                {team.students.length} student{team.students.length !== 1 ? 's' : ''}
+                              </p>
+                              
+                              {/* Status Information - Mobile optimized */}
+                              <div className="text-xs text-gray-500 mt-2 space-y-1 lg:space-y-0 lg:flex lg:gap-4">
+                                {reviewTypes.map(reviewType => {
+                                  const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
+                                  const requestStatus = getTeamRequestStatus(team, reviewType.key);
+                                  return (
+                                    <div key={reviewType.key} className="flex items-center gap-1">
+                                      <span className="font-medium">{reviewType.name}:</span>
+                                      <span className={isPassed ? 'text-red-600 font-bold' : 'text-green-600'}>
+                                        {isPassed ? 'DEADLINE PASSED' : 'Active'}
+                                      </span>
+                                      {requestStatus === 'approved' && (
+                                        <span className="text-purple-600 text-xs bg-purple-100 px-1 rounded">extended</span>
+                                      )}
+                                      {requestStatus !== 'none' && requestStatus !== 'approved' && (
+                                        <span className="text-blue-600 bg-blue-100 px-1 rounded">({requestStatus})</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-600 ml-6">{team.description}</p>
-                        <p className="text-xs text-blue-600 ml-6">
-                          {team.students.length} student{team.students.length !== 1 ? 's' : ''}
-                        </p>
-                        <div className="text-xs text-gray-500 ml-6">
+                        
+                        {/* Review Buttons - Responsive */}
+                        <div className="flex flex-wrap gap-2 justify-start lg:justify-end">
                           {reviewTypes.map(reviewType => {
                             const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
                             const requestStatus = getTeamRequestStatus(team, reviewType.key);
                             return (
-                              <span key={reviewType.key} className="mr-4">
-                                {reviewType.name}: 
-                                <span className={isPassed ? 'text-red-600 font-bold' : 'text-green-600'}>
-                                  {isPassed ? 'DEADLINE PASSED' : 'Active'}
-                                </span>
+                              <button
+                                key={reviewType.key}
+                                onClick={() => setActivePopup({ type: reviewType.key, teamId: team.id })}
+                                className={`px-3 py-2 sm:px-4 text-white text-xs sm:text-sm rounded transition-colors ${getButtonColor(reviewType.key)} ${
+                                  isPassed ? 'opacity-75' : ''
+                                } flex items-center gap-1 whitespace-nowrap`}
+                                title={`${reviewType.components?.length || 0} components${
+                                  requestStatus === 'approved' ? ' | Extended by Admin' : ''
+                                }${isPassed ? ' | DEADLINE PASSED' : ''}`}
+                              >
+                                <span className="truncate max-w-20 sm:max-w-none">{reviewType.name}</span>
+                                {reviewType.requiresPPT && (
+                                  <span className="text-xs bg-white bg-opacity-20 px-1 rounded flex-shrink-0">PPT</span>
+                                )}
                                 {requestStatus === 'approved' && (
-                                  <span className="text-purple-600 text-xs"> (extended)</span>
+                                  <span className="text-xs bg-purple-500 px-1 rounded flex-shrink-0">EXT</span>
                                 )}
-                                {requestStatus !== 'none' && requestStatus !== 'approved' && (
-                                  <span className="text-blue-600"> ({requestStatus})</span>
+                                {isPassed && (
+                                  <span className="text-xs bg-red-500 px-1 rounded flex-shrink-0">🔒</span>
                                 )}
-                              </span>
+                              </button>
                             );
                           })}
                         </div>
                       </div>
-                      <div className="flex gap-2 flex-wrap">
-                        {reviewTypes.map(reviewType => {
-                          const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
-                          const requestStatus = getTeamRequestStatus(team, reviewType.key);
-                          return (
-                            <button
-                              key={reviewType.key}
-                              onClick={() => setActivePopup({ type: reviewType.key, teamId: team.id })}
-                              className={`px-4 py-2 text-white text-sm rounded transition-colors ${getButtonColor(reviewType.key)} ${
-                                isPassed ? 'opacity-75' : ''
-                              }`}
-                              title={`${reviewType.components?.length || 0} components${
-                                requestStatus === 'approved' ? ' | Extended by Admin' : ''
-                              }${isPassed ? ' | DEADLINE PASSED' : ''}`}
-                            >
-                              {reviewType.name}
-                              {reviewType.requiresPPT && (
-                                <span className="ml-1 text-xs bg-white bg-opacity-20 px-1 rounded">PPT</span>
-                              )}
-                              {requestStatus === 'approved' && (
-                                <span className="ml-1 text-xs bg-purple-500 px-1 rounded">EXT</span>
-                              )}
-                              {isPassed && (
-                                <span className="ml-1 text-xs bg-red-500 px-1 rounded">🔒</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      
+                      {/* Expanded Content */}
+                      {expandedTeam === team.id && (
+                        <div className="mt-4 -mx-4 sm:-mx-5 overflow-x-auto">
+                          <div className="px-4 sm:px-5">
+                            <ReviewTable
+                              team={team}
+                              deadlines={deadlines}
+                              requestStatuses={requestStatuses}
+                              isDeadlinePassed={(reviewType) => isTeamDeadlinePassed(reviewType, team.id)}
+                              isReviewLocked={(student, reviewType) => isReviewLocked(student, reviewType, team.id)}
+                              markingSchema={markingSchema}
+                              panelMode={true}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {expandedTeam === team.id && (
-                      <ReviewTable
-                        team={team}
-                        deadlines={deadlines}
-                        requestStatuses={requestStatuses}
-                        isDeadlinePassed={(reviewType) => isTeamDeadlinePassed(reviewType, team.id)}
-                        isReviewLocked={(student, reviewType) => isReviewLocked(student, reviewType, team.id)}
-                        markingSchema={markingSchema}
-                        panelMode={true}
-                      />
-                    )}
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
+          
+          {/* Popup Review Modal */}
           {activePopup && (() => {
             const team = teams.find(t => t.id === activePopup.teamId);
             if (!team) return null;

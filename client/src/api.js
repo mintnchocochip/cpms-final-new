@@ -6,6 +6,7 @@ const API = axios.create({
   baseURL: `${API_BASE_URL}`,
 });
 
+// Helper function to build query parameters for school/department filtering
 const buildAdminContextParams = (school = null, department = null) => {
   const params = new URLSearchParams();
   if (school) params.append('school', school);
@@ -13,6 +14,7 @@ const buildAdminContextParams = (school = null, department = null) => {
   return params.toString();
 };
 
+// Add authorization token to all requests if available
 API.interceptors.request.use((config) => {
   const token = sessionStorage.getItem("token");
   if (token) {
@@ -24,6 +26,48 @@ API.interceptors.request.use((config) => {
 // Auth endpoints
 export const adminLogin = (data) => API.post("/auth/login", data);
 
+// ✅ FIXED: Client-side getAllFaculty function
+export const getAllFaculty = (
+  school = null,
+  department = null,
+  specialization = null,
+  sortBy = null,
+  sortOrder = null
+) => {
+  // Build query string for optional parameters
+  const params = new URLSearchParams();
+
+  if (school && school !== 'all') params.append('school', school);
+  if (department && department !== 'all') params.append('department', department);
+  if (specialization && specialization !== 'all') params.append('specialization', specialization);
+  if (sortBy) params.append('sortBy', sortBy);
+  if (sortOrder) params.append('sortOrder', sortOrder);
+
+  const queryString = params.toString();
+
+  // Use query params for flexible route handling
+  return API.get(`/admin/getAllFaculty${queryString ? `?${queryString}` : ''}`);
+};
+
+// Keep the old function for backward compatibility
+export const getFacultyBySchoolAndDept = (school, department) => {
+  return getAllFaculty(school, department);
+};
+
+// Get faculty projects (for detailed view)
+export const getFacultyProjects = (employeeId) => {
+  return API.get(`/faculty/${employeeId}/projects`);
+};
+
+// ✅ Faculty CRUD operations
+export const deleteFacultyByEmployeeId = (employeeId) => {
+  return API.delete(`/admin/faculty/${employeeId}`);
+};
+
+export const updateFaculty = (employeeId, facultyData) => {
+  return API.put(`/admin/faculty/${employeeId}`, facultyData);
+};
+
 // Admin endpoints
 export const getAllPanelProjects = (school = null, department = null) => {
   const queryString = buildAdminContextParams(school, department);
@@ -33,16 +77,6 @@ export const getAllPanelProjects = (school = null, department = null) => {
 export const getAllGuideProjects = (school = null, department = null) => {
   const queryString = buildAdminContextParams(school, department);
   return API.get(`/admin/getAllGuideProjects${queryString ? `?${queryString}` : ''}`);
-};
-
-// Faculty endpoint
-export const getAllFaculty = () => API.get("/admin/getAllFaculty");
-
-export const getFacultyBySchoolAndDept = (school, department) => {
-  if (!school || !department) {
-    return API.get("/admin/getAllFaculty");
-  }
-  return API.get(`/admin/faculty/${school}/${department}`);
 };
 
 export const getGuideTeams = () => API.get("/project/guide");
@@ -124,12 +158,10 @@ export async function checkRequestStatus(facultyType, regNo, reviewType) {
   }
 }
 
-// ✅ FIXED: Completely removed hardcoded values
 export async function checkAllRequestStatuses(teamsList) {
   const statuses = {};
   
   for (const team of teamsList) {
-    // ✅ Only process teams with valid schemas
     if (!team.markingSchema?.reviews) {
       console.log(`⚠️ [API] No schema for team ${team.title}, skipping request status check`);
       continue;
@@ -138,7 +170,6 @@ export async function checkAllRequestStatuses(teamsList) {
     const isPanel = team.panel !== undefined;
     const facultyType = isPanel ? 'panel' : 'guide';
     
-    // ✅ Get review types from schema only
     const reviewTypes = team.markingSchema.reviews
       .filter(review => review.facultyType === facultyType)
       .map(review => review.reviewName);
@@ -169,7 +200,6 @@ export async function checkAllRequestStatuses(teamsList) {
   return statuses;
 }
 
-// Batch check request statuses for multiple students/reviews
 export async function batchCheckRequestStatuses(requests) {
   try {
     const res = await API.post('/student/batchCheckRequestStatus', { requests });
