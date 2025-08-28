@@ -1065,65 +1065,81 @@ const ProjectCreationPage = () => {
   };
 
   const handleBulkSubmit = async () => {
-    setError("");
-    setSuccess("");
-    setBulkFieldErrors({});
+  setError("");
+  setSuccess("");
+  setBulkFieldErrors({});
 
-    if (projects.length === 0) {
-      setError("❌ No projects to upload. Please upload a file first.");
-      return;
+  if (projects.length === 0) {
+    setError("❌ No projects to upload. Please upload a file first.");
+    return;
+  }
+
+  console.log('🚀 Starting bulk validation for', projects.length, 'projects');
+  const valid = validateBulkProjects(projects);
+  
+  if (!valid) {
+    setError("❌ Please fix all validation errors before uploading.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    // Assuming school, department, and guideFacultyEmpId are consistent across all projects,
+    // extract from first project or from context if available
+    const school = projects[0].school.trim();
+    const department = projects[0].department.trim();
+
+    // Here you may want to decide how to handle guideFacultyEmpId if projects have different values.
+    // Assuming you want to use guideFacultyEmpId from the first project for backend validation
+    const guideFacultyEmpId = projects[0].guideFacultyEmpId.trim().toUpperCase();
+
+    // Prepare projects array without school, department, guideFacultyEmpId fields since they are root-level now
+    // But keep specialization and students as is, trimming strings
+    const cleanedProjects = projects.map(proj => ({
+      name: proj.name.trim(),
+      specialization: normalizeSpecialization(proj.specialization), // normalized for backend
+      students: proj.students.map(student => ({
+        name: student.name.trim(),
+        regNo: student.regNo.trim().toUpperCase(),
+        emailId: student.emailId.trim().toLowerCase(),
+        school,         // student school same as root school
+        department      // student department same as root department
+      }))
+    }));
+
+    const payload = {
+      school,
+      department,
+      guideFacultyEmpId,
+      projects: cleanedProjects
+    };
+
+    console.log("📤 Submitting bulk projects payload:", payload);
+
+    const response = await createProjectsBulk(payload);
+
+    if (response.data?.success) {
+      setSuccess(`✅ Successfully uploaded ${projects.length} projects! All projects have been created and students enrolled.`);
+      setProjects([]);
+      setBulkPreviewMode(false);
+      setFileName("");
+      // Reset file input
+      const fileInput = document.getElementById('bulkfileinput');
+      if (fileInput) fileInput.value = '';
+    } else {
+      setError(response.data?.message || "❌ Failed to upload bulk projects.");
     }
 
-    console.log('🚀 Starting bulk validation for', projects.length, 'projects');
-    const valid = validateBulkProjects(projects);
-    
-    if (!valid) {
-      setError("❌ Please fix all validation errors before uploading.");
-      return;
-    }
+  } catch (err) {
+    console.error("❌ Bulk upload error:", err);
+    const errMsg = err.response?.data?.message || err.message || "Unknown error occurred during bulk upload.";
+    setError("❌ Bulk upload failed: " + errMsg);
+  } finally {
+    setLoading(false);
+  }
+};
 
-    try {
-      setLoading(true);
-      
-      // ✅ FIXED: Ensure proper data format for API with normalized specialization
-      const bulkPayload = projects.map(proj => ({
-        name: proj.name.trim(),
-        guideFacultyEmpId: proj.guideFacultyEmpId.trim().toUpperCase(),
-        specialization: normalizeSpecialization(proj.specialization), // ✅ Normalize for backend
-        school: proj.school.trim(),
-        department: proj.department.trim(),
-        students: proj.students.map(student => ({
-          name: student.name.trim(),
-          regNo: student.regNo.trim().toUpperCase(),
-          emailId: student.emailId.trim().toLowerCase(),
-          school: proj.school.trim(),
-          department: proj.department.trim()
-        }))
-      }));
-
-      console.log("📤 Submitting bulk projects:", bulkPayload.length, "projects");
-
-      const response = await createProjectsBulk({ projects: bulkPayload });
-
-      if (response.data?.success) {
-        setSuccess(`✅ Successfully uploaded ${projects.length} projects! All projects have been created and students enrolled.`);
-        setProjects([]);
-        setBulkPreviewMode(false);
-        setFileName("");
-        // Reset file input
-        const fileInput = document.getElementById('bulkfileinput');
-        if (fileInput) fileInput.value = '';
-      } else {
-        setError(response.data?.message || "❌ Failed to upload bulk projects.");
-      }
-    } catch (err) {
-      console.error("❌ Bulk upload error:", err);
-      const errMsg = err.response?.data?.message || err.message || "Unknown error occurred during bulk upload.";
-      setError("❌ Bulk upload failed: " + errMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const clearBulkData = () => {
     setProjects([]);
