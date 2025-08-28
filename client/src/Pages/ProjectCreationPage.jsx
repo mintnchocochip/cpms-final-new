@@ -1090,8 +1090,8 @@ const ProjectCreationPage = () => {
         name: proj.name.trim(),
         guideFacultyEmpId: proj.guideFacultyEmpId.trim().toUpperCase(),
         specialization: normalizeSpecialization(proj.specialization), // ✅ Normalize for backend
-        schools: proj.school.trim(),
-        departments: proj.department.trim(),
+        school: proj.school.trim(),
+        department: proj.department.trim(),
         students: proj.students.map(student => ({
           name: student.name.trim(),
           regNo: student.regNo.trim().toUpperCase(),
