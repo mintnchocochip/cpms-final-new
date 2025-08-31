@@ -15,9 +15,6 @@ export async function getFilteredStudents(req, res) {
 
     // Query students matching the filter (if filter is empty returns all)
     const students = await Student.find(filter)
-      .populate("school")
-      .populate("department")
-      .populate("specialization");
 
     return res.json({ students });
   } catch (error) {
