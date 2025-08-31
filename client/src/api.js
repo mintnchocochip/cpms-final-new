@@ -5,6 +5,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 const API = axios.create({
   baseURL: `${API_BASE_URL}`,
 });
+// Get filtered students
+export const getFilteredStudents = (params = new URLSearchParams()) => {
+  const queryString = params.toString();
+  return API.get(`student/students${queryString ? `?${queryString}` : ''}`);
+};
+
 
 // Helper function to build query parameters for school/department filtering
 const buildAdminContextParams = (school = null, department = null) => {
