@@ -2,6 +2,29 @@ import Faculty from "../models/facultySchema.js";
 import Student from "../models/studentSchema.js";
 import Request from "../models/requestSchema.js";
 
+// Fetch students based on optional school, department, specialization filters
+export async function getFilteredStudents(req, res) {
+  try {
+    const { school, department, specialization } = req.query;
+
+    // Build dynamic filter object
+    const filter = {};
+    if (school) filter.school = school;
+    if (department) filter.department = department;
+    if (specialization) filter.specialization = specialization;
+
+    // Query students matching the filter (if filter is empty returns all)
+    const students = await Student.find(filter)
+      .populate("school")
+      .populate("department")
+      .populate("specialization");
+
+    return res.json({ students });
+  } catch (error) {
+    return res.status(500).json({ message: error.stack });
+  }
+}
+
 // Faculty requests admin to unlock a review
 export async function requestAdmin(req, res, next) {
   try {
