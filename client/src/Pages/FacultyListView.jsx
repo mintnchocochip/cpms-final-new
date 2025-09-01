@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bell, X, Users, Mail, Phone, MapPin, Calendar, BookOpen, Eye, 
-  Edit, Trash2, Plus, Download, Search, AlertTriangle, Check, Filter 
+  Edit, Trash2, Plus, Download, Search, AlertTriangle, Check, Filter,
+  Building2, GraduationCap, Database, FileSpreadsheet, CheckCircle,
+  XCircle, RefreshCw, Settings, ChevronDown, ChevronRight, BarChart3,
+  Grid3X3, Award
 } from 'lucide-react';
 import Navbar from "../Components/UniversalNavbar";
 import { 
@@ -12,7 +15,34 @@ import {
   getFacultyProjects 
 } from '../api';
 
-// Faculty Edit Modal Component
+// Helper functions for specialization normalization
+const normalizeSpecialization = (spec) => {
+  if (!spec) return '';
+  return spec
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '');
+};
+
+const specializationMapping = {
+  'aiml': 'AI/ML',
+  'datascience': 'Data Science', 
+  'cybersecurity': 'Cyber Security',
+  'iot': 'IoT',
+  'blockchain': 'Blockchain',
+  'cloudcomputing': 'Cloud Computing',
+  'vlsi': 'VLSI',
+  'softwareengineering': 'Software Engineering',
+  'general': 'General'
+};
+
+const reverseSpecializationMapping = Object.entries(specializationMapping)
+  .reduce((acc, [key, value]) => {
+    acc[normalizeSpecialization(value)] = value;
+    return acc;
+  }, {});
+
 // Faculty Edit Modal Component
 const FacultyEditModal = ({ faculty, onClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -35,41 +65,34 @@ const FacultyEditModal = ({ faculty, onClose, onSave }) => {
     'Blockchain', 'Cloud Computing', 'VLSI', 'Software Engineering', 'General'
   ];
 
-  // ✅ FIXED: Initialize form data when faculty prop changes
- // ✅ FIXED: Initialize form data when faculty prop changes with normalization
-useEffect(() => {
-  if (faculty) {
-    setFormData({
-      name: faculty.name || '',
-      emailId: faculty.emailId || '',
-      employeeId: faculty.employeeId || '',
-      role: faculty.role || 'faculty',
-      // ✅ Handle both array and string formats for school
-      school: Array.isArray(faculty.schools) 
-        ? faculty.schools 
-        : Array.isArray(faculty.school)
-        ? faculty.school 
-        : (faculty.school ? [faculty.school] : []),
-      // ✅ Handle both array and string formats for department  
-      department: Array.isArray(faculty.departments) 
-        ? faculty.departments 
-        : Array.isArray(faculty.department) 
-        ? faculty.department 
-        : (faculty.department ? [faculty.department] : []),
-      // ✅ FIXED: Normalize specializations for matching
-      specialization: Array.isArray(faculty.specialization) 
-        ? faculty.specialization.map(spec => {
-            const normalized = normalizeSpecialization(spec);
-            return reverseSpecializationMapping[normalized] || spec;
-          })
-        : (faculty.specialization ? [faculty.specialization] : []),
-      imageUrl: faculty.imageUrl || ''
-    });
-    // Clear any previous errors
-    setError('');
-  }
-}, [faculty]);
-
+  useEffect(() => {
+    if (faculty) {
+      setFormData({
+        name: faculty.name || '',
+        emailId: faculty.emailId || '',
+        employeeId: faculty.employeeId || '',
+        role: faculty.role || 'faculty',
+        school: Array.isArray(faculty.schools) 
+          ? faculty.schools 
+          : Array.isArray(faculty.school)
+          ? faculty.school 
+          : (faculty.school ? [faculty.school] : []),
+        department: Array.isArray(faculty.departments) 
+          ? faculty.departments 
+          : Array.isArray(faculty.department) 
+          ? faculty.department 
+          : (faculty.department ? [faculty.department] : []),
+        specialization: Array.isArray(faculty.specialization) 
+          ? faculty.specialization.map(spec => {
+              const normalized = normalizeSpecialization(spec);
+              return reverseSpecializationMapping[normalized] || spec;
+            })
+          : (faculty.specialization ? [faculty.specialization] : []),
+        imageUrl: faculty.imageUrl || ''
+      });
+      setError('');
+    }
+  }, [faculty]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -106,12 +129,10 @@ useEffect(() => {
         throw new Error('At least one school, department, and specialization must be selected');
       }
 
-      // Rename fields to match backend expectation
       const updatePayload = {
         ...formData,
         schools: formData.school,
         departments: formData.department,
-        // specialization stays the same
       };
 
       await onSave(updatePayload);
@@ -127,11 +148,11 @@ useEffect(() => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-xl">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white p-6 rounded-t-2xl">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold">Edit Faculty Details</h2>
-            <button onClick={onClose} className="text-white hover:text-gray-200 p-2">
+            <button onClick={onClose} className="text-white hover:text-gray-200 p-2 hover:bg-white/20 rounded-lg transition-all">
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -139,10 +160,10 @@ useEffect(() => {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
               <div className="flex items-center">
                 <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-                <span className="text-red-700">{error}</span>
+                <span className="text-red-700 font-semibold">{error}</span>
               </div>
             </div>
           )}
@@ -150,59 +171,57 @@ useEffect(() => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Basic Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800">Basic Information</h3>
+              <h3 className="text-lg font-semibold text-slate-800">Basic Information</h3>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Full Name *
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Full Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Employee ID *
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Employee ID <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   name="employeeId"
                   value={formData.employeeId}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address *
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Email Address <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
                   name="emailId"
                   value={formData.emailId}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Role
-                </label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Role</label>
                 <select
                   name="role"
                   value={formData.role}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all"
                 >
                   <option value="faculty">Faculty</option>
                   <option value="admin">Admin</option>
@@ -210,15 +229,15 @@ useEffect(() => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Image URL (Optional)
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Image URL <span className="text-slate-400">(Optional)</span>
                 </label>
                 <input
                   type="url"
                   name="imageUrl"
                   value={formData.imageUrl}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all"
                   placeholder="https://example.com/image.jpg"
                 />
               </div>
@@ -226,88 +245,88 @@ useEffect(() => {
 
             {/* Academic Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800">Academic Information</h3>
+              <h3 className="text-lg font-semibold text-slate-800">Academic Information</h3>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Schools * (Select multiple)
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Schools <span className="text-red-500">*</span> (Select multiple)
                 </label>
-                <div className="border border-gray-300 rounded-lg p-3 max-h-32 overflow-y-auto">
+                <div className="border-2 border-slate-200 rounded-xl p-3 max-h-32 overflow-y-auto">
                   {schoolOptions.map(school => (
-                    <label key={school} className="flex items-center space-x-2 mb-1">
+                    <label key={school} className="flex items-center space-x-2 mb-1 hover:bg-slate-50 p-1 rounded">
                       <input
                         type="checkbox"
                         checked={formData.school.includes(school)}
                         onChange={() => handleMultiSelect('school', school)}
-                        className="rounded border-gray-300"
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
                       <span className="text-sm">{school}</span>
                     </label>
                   ))}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-slate-500 mt-1">
                   Selected: {formData.school.join(', ') || 'None'}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Departments * (Select multiple)
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Departments <span className="text-red-500">*</span> (Select multiple)
                 </label>
-                <div className="border border-gray-300 rounded-lg p-3 max-h-32 overflow-y-auto">
+                <div className="border-2 border-slate-200 rounded-xl p-3 max-h-32 overflow-y-auto">
                   {departmentOptions.map(dept => (
-                    <label key={dept} className="flex items-center space-x-2 mb-1">
+                    <label key={dept} className="flex items-center space-x-2 mb-1 hover:bg-slate-50 p-1 rounded">
                       <input
                         type="checkbox"
                         checked={formData.department.includes(dept)}
                         onChange={() => handleMultiSelect('department', dept)}
-                        className="rounded border-gray-300"
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
                       <span className="text-sm">{dept}</span>
                     </label>
                   ))}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-slate-500 mt-1">
                   Selected: {formData.department.join(', ') || 'None'}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Specializations * (Select multiple)
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Specializations <span className="text-red-500">*</span> (Select multiple)
                 </label>
-                <div className="border border-gray-300 rounded-lg p-3 max-h-32 overflow-y-auto">
+                <div className="border-2 border-slate-200 rounded-xl p-3 max-h-32 overflow-y-auto">
                   {specializationOptions.map(spec => (
-                    <label key={spec} className="flex items-center space-x-2 mb-1">
+                    <label key={spec} className="flex items-center space-x-2 mb-1 hover:bg-slate-50 p-1 rounded">
                       <input
                         type="checkbox"
                         checked={formData.specialization.includes(spec)}
                         onChange={() => handleMultiSelect('specialization', spec)}
-                        className="rounded border-gray-300"
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
                       <span className="text-sm">{spec}</span>
                     </label>
                   ))}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-slate-500 mt-1">
                   Selected: {formData.specialization.join(', ') || 'None'}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-4 pt-6 border-t">
+          <div className="flex justify-end gap-4 pt-6 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-6 py-3 border-2 border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 transition-all font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium shadow-lg"
             >
               {loading ? (
                 <>
@@ -328,55 +347,25 @@ useEffect(() => {
   );
 };
 
-// Add this helper function at the top of both files
-const normalizeSpecialization = (spec) => {
-  if (!spec) return '';
-  return spec
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '')  // Remove all spaces
-    .replace(/[^a-zA-Z0-9]/g, ''); // Remove special characters for comparison
-};
-
-// Create a mapping for display purposes
-const specializationMapping = {
-  'aiml': 'AI/ML',
-  'datascience': 'Data Science', 
-  'cybersecurity': 'Cyber Security',
-  'iot': 'IoT',
-  'blockchain': 'Blockchain',
-  'cloudcomputing': 'Cloud Computing',
-  'vlsi': 'VLSI',
-  'softwareengineering': 'Software Engineering',
-  'general': 'General'
-};
-
-// Reverse mapping for finding matches
-const reverseSpecializationMapping = Object.entries(specializationMapping)
-  .reduce((acc, [key, value]) => {
-    acc[normalizeSpecialization(value)] = value;
-    return acc;
-  }, {});
-
 // Team Popup Component
 const TeamPopup = ({ team, onClose }) => {
   if (!team) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl relative max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-xl">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white p-6 rounded-t-2xl">
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-2xl font-bold mb-2">{team.title || team.name || 'Project Details'}</h2>
               {team.domain && team.domain !== 'N/A' && (
-                <span className="bg-blue-400 text-blue-100 px-3 py-1 rounded-full text-sm font-medium">
+                <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
                   {team.domain}
                 </span>
               )}
             </div>
             <button
-              className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white hover:bg-opacity-20 rounded-lg"
+              className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white/20 rounded-lg"
               onClick={onClose}
             >
               <X className="h-6 w-6" />
@@ -386,28 +375,28 @@ const TeamPopup = ({ team, onClose }) => {
 
         <div className="p-6">
           <div className="mb-6">
-            <h3 className="font-semibold text-lg mb-3 text-gray-800 flex items-center gap-2">
+            <h3 className="font-semibold text-lg mb-3 text-slate-800 flex items-center gap-2">
               <Users className="h-5 w-5 text-blue-600" />
               Team Members
             </h3>
             {team.students && team.students.length > 0 ? (
               <div className="grid gap-3">
                 {team.students.map((student, idx) => (
-                  <div key={student._id || idx} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div key={student._id || idx} className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-semibold text-gray-800">{student.name || 'N/A'}</h4>
-                        <p className="text-sm text-gray-600">
+                        <h4 className="font-semibold text-slate-800">{student.name || 'N/A'}</h4>
+                        <p className="text-sm text-slate-600">
                           Registration: <span className="font-mono">{student.regNo || 'N/A'}</span>
                         </p>
                         {student.emailId && (
-                          <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                          <p className="text-sm text-slate-600 flex items-center gap-1 mt-1">
                             <Mail className="h-3 w-3" />
                             {student.emailId}
                           </p>
                         )}
                         {student.school && (
-                          <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                          <p className="text-sm text-slate-600 flex items-center gap-1 mt-1">
                             <MapPin className="h-3 w-3" />
                             {student.school} - {student.department}
                           </p>
@@ -425,8 +414,8 @@ const TeamPopup = ({ team, onClose }) => {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-                <Users className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+              <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-xl">
+                <Users className="h-12 w-12 mx-auto mb-2 text-slate-300" />
                 <p>No team members listed</p>
               </div>
             )}
@@ -434,8 +423,8 @@ const TeamPopup = ({ team, onClose }) => {
 
           {(team.school || team.department || team.specialization) && (
             <div className="mb-6">
-              <h3 className="font-semibold text-lg mb-3 text-gray-800">Project Information</h3>
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 space-y-2">
+              <h3 className="font-semibold text-lg mb-3 text-slate-800">Project Information</h3>
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 space-y-2">
                 {team.school && (
                   <p className="text-sm">
                     <span className="font-medium">School:</span> {team.school}
@@ -457,8 +446,8 @@ const TeamPopup = ({ team, onClose }) => {
 
           {team.faculty && (
             <div className="mb-6">
-              <h3 className="font-semibold text-lg mb-3 text-gray-800">Faculty Assignment</h3>
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+              <h3 className="font-semibold text-lg mb-3 text-slate-800">Faculty Assignment</h3>
+              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
                 <p className="text-sm">
                   <span className="font-medium">Employee ID:</span> {team.faculty.employeeId}
                 </p>
@@ -466,7 +455,7 @@ const TeamPopup = ({ team, onClose }) => {
                   <span className="font-medium">Role:</span> 
                   <span className={`ml-2 px-2 py-1 rounded text-xs ${
                     team.faculty.role === 'guide' 
-                      ? 'bg-green-100 text-green-800' 
+                      ? 'bg-emerald-100 text-emerald-800' 
                       : 'bg-orange-100 text-orange-800'
                   }`}>
                     {team.faculty.role}
@@ -477,11 +466,11 @@ const TeamPopup = ({ team, onClose }) => {
           )}
         </div>
 
-        <div className="bg-gray-50 p-4 rounded-b-xl">
+        <div className="bg-slate-50 p-4 rounded-b-2xl">
           <div className="flex justify-end">
             <button
               onClick={onClose}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+              className="bg-slate-600 hover:bg-slate-700 text-white px-6 py-2 rounded-lg font-medium transition-all"
             >
               Close
             </button>
@@ -506,23 +495,23 @@ const DeleteConfirmationModal = ({ faculty, onClose, onConfirm }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="p-6">
           <div className="flex items-center mb-4">
             <div className="bg-red-100 p-3 rounded-full mr-4">
               <AlertTriangle className="h-6 w-6 text-red-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Delete Faculty</h3>
-              <p className="text-sm text-gray-600">This action cannot be undone</p>
+              <h3 className="text-lg font-semibold text-slate-900">Delete Faculty</h3>
+              <p className="text-sm text-slate-600">This action cannot be undone</p>
             </div>
           </div>
 
           <div className="mb-6">
-            <p className="text-gray-700">
+            <p className="text-slate-700">
               Are you sure you want to delete <strong>{faculty.name}</strong> ({faculty.employeeId})?
             </p>
-            <div className="mt-2 p-3 bg-red-50 rounded-lg border border-red-200">
+            <div className="mt-3 p-4 bg-red-50 rounded-xl border border-red-200">
               <p className="text-sm text-red-700">
                 ⚠️ This will permanently remove the faculty member and may affect associated projects.
               </p>
@@ -532,14 +521,14 @@ const DeleteConfirmationModal = ({ faculty, onClose, onConfirm }) => {
           <div className="flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 text-slate-700 border-2 border-slate-300 rounded-lg hover:bg-slate-50 transition-all font-medium"
             >
               Cancel
             </button>
             <button
               onClick={handleConfirm}
               disabled={loading}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
             >
               {loading ? (
                 <>
@@ -595,13 +584,40 @@ const FacultyListView = () => {
   const [search, setSearch] = useState('');
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [facultyProjects, setFacultyProjects] = useState({});
   const [loadingProjects, setLoadingProjects] = useState({});
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [editingFaculty, setEditingFaculty] = useState(null);
   const [deletingFaculty, setDeletingFaculty] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Notification state
+  const [notification, setNotification] = useState({
+    isVisible: false,
+    type: "",
+    title: "",
+    message: "",
+  });
+
+  // Show notification function
+  const showNotification = useCallback((type, title, message, duration = 4000) => {
+    setNotification({
+      isVisible: true,
+      type,
+      title,
+      message,
+    });
+
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, isVisible: false }));
+    }, duration);
+  }, []);
+
+  // Hide notification function
+  const hideNotification = useCallback(() => {
+    setNotification(prev => ({ ...prev, isVisible: false }));
+  }, []);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -609,7 +625,6 @@ const FacultyListView = () => {
     department: 'all',
     specialization: 'all'
   });
-  const [showFilters, setShowFilters] = useState(false);
 
   const schoolOptions = ['SCOPE', 'SENSE', 'SELECT', 'SMEC', 'SCE'];
   const departmentOptions = ['BTech', 'MTech (Integrated)', 'MCA'];
@@ -688,11 +703,10 @@ const FacultyListView = () => {
     }
   };
 
-  // ✅ FIXED: Fetch faculty list with proper error handling
+  // Fetch faculty list
   const fetchFacultyData = async (schoolFilter = null, departmentFilter = null, specializationFilter = null) => {
     try {
       setLoading(true);
-      setError(null);
       
       const currentUser = getCurrentUser();
       if (!currentUser || currentUser.role !== 'admin') {
@@ -701,7 +715,6 @@ const FacultyListView = () => {
       
       console.log('Fetching faculty with filters:', { schoolFilter, departmentFilter, specializationFilter });
       
-      // ✅ FIXED: Use the corrected API call
       const response = await getAllFaculty(
         schoolFilter === 'all' ? null : schoolFilter,
         departmentFilter === 'all' ? null : departmentFilter,
@@ -721,9 +734,13 @@ const FacultyListView = () => {
       
       setFacultyList(facultyData);
       setFilteredFacultyList(facultyData);
+      
+      if (facultyData.length > 0) {
+        showNotification("success", "Data Loaded", `Successfully loaded ${facultyData.length} faculty members`);
+      }
     } catch (err) {
       console.error('Error fetching faculty list:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to fetch faculty list');
+      showNotification("error", "Fetch Failed", err.response?.data?.message || err.message || 'Failed to fetch faculty list');
     } finally {
       setLoading(false);
     }
@@ -734,7 +751,6 @@ const FacultyListView = () => {
     const newFilters = { ...filters, [filterType]: value };
     setFilters(newFilters);
     
-    // Fetch data with new filters
     fetchFacultyData(
       newFilters.school,
       newFilters.department,
@@ -779,9 +795,7 @@ const FacultyListView = () => {
       const response = await updateFaculty(editingFaculty.employeeId, updatedData);
       
       if (response.data?.success) {
-        alert('Faculty updated successfully!');
-        
-        // Refresh the list
+        showNotification("success", "Faculty Updated", 'Faculty updated successfully!');
         await fetchFacultyData(filters.school, filters.department, filters.specialization);
       } else {
         throw new Error(response.data?.message || 'Failed to update faculty');
@@ -798,7 +812,6 @@ const FacultyListView = () => {
       const response = await deleteFacultyByEmployeeId(deletingFaculty.employeeId);
       
       if (response.data?.success) {
-        // Remove from local state
         setFacultyList(prev => 
           prev.filter(faculty => faculty.employeeId !== deletingFaculty.employeeId)
         );
@@ -806,25 +819,23 @@ const FacultyListView = () => {
           prev.filter(faculty => faculty.employeeId !== deletingFaculty.employeeId)
         );
         
-        // Clear expanded details if it was the deleted faculty
         if (expandedIndex !== null && filteredFacultyList[expandedIndex]?.employeeId === deletingFaculty.employeeId) {
           setExpandedIndex(null);
         }
         
-        // Clear projects cache
         setFacultyProjects(prev => {
           const newProjects = { ...prev };
           delete newProjects[deletingFaculty.employeeId];
           return newProjects;
         });
         
-        alert('Faculty deleted successfully!');
+        showNotification("success", "Faculty Deleted", 'Faculty deleted successfully!');
       } else {
         throw new Error(response.data?.message || 'Failed to delete faculty');
       }
     } catch (error) {
       console.error('Error deleting faculty:', error);
-      alert('Error deleting faculty: ' + (error.response?.data?.message || error.message));
+      showNotification("error", "Delete Failed", 'Error deleting faculty: ' + (error.response?.data?.message || error.message));
     } finally {
       setDeletingFaculty(null);
     }
@@ -866,17 +877,17 @@ const FacultyListView = () => {
   if (loading) {
     return (
       <>
-        <Navbar userType="admin" />
-        <div className='min-h-screen bg-gray-50 overflow-x-hidden'>
-          <div className="p-20 pl-28">
-            <div className='shadow-md rounded-lg bg-white p-10'>
-              <div className="flex items-center justify-center h-64">
-                <div className="flex flex-col items-center space-y-4">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                  <div className="text-xl text-gray-600">Loading faculty list...</div>
-                </div>
+        <Navbar />
+        <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+          <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md mx-auto text-center">
+            <div className="relative mb-8">
+              <div className="animate-spin rounded-full h-20 w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Users className="h-8 w-8 text-blue-600 animate-pulse" />
               </div>
             </div>
+            <h3 className="text-2xl font-bold text-slate-800 mb-3">Loading Faculty Database</h3>
+            <p className="text-slate-600">Retrieving faculty records and project assignments...</p>
           </div>
         </div>
       </>
@@ -885,609 +896,638 @@ const FacultyListView = () => {
 
   return (
     <>
-      <Navbar userType="admin" />
-      <div className='min-h-screen bg-gray-50 overflow-x-hidden'>
-        <div className="p-20 pl-28">
-          <div className='shadow-md rounded-lg bg-white p-10'>
-            {/* Header */}
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h3 className="font-bold font-roboto text-4xl text-gray-800 mb-2">
-                  Faculty Management
-                </h3>
-                <p className="text-gray-600">Manage faculty members and their assignments</p>
-              </div>
-              <div className="flex gap-2 items-center flex-wrap">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by name, ID, email..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="border pl-10 pr-3 py-2 rounded-lg shadow w-80 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
+      <Navbar />
+      <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
+        
+        {/* Page Header */}
+        <div className="mb-8 bg-white rounded-2xl shadow-lg mx-8 overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="bg-white/20 p-3 rounded-xl">
+                  <Users className="h-8 w-8 text-white" />
                 </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-white">Faculty Management</h1>
+                  <p className="text-indigo-100 mt-1">Manage faculty members and their project assignments</p>
+                </div>
+              </div>
+              
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <div className="text-center">
+                  <div className="text-white/90 text-sm">Total Faculty</div>
+                  <div className="text-white font-semibold text-xl">{facultyList.length}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Statistics Dashboard */}
+        <div className="mx-8 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-sm font-medium">Total Faculty</p>
+                  <p className="text-3xl font-bold mt-1">{facultyList.length}</p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-xl">
+                  <Users className="h-8 w-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-emerald-100 text-sm font-medium">Faculty Members</p>
+                  <p className="text-3xl font-bold mt-1">{facultyList.filter(f => f.role !== 'admin').length}</p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-xl">
+                  <GraduationCap className="h-8 w-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 text-sm font-medium">Administrators</p>
+                  <p className="text-3xl font-bold mt-1">{facultyList.filter(f => f.role === 'admin').length}</p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-xl">
+                  <Settings className="h-8 w-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-100 text-sm font-medium">Filtered Results</p>
+                  <p className="text-3xl font-bold mt-1">{filteredFacultyList.length}</p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-xl">
+                  <Filter className="h-8 w-8" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Filters Panel */}
+        <div className="mx-8 mb-8">
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center space-x-3">
+                <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
+                  <Search className="h-5 w-5 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800">Search & Filter Controls</h2>
+              </div>
+              <div className="flex items-center space-x-4">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
-                    showFilters ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+                  className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium"
                 >
-                  <Filter className="h-4 w-4" />
-                  Filters
+                  <Grid3X3 className="h-4 w-4" />
+                  <span>Advanced Filters</span>
+                  {showFilters ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </button>
                 <button
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-all duration-200 disabled:opacity-50 flex items-center gap-2"
+                  className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium disabled:opacity-50"
                 >
-                  {refreshing ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
-                  {refreshing ? 'Refreshing...' : 'Refresh'}
+                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
                 </button>
                 <button
                   onClick={() => downloadCSV(filteredFacultyList)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105 flex items-center gap-2"
                   disabled={filteredFacultyList.length === 0}
+                  className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
                 >
                   <Download className="h-4 w-4" />
-                  Download CSV
+                  <span>Export CSV ({filteredFacultyList.length})</span>
                 </button>
               </div>
             </div>
 
-            {/* Filters Section */}
-            <AnimatePresence>
-              {showFilters && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6"
+            {/* Search Bar */}
+            <div className="relative mb-6">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-slate-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search by faculty name, employee ID, email, school, or department..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-12 pr-12 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400 text-lg"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center"
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-gray-800">Filter Faculty</h4>
-                    <button
-                      onClick={clearFilters}
-                      className="text-sm text-blue-600 hover:text-blue-800 underline"
-                    >
-                      Clear All Filters
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        School
-                      </label>
-                      <select
-                        value={filters.school}
-                        onChange={(e) => handleFilterChange('school', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="all">All Schools</option>
-                        {schoolOptions.map(school => (
-                          <option key={school} value={school}>{school}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Department
-                      </label>
-                      <select
-                        value={filters.department}
-                        onChange={(e) => handleFilterChange('department', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="all">All Departments</option>
-                        {departmentOptions.map(dept => (
-                          <option key={dept} value={dept}>{dept}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Specialization
-                      </label>
-                      <select
-                        value={filters.specialization}
-                        onChange={(e) => handleFilterChange('specialization', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="all">All Specializations</option>
-                        {specializationOptions.map(spec => (
-                          <option key={spec} value={spec}>{spec}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  
-                  {/* Active Filters Display */}
-                  {(filters.school !== 'all' || filters.department !== 'all' || filters.specialization !== 'all') && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <p className="text-sm text-gray-600 mb-2">Active filters:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {filters.school !== 'all' && (
-                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs flex items-center gap-1">
-                            School: {filters.school}
-                            <button
-                              onClick={() => handleFilterChange('school', 'all')}
-                              className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        )}
-                        {filters.department !== 'all' && (
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs flex items-center gap-1">
-                            Department: {filters.department}
-                            <button
-                              onClick={() => handleFilterChange('department', 'all')}
-                              className="ml-1 hover:bg-green-200 rounded-full p-0.5"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        )}
-                        {filters.specialization !== 'all' && (
-                          <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs flex items-center gap-1">
-                            Specialization: {filters.specialization}
-                            <button
-                              onClick={() => handleFilterChange('specialization', 'all')}
-                              className="ml-1 hover:bg-purple-200 rounded-full p-0.5"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
+                  <X className="h-5 w-5 text-slate-400 hover:text-slate-600 transition-colors" />
+                </button>
               )}
-            </AnimatePresence>
-
-            {/* Error message */}
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-                <div className="flex items-center">
-                  <AlertTriangle className="h-5 w-5 mr-2" />
-                  <strong>Error:</strong> {error}
-                </div>
-              </div>
-            )}
-
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-blue-100 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-blue-800">{facultyList.length}</div>
-                <div className="text-blue-600">Total Faculty</div>
-              </div>
-              <div className="bg-green-100 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-green-800">
-                  {facultyList.filter(f => f.role !== 'admin').length}
-                </div>
-                <div className="text-green-600">Faculty Members</div>
-              </div>
-              <div className="bg-purple-100 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-purple-800">
-                  {facultyList.filter(f => f.role === 'admin').length}
-                </div>
-                <div className="text-purple-600">Administrators</div>
-              </div>
-              <div className="bg-orange-100 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-orange-800">
-                  {filteredFacultyList.length}
-                </div>
-                <div className="text-orange-600">
-                  {search || filters.school !== 'all' || filters.department !== 'all' || filters.specialization !== 'all' 
-                    ? 'Filtered Results' 
-                    : 'Active Faculty'}
-                </div>
-              </div>
             </div>
 
-            {/* Search/Filter results info */}
-            {(search || filters.school !== 'all' || filters.department !== 'all' || filters.specialization !== 'all') && (
-              <div className="mb-4 text-sm text-gray-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
-                <div className="flex items-center">
-                  <Search className="inline h-4 w-4 mr-1" />
-                  Showing {filteredFacultyList.length} of {facultyList.length} faculty members
-                  {filteredFacultyList.length === 0 && (
-                    <span className="text-orange-600 ml-2">- Try different search terms or filters</span>
-                  )}
+            {/* Advanced Filters */}
+            {showFilters && (
+              <div className="border-t border-slate-200 pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-3">School Filter</label>
+                    <select
+                      value={filters.school}
+                      onChange={(e) => handleFilterChange('school', e.target.value)}
+                      className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    >
+                      <option value="all">All Schools</option>
+                      {schoolOptions.map(school => (
+                        <option key={school} value={school}>{school}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-3">Department Filter</label>
+                    <select
+                      value={filters.department}
+                      onChange={(e) => handleFilterChange('department', e.target.value)}
+                      className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    >
+                      <option value="all">All Departments</option>
+                      {departmentOptions.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-3">Specialization Filter</label>
+                    <select
+                      value={filters.specialization}
+                      onChange={(e) => handleFilterChange('specialization', e.target.value)}
+                      className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    >
+                      <option value="all">All Specializations</option>
+                      {specializationOptions.map(spec => (
+                        <option key={spec} value={spec}>{spec}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {/* Faculty Table */}
-            {filteredFacultyList.length === 0 && !search && filters.school === 'all' && filters.department === 'all' && filters.specialization === 'all' ? (
-              <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-lg">
-                <Users className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg">No faculty members found</p>
-                <p className="text-sm">Faculty members will appear here once added</p>
-              </div>
-            ) : filteredFacultyList.length === 0 ? (
-              <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-lg">
-                <Search className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg">No matches found</p>
-                <p className="text-sm">Try adjusting your search terms or filters</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border text-left">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-4 border font-semibold">Name</th>
-                      <th className="p-4 border font-semibold">Employee ID</th>
-                      <th className="p-4 border font-semibold">Email</th>
-                      <th className="p-4 border font-semibold">Schools</th>
-                      <th className="p-4 border font-semibold">Departments</th>
-                      <th className="p-4 border font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredFacultyList.map((f, i) => (
-                      <React.Fragment key={f._id || i}>
-                        <tr className="hover:bg-gray-50 transition-colors">
-                          <td className="p-4 border">
-                            <div className="flex items-center gap-3">
-                              {f.imageUrl && (
-                                <img 
-                                  src={f.imageUrl} 
-                                  alt={f.name}
-                                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
-                                  onError={(e) => {
-                                    e.target.style.display = 'none';
-                                  }}
-                                />
-                              )}
-                              <div>
-                                <span className="font-medium text-gray-900">{f.name || 'N/A'}</span>
-                                {f.specialization && Array.isArray(f.specialization) && f.specialization.length > 0 && (
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {f.specialization.slice(0, 2).join(', ')}
-                                    {f.specialization.length > 2 && '...'}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-4 border">
-                            <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                              {f.employeeId || 'N/A'}
-                            </span>
-                          </td>
-                          <td className="p-4 border">
-                            <a 
-                              href={`mailto:${f.emailId}`} 
-                              className="text-blue-600 hover:underline text-sm"
-                            >
-                              {f.emailId || 'N/A'}
-                            </a>
-                          </td>
-                          <td className="p-4 border">
-                            <div className="text-sm">
-                              {Array.isArray(f.school) ? (
-                                f.school.length > 2 ? (
-                                  <div>
-                                    <div>{f.school.slice(0, 2).join(', ')}</div>
-                                    <div className="text-xs text-gray-500">+{f.school.length - 2} more</div>
-                                  </div>
-                                ) : (
-                                  f.school.join(', ')
-                                )
-                              ) : (f.school || 'N/A')}
-                            </div>
-                          </td>
-                          <td className="p-4 border">
-                            <div className="text-sm">
-                              {Array.isArray(f.department) ? (
-                                f.department.length > 2 ? (
-                                  <div>
-                                    <div>{f.department.slice(0, 2).join(', ')}</div>
-                                    <div className="text-xs text-gray-500">+{f.department.length - 2} more</div>
-                                  </div>
-                                ) : (
-                                  f.department.join(', ')
-                                )
-                              ) : (f.department || 'N/A')}
-                            </div>
-                          </td>
-                          <td className="p-4 border">
-                            <div className="flex gap-2 flex-wrap">
-                              <button
-                                onClick={() => toggleDetails(i)}
-                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 flex items-center gap-1"
-                                disabled={loadingProjects[f.employeeId]}
-                                title="View detailed information"
-                              >
-                                {loadingProjects[f.employeeId] ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                ) : (
-                                  <Eye className="h-4 w-4" />
-                                )}
-                                <span className="hidden sm:inline">
-                                  {expandedIndex === i ? 'Hide' : 'View'}
-                                </span>
-                              </button>
-                              <button
-                                onClick={() => setEditingFaculty(f)}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 flex items-center gap-1"
-                                title="Edit faculty details"
-                              >
-                                <Edit className="h-4 w-4" />
-                                <span className="hidden sm:inline">Edit</span>
-                              </button>
-                              <button
-                                onClick={() => setDeletingFaculty(f)}
-                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 flex items-center gap-1"
-                                title="Delete faculty"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                <span className="hidden sm:inline">Delete</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                        
-                        {/* Expanded Details Row */}
-                        <AnimatePresence>
-                          {expandedIndex === i && (
-                            <motion.tr
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -10 }}
-                              className="bg-gray-50"
-                            >
-                              <td colSpan="6" className="p-6">
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                  {/* Faculty Details */}
-                                  <div className="space-y-4">
-                                    <h4 className="font-semibold text-lg text-gray-800 border-b pb-2">
-                                      Faculty Information
-                                    </h4>
-                                    
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      <div>
-                                        <label className="text-sm font-medium text-gray-600">Full Name:</label>
-                                        <p className="text-gray-900 font-medium">{f.name || 'N/A'}</p>
-                                      </div>
-                                      <div>
-                                        <label className="text-sm font-medium text-gray-600">Employee ID:</label>
-                                        <p className="text-gray-900 font-mono">{f.employeeId || 'N/A'}</p>
-                                      </div>
-                                      <div className="md:col-span-2">
-                                        <label className="text-sm font-medium text-gray-600">Email Address:</label>
-                                        <a 
-                                          href={`mailto:${f.emailId}`} 
-                                          className="text-blue-600 hover:underline block"
-                                        >
-                                          {f.emailId || 'N/A'}
-                                        </a>
-                                      </div>
-                                    </div>
-
-                                    {/* Academic Information */}
-                                    <div className="border-t pt-4">
-                                      <h5 className="font-medium text-gray-800 mb-3">Academic Associations</h5>
-                                      <div className="space-y-3">
-                                        <div>
-                                          <label className="text-sm font-medium text-gray-600">Schools:</label>
-                                          <div className="flex flex-wrap gap-1 mt-1">
-                                            {Array.isArray(f.school) && f.school.length > 0 ? (
-                                              f.school.map((school, idx) => (
-                                                <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                                                  {school}
-                                                </span>
-                                              ))
-                                            ) : (
-                                              <span className="text-gray-500 text-sm">{f.school || 'None'}</span>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium text-gray-600">Departments:</label>
-                                          <div className="flex flex-wrap gap-1 mt-1">
-                                            {Array.isArray(f.department) && f.department.length > 0 ? (
-                                              f.department.map((dept, idx) => (
-                                                <span key={idx} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
-                                                  {dept}
-                                                </span>
-                                              ))
-                                            ) : (
-                                              <span className="text-gray-500 text-sm">{f.department || 'None'}</span>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div>
-                                          <label className="text-sm font-medium text-gray-600">Specializations:</label>
-                                          <div className="flex flex-wrap gap-1 mt-1">
-                                            {Array.isArray(f.specialization) && f.specialization.length > 0 ? (
-                                              f.specialization.map((spec, idx) => (
-                                                <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
-                                                  {spec}
-                                                </span>
-                                              ))
-                                            ) : (
-                                              <span className="text-gray-500 text-sm">{f.specialization || 'None'}</span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Project Assignments */}
-                                  <div className="space-y-4">
-                                    <h4 className="font-semibold text-lg text-gray-800 border-b pb-2">
-                                      Project Assignments
-                                    </h4>
-                                    
-                                    {loadingProjects[f.employeeId] ? (
-                                      <div className="flex items-center justify-center py-8">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-                                        <span className="text-gray-600">Loading project details...</span>
-                                      </div>
-                                    ) : facultyProjects[f.employeeId] ? (
-                                      <div className="space-y-4">
-                                        {facultyProjects[f.employeeId].error ? (
-                                          <div className="text-sm text-red-600 bg-red-50 p-4 rounded-lg border border-red-200">
-                                            <div className="flex items-center mb-2">
-                                              <AlertTriangle className="h-4 w-4 mr-2" />
-                                              <strong>Error loading projects:</strong>
-                                            </div>
-                                            <div>{facultyProjects[f.employeeId].error}</div>
-                                          </div>
-                                        ) : (
-                                          <>
-                                            {/* Project Summary */}
-                                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                                              <div className="flex items-center justify-between mb-3">
-                                                <span className="font-medium text-blue-800">Total Projects:</span>
-                                                <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                                                  {facultyProjects[f.employeeId].total}
-                                                </span>
-                                              </div>
-                                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                                <div className="text-center">
-                                                  <div className="text-lg font-semibold text-green-700">
-                                                    {facultyProjects[f.employeeId].guide.length}
-                                                  </div>
-                                                  <div className="text-green-600">Guide Projects</div>
-                                                </div>
-                                                <div className="text-center">
-                                                  <div className="text-lg font-semibold text-orange-700">
-                                                    {facultyProjects[f.employeeId].panel.length}
-                                                  </div>
-                                                  <div className="text-orange-600">Panel Projects</div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                            
-                                            {/* Guide Projects */}
-                                            {facultyProjects[f.employeeId].guide.length > 0 && (
-                                              <div>
-                                                <h5 className="font-medium text-gray-800 mb-3 flex items-center">
-                                                  <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                                                  Guide Projects ({facultyProjects[f.employeeId].guide.length})
-                                                </h5>
-                                                <div className="space-y-2">
-                                                  {facultyProjects[f.employeeId].guide.map((project, j) => (
-                                                    <div key={project._id || j} className="bg-green-50 p-3 rounded-lg border border-green-200">
-                                                      <div className="flex items-center justify-between">
-                                                        <div>
-                                                          <span className="font-medium text-green-800">
-                                                            {project.title || project.name || `Project ${j + 1}`}
-                                                          </span>
-                                                          {project.students && project.students.length > 0 && (
-                                                            <span className="text-green-600 text-sm ml-2">
-                                                              ({project.students.length} students)
-                                                            </span>
-                                                          )}
-                                                          {project.specialization && (
-                                                            <div className="text-xs text-green-600 mt-1">
-                                                              {project.specialization}
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                        <button
-                                                          onClick={() => handleTeamClick(project)}
-                                                          className="text-green-700 hover:text-green-900 transition-colors p-2 hover:bg-green-100 rounded"
-                                                          title="View project details"
-                                                        >
-                                                          <Eye className="h-4 w-4" />
-                                                        </button>
-                                                      </div>
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            )}
-                                            
-                                            {/* Panel Projects */}
-                                            {facultyProjects[f.employeeId].panel.length > 0 && (
-                                              <div>
-                                                <h5 className="font-medium text-gray-800 mb-3 flex items-center">
-                                                  <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
-                                                  Panel Projects ({facultyProjects[f.employeeId].panel.length})
-                                                </h5>
-                                                <div className="space-y-2">
-                                                  {facultyProjects[f.employeeId].panel.map((project, j) => (
-                                                    <div key={project._id || j} className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                                                      <div className="flex items-center justify-between">
-                                                        <div>
-                                                          <span className="font-medium text-orange-800">
-                                                            {project.title || project.name || `Project ${j + 1}`}
-                                                          </span>
-                                                          {project.students && project.students.length > 0 && (
-                                                            <span className="text-orange-600 text-sm ml-2">
-                                                              ({project.students.length} students)
-                                                            </span>
-                                                          )}
-                                                          {project.specialization && (
-                                                            <div className="text-xs text-orange-600 mt-1">
-                                                              {project.specialization}
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                        <button
-                                                          onClick={() => handleTeamClick(project)}
-                                                          className="text-orange-700 hover:text-orange-900 transition-colors p-2 hover:bg-orange-100 rounded"
-                                                          title="View project details"
-                                                        >
-                                                          <Eye className="h-4 w-4" />
-                                                        </button>
-                                                      </div>
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            )}
-                                            
-                                            {/* No Projects */}
-                                            {facultyProjects[f.employeeId].total === 0 && (
-                                              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
-                                                <BookOpen className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                                                <p className="font-medium">No Project Assignments</p>
-                                                <p className="text-sm">This faculty member has no current project assignments</p>
-                                              </div>
-                                            )}
-
-                                            {/* Last Updated */}
-                                            {facultyProjects[f.employeeId].lastUpdated && (
-                                              <div className="text-xs text-gray-400 text-center pt-3 border-t">
-                                                Last updated: {new Date(facultyProjects[f.employeeId].lastUpdated).toLocaleString()}
-                                              </div>
-                                            )}
-                                          </>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
-                                        <Eye className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                                        <p className="font-medium">Click "View" to load project information</p>
-                                        <p className="text-sm">Project assignments will be displayed here</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                            </motion.tr>
-                          )}
-                        </AnimatePresence>
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="flex justify-start">
+                  <button
+                    onClick={clearFilters}
+                    className="flex items-center space-x-2 px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Clear All Filters</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
+
+        {/* Faculty Data Display */}
+        <div className="mx-8 mb-8">
+          <div className="bg-white rounded-2xl shadow-lg">
+            {filteredFacultyList.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="mx-auto w-32 h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-8">
+                  <Users className="h-16 w-16 text-slate-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-600 mb-3">No Faculty Found</h3>
+                <p className="text-slate-500 max-w-md mx-auto">
+                  No faculty members match your current search and filter criteria. Try adjusting your filters to find the records you're looking for.
+                </p>
+              </div>
+            ) : (
+              <div className="p-8">
+                <div className="flex justify-between items-center mb-8">
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
+                      <BarChart3 className="h-5 w-5 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800">
+                      Faculty Records ({filteredFacultyList.length.toLocaleString()})
+                    </h2>
+                  </div>
+                  
+                  
+                </div>
+
+                <div className="space-y-4">
+                  {filteredFacultyList.map((faculty, index) => {
+                    const isExpanded = expandedIndex === index;
+                    
+                    return (
+                      <div
+                        key={faculty._id || index}
+                        className="border border-slate-200 rounded-xl bg-gradient-to-r from-white to-slate-50 hover:shadow-lg transition-all duration-300"
+                      >
+                        <div
+                          className="flex justify-between items-center p-6 cursor-pointer hover:bg-slate-50 transition-colors"
+                          onClick={() => toggleDetails(index)}
+                        >
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl">
+                              {isExpanded ? (
+                                <ChevronDown className="text-blue-600 h-6 w-6" />
+                              ) : (
+                                <ChevronRight className="text-blue-600 h-6 w-6" />
+                              )}
+                            </div>
+                            {faculty.imageUrl && (
+                              <img 
+                                src={faculty.imageUrl} 
+                                alt={faculty.name}
+                                className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            )}
+                            <div>
+                              <h4 className="font-bold text-xl text-slate-800 mb-1">
+                                {faculty.name}
+                              </h4>
+                              <div className="flex items-center space-x-6 text-sm text-slate-600">
+                                <span className="flex items-center space-x-1">
+                                  <BookOpen className="h-4 w-4" />
+                                  <span>{faculty.employeeId}</span>
+                                </span>
+                                <span>{faculty.emailId}</span>
+                                {Array.isArray(faculty.school) ? (
+                                  <span>{faculty.school.join(', ')}</span>
+                                ) : (
+                                  <span>{faculty.school}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center space-x-3">
+                            {faculty.role === 'admin' && (
+                              <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-semibold flex items-center space-x-1">
+                                <Settings className="h-4 w-4" />
+                                <span>Admin</span>
+                              </span>
+                            )}
+                            {Array.isArray(faculty.specialization) && faculty.specialization.length > 0 && (
+                              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
+                                {faculty.specialization.length} specializations
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="border-t border-slate-200 p-6 bg-slate-50">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                              {/* Faculty Details */}
+                              <div className="space-y-4">
+                                <h4 className="font-bold text-xl mb-6 text-slate-800 flex items-center space-x-2">
+                                  <Users className="h-5 w-5 text-blue-600" />
+                                  <span>Faculty Information</span>
+                                </h4>
+                                
+                                <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                      <label className="text-sm font-semibold text-slate-600">Full Name:</label>
+                                      <p className="text-slate-900 font-medium">{faculty.name || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                      <label className="text-sm font-semibold text-slate-600">Employee ID:</label>
+                                      <p className="text-slate-900 font-mono">{faculty.employeeId || 'N/A'}</p>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="text-sm font-semibold text-slate-600">Email Address:</label>
+                                      <a 
+                                        href={`mailto:${faculty.emailId}`} 
+                                        className="text-blue-600 hover:underline block"
+                                      >
+                                        {faculty.emailId || 'N/A'}
+                                      </a>
+                                    </div>
+                                  </div>
+
+                                  {/* Academic Information */}
+                                  <div className="border-t pt-4">
+                                    <h5 className="font-medium text-slate-800 mb-3">Academic Associations</h5>
+                                    <div className="space-y-3">
+                                      <div>
+                                        <label className="text-sm font-semibold text-slate-600">Schools:</label>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {Array.isArray(faculty.school) && faculty.school.length > 0 ? (
+                                            faculty.school.map((school, idx) => (
+                                              <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                                                {school}
+                                              </span>
+                                            ))
+                                          ) : (
+                                            <span className="text-slate-500 text-sm">{faculty.school || 'None'}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="text-sm font-semibold text-slate-600">Departments:</label>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {Array.isArray(faculty.department) && faculty.department.length > 0 ? (
+                                            faculty.department.map((dept, idx) => (
+                                              <span key={idx} className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full text-xs">
+                                                {dept}
+                                              </span>
+                                            ))
+                                          ) : (
+                                            <span className="text-slate-500 text-sm">{faculty.department || 'None'}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="text-sm font-semibold text-slate-600">Specializations:</label>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {Array.isArray(faculty.specialization) && faculty.specialization.length > 0 ? (
+                                            faculty.specialization.map((spec, idx) => (
+                                              <span key={idx} className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
+                                                {spec}
+                                              </span>
+                                            ))
+                                          ) : (
+                                            <span className="text-slate-500 text-sm">{faculty.specialization || 'None'}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Action Buttons */}
+                                  <div className="border-t pt-4">
+                                    <div className="flex space-x-3">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingFaculty(faculty);
+                                        }}
+                                        className="flex items-center space-x-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-all"
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                        <span>Edit</span>
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDeletingFaculty(faculty);
+                                        }}
+                                        className="flex items-center space-x-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-all"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        <span>Delete</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Project Assignments */}
+                              <div className="space-y-4">
+                                <h4 className="font-bold text-xl mb-6 text-slate-800 flex items-center space-x-2">
+                                  <FileSpreadsheet className="h-5 w-5 text-purple-600" />
+                                  <span>Project Assignments</span>
+                                </h4>
+                                
+                                {loadingProjects[faculty.employeeId] ? (
+                                  <div className="flex flex-col items-center justify-center py-12">
+                                    <div className="relative mb-4">
+                                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-blue-600"></div>
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <BookOpen className="h-4 w-4 text-blue-600 animate-pulse" />
+                                      </div>
+                                    </div>
+                                    <span className="text-slate-600">Loading project details...</span>
+                                  </div>
+                                ) : facultyProjects[faculty.employeeId] ? (
+                                  <div className="space-y-4">
+                                    {facultyProjects[faculty.employeeId].error ? (
+                                      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+                                        <div className="flex items-center space-x-3 text-red-800">
+                                          <AlertTriangle className="h-6 w-6" />
+                                          <div>
+                                            <span className="font-bold block">Error Loading Projects</span>
+                                            <span className="text-sm text-red-700">{facultyProjects[faculty.employeeId].error}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        {/* Project Summary */}
+                                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                                          <div className="flex items-center justify-between mb-4">
+                                            <span className="font-semibold text-blue-800">Total Projects:</span>
+                                            <span className="bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                                              {facultyProjects[faculty.employeeId].total}
+                                            </span>
+                                          </div>
+                                          <div className="grid grid-cols-2 gap-4 text-sm">
+                                            <div className="text-center">
+                                              <div className="text-lg font-semibold text-emerald-700">
+                                                {facultyProjects[faculty.employeeId].guide.length}
+                                              </div>
+                                              <div className="text-emerald-600">Guide Projects</div>
+                                            </div>
+                                            <div className="text-center">
+                                              <div className="text-lg font-semibold text-orange-700">
+                                                {facultyProjects[faculty.employeeId].panel.length}
+                                              </div>
+                                              <div className="text-orange-600">Panel Projects</div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Guide Projects */}
+                                        {facultyProjects[faculty.employeeId].guide.length > 0 && (
+                                          <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+                                            <h5 className="font-medium text-slate-800 mb-4 flex items-center">
+                                              <div className="w-3 h-3 bg-emerald-500 rounded-full mr-2"></div>
+                                              Guide Projects ({facultyProjects[faculty.employeeId].guide.length})
+                                            </h5>
+                                            <div className="space-y-3">
+                                              {facultyProjects[faculty.employeeId].guide.map((project, j) => (
+                                                <div key={project._id || j} className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                                                  <div className="flex items-center justify-between">
+                                                    <div>
+                                                      <span className="font-medium text-emerald-800">
+                                                        {project.title || project.name || `Project ${j + 1}`}
+                                                      </span>
+                                                      {project.students && project.students.length > 0 && (
+                                                        <span className="text-emerald-600 text-sm ml-2">
+                                                          ({project.students.length} students)
+                                                        </span>
+                                                      )}
+                                                      {project.specialization && (
+                                                        <div className="text-xs text-emerald-600 mt-1">
+                                                          {project.specialization}
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleTeamClick(project);
+                                                      }}
+                                                      className="text-emerald-700 hover:text-emerald-900 transition-colors p-2 hover:bg-emerald-100 rounded"
+                                                      title="View project details"
+                                                    >
+                                                      <Eye className="h-4 w-4" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Panel Projects */}
+                                        {facultyProjects[faculty.employeeId].panel.length > 0 && (
+                                          <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+                                            <h5 className="font-medium text-slate-800 mb-4 flex items-center">
+                                              <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
+                                              Panel Projects ({facultyProjects[faculty.employeeId].panel.length})
+                                            </h5>
+                                            <div className="space-y-3">
+                                              {facultyProjects[faculty.employeeId].panel.map((project, j) => (
+                                                <div key={project._id || j} className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                                                  <div className="flex items-center justify-between">
+                                                    <div>
+                                                      <span className="font-medium text-orange-800">
+                                                        {project.title || project.name || `Project ${j + 1}`}
+                                                      </span>
+                                                      {project.students && project.students.length > 0 && (
+                                                        <span className="text-orange-600 text-sm ml-2">
+                                                          ({project.students.length} students)
+                                                        </span>
+                                                      )}
+                                                      {project.specialization && (
+                                                        <div className="text-xs text-orange-600 mt-1">
+                                                          {project.specialization}
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleTeamClick(project);
+                                                      }}
+                                                      className="text-orange-700 hover:text-orange-900 transition-colors p-2 hover:bg-orange-100 rounded"
+                                                      title="View project details"
+                                                    >
+                                                      <Eye className="h-4 w-4" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* No Projects */}
+                                        {facultyProjects[faculty.employeeId].total === 0 && (
+                                          <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200">
+                                            <BookOpen className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                                            <p className="font-medium">No Project Assignments</p>
+                                            <p className="text-sm">This faculty member has no current project assignments</p>
+                                          </div>
+                                        )}
+
+                                        {/* Last Updated */}
+                                        {facultyProjects[faculty.employeeId].lastUpdated && (
+                                          <div className="text-xs text-slate-400 text-center pt-3 border-t">
+                                            Last updated: {new Date(facultyProjects[faculty.employeeId].lastUpdated).toLocaleString()}
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200">
+                                    <Eye className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                                    <p className="font-medium">Click to Load Project Information</p>
+                                    <p className="text-sm">Project assignments will be displayed here</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Enhanced Notification */}
+        {notification.isVisible && (
+          <div className="fixed top-24 right-8 z-50 max-w-md w-full">
+            <div className={`transform transition-all duration-500 ease-out ${
+              notification.isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+            }`}>
+              <div className={`rounded-xl shadow-2xl border-l-4 p-6 ${
+                notification.type === "success" 
+                  ? "bg-emerald-50 border-emerald-400" 
+                  : "bg-red-50 border-red-400"
+              }`}>
+                <div className="flex items-start">
+                  <div className={`flex-shrink-0 ${
+                    notification.type === "success" ? "text-emerald-500" : "text-red-500"
+                  }`}>
+                    {notification.type === "success" ? (
+                      <div className="relative">
+                        <div className="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-emerald-400 opacity-75"></div>
+                        <CheckCircle className="relative inline-flex h-6 w-6" />
+                      </div>
+                    ) : (
+                      <XCircle className="h-6 w-6" />
+                    )}
+                  </div>
+                  <div className="ml-4 flex-1">
+                    <h3 className={`text-sm font-bold ${
+                      notification.type === "success" ? "text-emerald-800" : "text-red-800"
+                    }`}>
+                      {notification.title}
+                    </h3>
+                    <p className={`mt-1 text-sm ${
+                      notification.type === "success" ? "text-emerald-700" : "text-red-700"
+                    }`}>
+                      {notification.message}
+                    </p>
+                  </div>
+                  <button
+                    onClick={hideNotification}
+                    className={`flex-shrink-0 ml-3 ${
+                      notification.type === "success" 
+                        ? "text-emerald-400 hover:text-emerald-600" 
+                        : "text-red-400 hover:text-red-600"
+                    } transition-colors`}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Modals */}
         <FacultyEditModal 

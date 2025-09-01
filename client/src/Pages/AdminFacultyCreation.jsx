@@ -1,6 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, User, Mail, Hash, Shield, Upload, Building2, Plus, Save, AlertCircle, Download } from 'lucide-react';
+import { 
+  Eye, 
+  EyeOff, 
+  User, 
+  Mail, 
+  Hash, 
+  Shield, 
+  Upload, 
+  Building2, 
+  Plus, 
+  Save, 
+  AlertTriangle, 
+  Download,
+  Database,
+  Users,
+  FileSpreadsheet,
+  CheckCircle,
+  XCircle,
+  Settings,
+  X,
+  RefreshCw
+} from 'lucide-react';
 import Navbar from '../Components/UniversalNavbar';
 import { createFaculty, createAdmin, createFacultyBulk } from '../api';
 import * as XLSX from 'xlsx';
@@ -31,7 +52,7 @@ const specializationMap = {
   general: 'General'
 };
 
-const specializationOptions = specializationOptionsRaw.map(normalizeSpecialization); // ['aiml', 'datascience', ...]
+const specializationOptions = specializationOptionsRaw.map(normalizeSpecialization);
 // ------------------------------------------------------------------------------
 
 const FacultyManagement = () => {
@@ -49,11 +70,34 @@ const FacultyManagement = () => {
   const departmentFromContext = adminContext?.department || '';
   const hasContext = Boolean(schoolFromContext && departmentFromContext);
 
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('single');
+  const [notification, setNotification] = useState({
+    isVisible: false,
+    type: "",
+    title: "",
+    message: "",
+  });
+
+  // Show notification function
+  const showNotification = useCallback((type, title, message, duration = 4000) => {
+    setNotification({
+      isVisible: true,
+      type,
+      title,
+      message,
+    });
+
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, isVisible: false }));
+    }, duration);
+  }, []);
+
+  // Hide notification function
+  const hideNotification = useCallback(() => {
+    setNotification(prev => ({ ...prev, isVisible: false }));
+  }, []);
 
   const [formData, setFormData] = useState({
     imageUrl: '',
@@ -72,13 +116,6 @@ const FacultyManagement = () => {
 
   const schoolOptions = ['SCOPE', 'SENSE'];
   const departmentOptions = ['BTech', 'MTech(integrated)', 'MCA'];
-
-  useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => setSuccess(''), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [success]);
 
   useEffect(() => {
     if (hasContext) {
@@ -102,14 +139,12 @@ const FacultyManagement = () => {
       department: departmentFromContext || '',
       specializations: []
     });
-    setError('');
     setShowPassword(false);
   };
+
   const resetBulkData = () => {
     setBulkData([]);
     setFileName('');
-    setError('');
-    setSuccess('');
   };
 
   const handleSelectContext = () => {
@@ -130,8 +165,8 @@ const FacultyManagement = () => {
       [name]: value
     }));
   };
+
   const handleSpecializationChange = (e) => {
-    // Always store normalized values in specializations array
     const selectedOptions = Array.from(e.target.selectedOptions, option => normalizeSpecialization(option.value));
     setFormData(prev => ({
       ...prev,
@@ -139,7 +174,6 @@ const FacultyManagement = () => {
     }));
   };
 
-  // Ensure all specializations are normalized before submit
   const validateForm = () => {
     if (!formData.name.trim()) throw new Error('Name is required');
     if (!formData.employeeId.trim()) throw new Error('Employee ID is required');
@@ -158,12 +192,9 @@ const FacultyManagement = () => {
   };
 
   const handleSingleSubmit = async () => {
-    setError('');
-    setSuccess('');
     setIsLoading(true);
     try {
       validateForm();
-      // Send only normalized specializations
       const apiData = {
         name: String(formData.name.trim()),
         emailId: String(formData.emailId.trim().toLowerCase()),
@@ -172,8 +203,9 @@ const FacultyManagement = () => {
         imageUrl: String(formData.imageUrl.trim()),
         school: [formData.school],
         department: [formData.department],
-        specialization: formData.specializations.map(normalizeSpecialization) // always normalized!
+        specialization: formData.specializations.map(normalizeSpecialization)
       };
+
       let response;
       if (formData.role === 'faculty') {
         response = await createFaculty(apiData);
@@ -182,23 +214,29 @@ const FacultyManagement = () => {
       } else {
         throw new Error('Invalid role selected');
       }
-setSuccess(
-  response.message && response.message.trim().length > 0
-    ? response.message
-    : `${formData.role === "faculty" ? "Faculty" : "Admin"} account for "${formData.name}" (${formData.employeeId}) created successfully! (Total created: 1)`
-);
+
+      showNotification(
+        "success", 
+        "Account Created", 
+        response.message && response.message.trim().length > 0
+          ? response.message
+          : `${formData.role === "faculty" ? "Faculty" : "Admin"} account for "${formData.name}" (${formData.employeeId}) created successfully!`
+      );
 
       resetForm();
     } catch (err) {
-      if (err.response && err.response.data) setError(err.response.data.message || 'Server validation failed');
-      else if (err.message) setError(err.message);
-      else setError('Failed to create user. Please try again.');
+      if (err.response && err.response.data) {
+        showNotification("error", "Creation Failed", err.response.data.message || 'Server validation failed');
+      } else if (err.message) {
+        showNotification("error", "Validation Error", err.message);
+      } else {
+        showNotification("error", "Creation Failed", 'Failed to create user. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Bulk helpers: normalization and parsing Excel/CSV
   const cleanText = (value) => {
     if (value === null || value === undefined) return '';
     return String(value)
@@ -220,7 +258,8 @@ setSuccess(
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    setFileName(file.name); setError(''); setSuccess('');
+    setFileName(file.name);
+    
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -229,8 +268,10 @@ setSuccess(
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(sheet);
+        
         const formattedData = [];
         const errorDetails = [];
+        
         jsonData.forEach((row, index) => {
           try {
             const name = cleanText(row.name);
@@ -239,6 +280,7 @@ setSuccess(
             const password = row.password ? String(row.password).trim() : '';
             const role = cleanText(row.role);
             const imageUrl = cleanText(row.imageUrl) || '';
+            
             let school, department, specializations;
             if (hasContext) {
               school = schoolFromContext;
@@ -249,30 +291,44 @@ setSuccess(
               department = cleanText(row.department);
               specializations = parseArrayField(row.specializations || row.specialization);
             }
+            
             const rowErrors = [];
             if (!name) rowErrors.push('Missing name');
             if (!employeeId) rowErrors.push('Missing employee ID');
             if (!emailId) rowErrors.push('Missing email');
             if (!password || password === '0') rowErrors.push('Missing password');
+            
             const cleanEmployeeId = employeeId.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
             if (employeeId && !cleanEmployeeId) rowErrors.push('Invalid employee ID');
+            
             if (emailId) {
               const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
               if (!emailRegex.test(emailId)) rowErrors.push('Invalid email format');
               else if (!emailId.endsWith('@vit.ac.in')) rowErrors.push('Email must end with @vit.ac.in');
             }
+            
             if (!school) rowErrors.push('Missing school');
             if (!department) rowErrors.push('Missing department');
             if (specializations.length === 0) rowErrors.push('Missing specializations');
+            
             const cleanRole = role.toLowerCase();
             const validRole = cleanRole === 'admin' ? 'admin' : 'faculty';
+            
             let cleanPassword = password;
             if (password && (password.includes('\n') || password.includes('\r') || password.includes('\t'))) {
               cleanPassword = password.replace(/[\r\n\t]/g, '').trim();
             }
-            if (rowErrors.length > 0) errorDetails.push({
-              row: index + 2, name: name || 'N/A', employeeId: employeeId || 'N/A', emailId: emailId || 'N/A', errors: rowErrors
-            });
+            
+            if (rowErrors.length > 0) {
+              errorDetails.push({
+                row: index + 2, 
+                name: name || 'N/A', 
+                employeeId: employeeId || 'N/A', 
+                emailId: emailId || 'N/A', 
+                errors: rowErrors
+              });
+            }
+            
             formattedData.push({
               name: name || '',
               employeeId: cleanEmployeeId || employeeId || '',
@@ -282,16 +338,20 @@ setSuccess(
               imageUrl: imageUrl,
               school: school,
               department: department,
-              specializations: specializations, // already normalized
+              specializations: specializations,
               originalRow: index + 2,
               hasErrors: rowErrors.length > 0,
               errors: rowErrors
             });
           } catch (rowError) {
             errorDetails.push({
-              row: index + 2, name: 'Error processing row', employeeId: 'N/A', emailId: 'N/A',
+              row: index + 2, 
+              name: 'Error processing row', 
+              employeeId: 'N/A', 
+              emailId: 'N/A',
               errors: [`Row processing error: ${rowError.message}`]
             });
+            
             formattedData.push({
               name: 'ERROR',
               employeeId: 'ERROR',
@@ -308,52 +368,70 @@ setSuccess(
             });
           }
         });
+        
         setBulkData(formattedData);
+        
         const validEntries = formattedData.filter(entry => !entry.hasErrors);
         const invalidEntries = formattedData.filter(entry => entry.hasErrors);
+        
         if (invalidEntries.length > 0) {
           const errorSummary = errorDetails
             .slice(0, 5)
             .map(detail => `Row ${detail.row}: ${detail.errors.join(', ')}`).join('\n');
-          setError(`Found ${invalidEntries.length} problematic entries:\n\n${errorSummary}${invalidEntries.length > 5 ? `\n... and ${invalidEntries.length - 5} more errors` : ''}\n\nFix issues before submitting.`);
+          showNotification(
+            "error", 
+            "File Processing Issues", 
+            `Found ${invalidEntries.length} problematic entries:\n\n${errorSummary}${invalidEntries.length > 5 ? `\n... and ${invalidEntries.length - 5} more errors` : ''}\n\nFix issues before submitting.`
+          );
         }
+        
         if (validEntries.length > 0) {
-          setSuccess(`${formattedData.length} faculty records loaded. ${validEntries.length} are valid, ${invalidEntries.length} have issues.`);
+          showNotification(
+            "success", 
+            "File Processed", 
+            `${formattedData.length} faculty records loaded. ${validEntries.length} are valid, ${invalidEntries.length} have issues.`
+          );
         } else {
-          setSuccess(`${formattedData.length} faculty records loaded, but all have issues.`);
+          showNotification(
+            "error", 
+            "No Valid Records", 
+            `${formattedData.length} faculty records loaded, but all have issues.`
+          );
         }
       } catch (err) {
         console.error('File processing error:', err);
-        setError(`Error processing file: ${err.message}. Please ensure the file format is correct.`);
+        showNotification("error", "File Processing Error", `Error processing file: ${err.message}. Please ensure the file format is correct.`);
         setBulkData([]);
       }
     };
-    reader.onerror = () => setError('Error reading file. Please try again.');
+    
+    reader.onerror = () => showNotification("error", "File Read Error", 'Error reading file. Please try again.');
     reader.readAsArrayBuffer(file);
   };
 
   const handleBulkSubmit = async () => {
     if (bulkData.length === 0) {
-      setError('No faculty data to upload. Please select a valid Excel file.');
+      showNotification("error", "No Data", 'No faculty data to upload. Please select a valid Excel file.');
       return;
     }
+    
     const validEntries = bulkData.filter(entry => !entry.hasErrors);
     const invalidEntries = bulkData.filter(entry => entry.hasErrors);
+    
     if (validEntries.length === 0) {
-      setError('No valid faculty entries to submit. Please fix the errors first.');
+      showNotification("error", "No Valid Entries", 'No valid faculty entries to submit. Please fix the errors first.');
       return;
     }
+    
     if (invalidEntries.length > 0) {
       const confirmSubmit = window.confirm(
         `You have ${invalidEntries.length} invalid entries that will be skipped. Continue with creating ${validEntries.length} valid accounts?`
       );
       if (!confirmSubmit) return;
     }
-    setError('');
-    setSuccess('');
+    
     setIsLoading(true);
     try {
-      // ALWAYS send normalized specializations for backend
       const validatedData = validEntries.map(faculty => ({
         name: String(faculty.name).trim(),
         emailId: String(faculty.emailId).trim().toLowerCase(),
@@ -365,30 +443,30 @@ setSuccess(
         departments: [faculty.department],
         specialization: faculty.specializations.map(normalizeSpecialization)
       }));
+      
       const response = await createFacultyBulk({ facultyList: validatedData });
       const successCount = response.data?.created || 0;
       const errorCount = response.data?.errors || 0;
+      
       if (successCount > 0) {
-if (successCount > 0) {
-  const createdNames = validEntries.slice(0, 5).map(e => `"${e.name}" (${e.employeeId})`).join(', ');
-  setSuccess(
-    `Successfully created ${successCount} faculty member${successCount > 1 ? "s" : ""}${
-      createdNames ? ": " + createdNames : ""
-    }${validEntries.length > 5 ? `, ...and ${validEntries.length - 5} more` : ""}. (Total created: ${successCount})`
-    + (errorCount > 0 ? ` (${errorCount} errors occurred)` : "")
-    + (invalidEntries.length > 0 ? ` (${invalidEntries.length} entries were skipped)` : "")
-  );
-  if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
-} else {
-  setError('No faculty members were created. Please check the data and try again.');
-}
-
-
-if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
-      } else setError('No faculty members were created. Please check the data and try again.');
+        const createdNames = validEntries.slice(0, 5).map(e => `"${e.name}" (${e.employeeId})`).join(', ');
+        showNotification(
+          "success",
+          "Bulk Creation Complete",
+          `Successfully created ${successCount} faculty member${successCount > 1 ? "s" : ""}${
+            createdNames ? ": " + createdNames : ""
+          }${validEntries.length > 5 ? `, ...and ${validEntries.length - 5} more` : ""}. (Total created: ${successCount})`
+          + (errorCount > 0 ? ` (${errorCount} errors occurred)` : "")
+          + (invalidEntries.length > 0 ? ` (${invalidEntries.length} entries were skipped)` : "")
+        );
+        
+        if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
+      } else {
+        showNotification("error", "Creation Failed", 'No faculty members were created. Please check the data and try again.');
+      }
     } catch (err) {
       console.error('Bulk creation error:', err);
-      setError(err.response?.data?.message || 'Failed to create faculty in bulk. Please try again.');
+      showNotification("error", "Bulk Creation Failed", err.response?.data?.message || 'Failed to create faculty in bulk. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -402,7 +480,7 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
         emailId: 'john.smith@vit.ac.in',
         password: 'TempPass@123',
         role: 'faculty',
-        specializations: 'aiml,datascience', // Use normalized codes in template
+        specializations: 'aiml,datascience',
         imageUrl: ''
       },
       {
@@ -423,7 +501,7 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
         role: 'faculty',
         school: 'SCOPE',
         department: 'CSE',
-        specializations: 'aiml,datascience', // Use normalized codes in template
+        specializations: 'aiml,datascience',
         imageUrl: ''
       },
       {
@@ -438,6 +516,7 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
         imageUrl: 'https://example.com/profile.jpg'
       }
     ];
+    
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Faculty Template');
@@ -449,17 +528,22 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
     );
   };
 
-  
   if (isLoading) {
     return (
       <>
-        <Navbar userType="admin" />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
-            <div className="text-xl text-gray-600">
-              {activeTab === 'single' ? 'Creating faculty...' : 'Creating faculty members...'}
+        <Navbar />
+        <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+          <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md mx-auto text-center">
+            <div className="relative mb-8">
+              <div className="animate-spin rounded-full h-20 w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Users className="h-8 w-8 text-blue-600 animate-pulse" />
+              </div>
             </div>
+            <h3 className="text-2xl font-bold text-slate-800 mb-3">
+              {activeTab === 'single' ? 'Creating Faculty Account' : 'Creating Faculty Accounts'}
+            </h3>
+            <p className="text-slate-600">Please wait while we process your request...</p>
           </div>
         </div>
       </>
@@ -468,143 +552,111 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
 
   return (
     <>
-      <Navbar userType="admin" />
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="container mx-auto px-4 pt-24 pb-8 max-w-6xl">
-
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            {/* ✅ IMPROVED: Better Header Layout */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Faculty Management</h1>
-                <p className="text-gray-600">Create and manage faculty accounts</p>
-              </div>
-              
-              <div className="mt-4 md:mt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                {hasContext ? (
-                  <div className="px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Building2 className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm font-medium text-blue-900">Current Context</span>
-                    </div>
-                    <div className="text-sm text-blue-700">
-                      <strong>{schoolFromContext}</strong> • <strong>{departmentFromContext}</strong>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <AlertCircle className="h-4 w-4 text-amber-600" />
-                      <span className="text-sm font-medium text-amber-900">No Context</span>
-                    </div>
-                    <div className="text-sm text-amber-700">
-                      Managing all schools & departments
-                    </div>
-                  </div>
-                )}
-                
-                <button
-                  onClick={handleSelectContext}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                >
-                  <Building2 className="h-4 w-4" />
-                  {hasContext ? 'Change Context' : 'Select Context'}
-                </button>
-              </div>
-            </div>
-
-            {/* Tab Navigation */}
-            <div className="mb-8">
-              <div className="flex bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setActiveTab('single')}
-                  className={`flex-1 px-4 py-3 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-2 ${
-                    activeTab === 'single'
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  <Plus size={16} />
-                  Single Faculty
-                </button>
-                <button
-                  onClick={() => setActiveTab('bulk')}
-                  className={`flex-1 px-4 py-3 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-2 ${
-                    activeTab === 'bulk'
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  <Upload size={16} />
-                  Bulk Upload
-                </button>
-              </div>
-            </div>
-
-            {/* Success/Error Messages */}
-            {success && (
-              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-green-800">{success}</p>
-                  </div>
+      <Navbar />
+      <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
+        
+        {/* Page Header */}
+        <div className="mb-8 bg-white rounded-2xl shadow-lg mx-8 overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="bg-white/20 p-3 rounded-xl">
+                  <Users className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-white">Faculty Management</h1>
+                  <p className="text-indigo-100 mt-1">Create and manage faculty accounts</p>
                 </div>
               </div>
-            )}
-
-            {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <AlertCircle className="h-5 w-5 text-red-400" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-red-800 whitespace-pre-line">{error}</p>
+              
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="text-white/90 text-sm">Current Context</div>
+                    <div className="text-white font-semibold">
+                      {hasContext ? `${schoolFromContext} - ${departmentFromContext}` : 'All Schools & Departments'}
                     </div>
                   </div>
-                  <button 
-                    onClick={() => setError('')}
-                    className="ml-4 text-red-400 hover:text-red-600"
+                  <button
+                    onClick={handleSelectContext}
+                    className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-all duration-200 font-medium"
                   >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    {hasContext ? 'Change Context' : 'Select Context'}
                   </button>
                 </div>
               </div>
-            )}
+            </div>
+          </div>
+        </div>
 
-            {/* Tab Content */}
+           
+
+      
+
+
+        {/* Tab Navigation */}
+        <div className="mx-8 mb-8">
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
+                <Settings className="h-5 w-5 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800">Creation Mode</h2>
+            </div>
+            
+            <div className="inline-flex bg-slate-100 rounded-xl p-1.5 shadow-inner">
+              <button
+                onClick={() => setActiveTab('single')}
+                className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 ${
+                  activeTab === 'single'
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transform scale-105"
+                    : "text-slate-600 hover:text-slate-800 hover:bg-slate-200"
+                }`}
+              >
+                <Plus size={16} />
+                <span>Single Faculty</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('bulk')}
+                className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 ${
+                  activeTab === 'bulk'
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transform scale-105"
+                    : "text-slate-600 hover:text-slate-800 hover:bg-slate-200"
+                }`}
+              >
+                <Upload size={16} />
+                <span>Bulk Upload</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="mx-8 mb-8">
+          <div className="bg-white rounded-2xl shadow-lg">
             {activeTab === 'single' ? (
-              <div className="bg-gray-50 rounded-xl p-8">
-                <div className="text-center mb-8">
-                  <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                    <Plus className="h-8 w-8 text-blue-600" />
+              <div className="p-8">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
+                    <Plus className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Create Faculty Account</h3>
-                  <p className="text-gray-600">Fill in the details to create a new faculty or admin account</p>
+                  <h2 className="text-2xl font-bold text-slate-800">Create Faculty Account</h2>
                 </div>
 
-                <div className="max-w-2xl mx-auto space-y-6">
+                <div className="max-w-3xl mx-auto space-y-6">
                   {/* Role Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                    <label className="block text-sm font-semibold text-slate-700 mb-3">
                       Account Type <span className="text-red-500">*</span>
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-4">
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, role: 'faculty' }))}
-                        className={`p-4 rounded-lg border-2 transition-all flex items-center justify-center gap-3 ${
+                        className={`p-4 rounded-xl border-2 transition-all flex items-center justify-center space-x-3 ${
                           formData.role === 'faculty' 
                             ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                            : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         }`}
                       >
                         <User size={20} />
@@ -613,10 +665,10 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, role: 'admin' }))}
-                        className={`p-4 rounded-lg border-2 transition-all flex items-center justify-center gap-3 ${
+                        className={`p-4 rounded-xl border-2 transition-all flex items-center justify-center space-x-3 ${
                           formData.role === 'admin' 
                             ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                            : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         }`}
                       >
                         <Shield size={20} />
@@ -628,19 +680,19 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Name */}
                     <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="name" className="block text-sm font-semibold text-slate-700 mb-3">
                         Full Name <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <User size={18} className="text-gray-400" />
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <User size={18} className="text-slate-400" />
                         </div>
                         <input
                           id="name"
                           name="name"
                           type="text"
                           placeholder="Dr. John Doe"
-                          className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          className="block w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400"
                           value={formData.name}
                           onChange={handleInputChange}
                           required
@@ -650,19 +702,19 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
 
                     {/* Employee ID */}
                     <div>
-                      <label htmlFor="employeeId" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="employeeId" className="block text-sm font-semibold text-slate-700 mb-3">
                         Employee ID <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Hash size={18} className="text-gray-400" />
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <Hash size={18} className="text-slate-400" />
                         </div>
                         <input
                           id="employeeId"
                           name="employeeId"
                           type="text"
                           placeholder="FAC001"
-                          className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          className="block w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400"
                           value={formData.employeeId}
                           onChange={handleInputChange}
                           required
@@ -673,19 +725,19 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
 
                   {/* Email */}
                   <div>
-                    <label htmlFor="emailId" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="emailId" className="block text-sm font-semibold text-slate-700 mb-3">
                       Email Address <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Mail size={18} className="text-gray-400" />
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Mail size={18} className="text-slate-400" />
                       </div>
                       <input
                         id="emailId"
                         name="emailId"
                         type="email"
                         placeholder="john.doe@vit.ac.in"
-                        className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="block w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400"
                         value={formData.emailId}
                         onChange={handleInputChange}
                         required
@@ -695,38 +747,36 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
 
                   {/* Password */}
                   <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-3">
                       Password <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Shield size={18} className="text-slate-400" />
                       </div>
                       <input
                         id="password"
                         name="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Password123!"
-                        className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="block w-full pl-12 pr-16 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400"
                         value={formData.password}
                         onChange={handleInputChange}
                         required
                       />
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                      <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                          className="text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
                         >
                           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                       </div>
                     </div>
-                    <div className="mt-2 p-3 bg-white rounded-md border border-gray-200">
-                      <p className="text-xs font-medium text-gray-700 mb-2">Password Requirements:</p>
-                      <div className="grid grid-cols-2 gap-1 text-xs text-gray-600">
+                    <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <p className="text-xs font-semibold text-slate-700 mb-2">Password Requirements:</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
                         <span>• 8+ characters</span>
                         <span>• Uppercase letter</span>
                         <span>• Lowercase letter</span>
@@ -736,18 +786,17 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
                     </div>
                   </div>
 
-                  {/* ✅ IMPROVED: School & Department Selection */}
+                  {/* School & Department Selection */}
                   {!hasContext && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* School Selection */}
                       <div>
-                        <label htmlFor="school" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="school" className="block text-sm font-semibold text-slate-700 mb-3">
                           School <span className="text-red-500">*</span>
                         </label>
                         <select
                           id="school"
                           name="school"
-                          className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          className="block w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700"
                           value={formData.school}
                           onChange={handleInputChange}
                           required
@@ -759,15 +808,14 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
                         </select>
                       </div>
 
-                      {/* Department Selection */}
                       <div>
-                        <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="department" className="block text-sm font-semibold text-slate-700 mb-3">
                           Department <span className="text-red-500">*</span>
                         </label>
                         <select
                           id="department"
                           name="department"
-                          className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          className="block w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700"
                           value={formData.department}
                           onChange={handleInputChange}
                           required
@@ -783,40 +831,40 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
 
                   {/* Specialization Selection */}
                   <div>
-                    <label htmlFor="specializations" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="specializations" className="block text-sm font-semibold text-slate-700 mb-3">
                       Specializations <span className="text-red-500">*</span>
                     </label>
                     <select
                       id="specializations"
                       multiple
-                      size={4}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      size={5}
+                      className="block w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700"
                       value={formData.specializations}
                       onChange={handleSpecializationChange}
                       required
                     >
                       {specializationOptions.map(option => (
-                        <option key={option} value={option}>{option}</option>
+                        <option key={option} value={option}>{specializationMap[option] || option}</option>
                       ))}
                     </select>
-                    <p className="mt-1 text-xs text-gray-500">Hold Ctrl (Cmd on Mac) to select multiple specializations</p>
+                    <p className="mt-2 text-xs text-slate-500">Hold Ctrl (Cmd on Mac) to select multiple specializations</p>
                   </div>
 
                   {/* Profile Image URL */}
                   <div>
-                    <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-700 mb-2">
-                      Profile Image URL <span className="text-gray-400">(Optional)</span>
+                    <label htmlFor="imageUrl" className="block text-sm font-semibold text-slate-700 mb-3">
+                      Profile Image URL <span className="text-slate-400">(Optional)</span>
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Upload size={18} className="text-gray-400" />
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Upload size={18} className="text-slate-400" />
                       </div>
                       <input
                         id="imageUrl"
                         name="imageUrl"
                         type="url"
                         placeholder="https://example.com/profile.jpg"
-                        className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="block w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400"
                         value={formData.imageUrl}
                         onChange={handleInputChange}
                       />
@@ -824,18 +872,15 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
                   </div>
 
                   {/* Submit Button */}
-                  <div className="pt-4">
+                  <div className="pt-6">
                     <button
                       onClick={handleSingleSubmit}
                       disabled={isLoading}
-                      className="w-full flex justify-center items-center bg-blue-600 hover:bg-blue-700 text-white py-4 px-6 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full flex justify-center items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     >
                       {isLoading ? (
                         <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
                           Creating {formData.role}...
                         </>
                       ) : (
@@ -849,25 +894,19 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-xl p-8">
-                <div className="text-center mb-8">
-                  <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                    <Upload className="h-8 w-8 text-blue-600" />
+              <div className="p-8">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
+                    <Upload className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Bulk Faculty Upload</h3>
-                  <p className="text-gray-600">Upload an Excel file to create multiple faculty accounts at once</p>
-                  {hasContext && (
-                    <p className="text-sm text-blue-600 mt-2">
-                      Using context: <strong>{schoolFromContext} - {departmentFromContext}</strong>
-                    </p>
-                  )}
+                  <h2 className="text-2xl font-bold text-slate-800">Bulk Faculty Upload</h2>
                 </div>
 
                 {/* Template Download */}
-                <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="mb-8 p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                      <h4 className="font-medium text-blue-900 mb-1">Download Excel Template</h4>
+                      <h4 className="font-semibold text-blue-900 mb-2">Download Excel Template</h4>
                       <p className="text-sm text-blue-700">
                         {hasContext 
                           ? `Template for ${schoolFromContext} - ${departmentFromContext} (school & department will be auto-filled)`
@@ -877,27 +916,27 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
                     </div>
                     <button
                       onClick={downloadTemplate}
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg font-medium"
                     >
-                      <Download size={16} className="mr-2" />
-                      Download Template
+                      <Download size={16} />
+                      <span>Download Template</span>
                     </button>
                   </div>
                 </div>
 
                 {/* File Upload */}
                 <div className="mb-8">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">
                     Excel File <span className="text-red-500">*</span>
                   </label>
                   <div className="flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colors">
+                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Upload className="w-10 h-10 mb-4 text-gray-400" />
-                        <p className="mb-2 text-sm text-gray-500">
+                        <Upload className="w-12 h-12 mb-4 text-slate-400" />
+                        <p className="mb-2 text-sm text-slate-600">
                           <span className="font-semibold">Click to upload</span> or drag and drop
                         </p>
-                        <p className="text-xs text-gray-500 mb-2">Excel files only (.xlsx, .xls)</p>
+                        <p className="text-xs text-slate-500 mb-2">Excel files only (.xlsx, .xls)</p>
                         <p className="text-xs text-blue-600 text-center max-w-sm">
                           {hasContext 
                             ? 'Required: name, employeeId, emailId, password, role, specializations'
@@ -914,151 +953,213 @@ if (errorCount === 0 && invalidEntries.length === 0) resetBulkData();
                     </label>
                   </div>
                   {fileName && (
-                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-sm text-green-700 font-medium">✅ File selected: {fileName}</p>
+                    <div className="mt-4 p-4 bg-emerald-50 border-2 border-emerald-200 rounded-xl">
+                      <p className="text-sm text-emerald-700 font-semibold flex items-center space-x-2">
+                        <CheckCircle size={16} />
+                        <span>File selected: {fileName}</span>
+                      </p>
                     </div>
                   )}
                 </div>
 
                 {/* Bulk Data Preview */}
-                {bulkData.length > 0 && (
+                {bulkData.length > 0 ? (
                   <div>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <h3 className="text-xl font-bold text-slate-800">
                           Faculty Preview ({bulkData.length} records)
                         </h3>
                         {bulkData.filter(f => f.hasErrors).length > 0 && (
-                          <p className="text-sm text-red-600">
+                          <p className="text-sm text-red-600 mt-1">
                             {bulkData.filter(f => f.hasErrors).length} records have errors
                           </p>
                         )}
                       </div>
-                      <div className="flex gap-3">
+                      <div className="flex space-x-3">
                         <button
                           onClick={handleBulkSubmit}
-                          className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                          className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed flex items-center space-x-2"
                           disabled={isLoading || bulkData.filter(f => !f.hasErrors).length === 0}
                         >
                           <Save className="h-4 w-4" />
-                          {isLoading ? 'Creating...' : `Create ${bulkData.filter(f => !f.hasErrors).length} Accounts`}
+                          <span>{isLoading ? 'Creating...' : `Create ${bulkData.filter(f => !f.hasErrors).length} Accounts`}</span>
                         </button>
                         <button
                           onClick={resetBulkData}
                           disabled={isLoading}
-                          className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                          className="px-6 py-3 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-semibold transition-all duration-200"
                         >
                           Clear
                         </button>
                       </div>
                     </div>
 
-                    <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee ID</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                            {!hasContext && (
-                              <>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">School</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                              </>
-                            )}
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Specializations</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issues</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {bulkData.map((faculty, index) => (
-                            <tr key={index} className={faculty.hasErrors ? 'bg-red-25' : ''}>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                {faculty.hasErrors ? (
-                                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                                    Error
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                                    Valid
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
-                                {faculty.name || <span className="text-red-500">Missing</span>}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-900 font-mono">
-                                {faculty.employeeId || <span className="text-red-500">Missing</span>}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
-                                {faculty.emailId || <span className="text-red-500">Missing</span>}
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                  faculty.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                                }`}>
-                                  {faculty.role}
-                                </span>
-                              </td>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gradient-to-r from-slate-100 to-blue-100">
+                            <tr>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Name</th>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Employee ID</th>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Email</th>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Role</th>
                               {!hasContext && (
                                 <>
-                                  <td className="px-4 py-3 text-sm text-gray-900">
-                                    {faculty.school || <span className="text-red-500">Missing</span>}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-900">
-                                    {faculty.department || <span className="text-red-500">Missing</span>}
-                                  </td>
+                                  <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">School</th>
+                                  <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Department</th>
                                 </>
                               )}
-                              <td className="px-4 py-3 text-sm text-gray-900">
-                                {faculty.specializations?.length > 0 ? (
-                                  <div className="flex flex-wrap gap-1">
-                                    {faculty.specializations.map((spec, idx) => (
-                                      <span key={idx} className="inline-flex px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800">
-                                        {spec}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-red-500">Missing</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                {faculty.hasErrors ? (
-                                  <div className="text-red-600">
-                                    <div className="font-medium text-xs">Row {faculty.originalRow}:</div>
-                                    <ul className="list-disc list-inside text-xs mt-1">
-                                      {faculty.errors.map((error, idx) => (
-                                        <li key={idx}>{error}</li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                ) : (
-                                  <span className="text-green-600 text-xs">✓ No issues</span>
-                                )}
-                              </td>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Specializations</th>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Issues</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {bulkData.map((faculty, index) => (
+                              <tr key={index} className={`${faculty.hasErrors ? 'bg-red-25' : ''} hover:bg-slate-50 transition-colors duration-150`}>
+                                <td className="px-4 py-4 whitespace-nowrap">
+                                  {faculty.hasErrors ? (
+                                    <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                      Error
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                                      Valid
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-4 text-sm text-slate-900">
+                                  {faculty.name || <span className="text-red-500">Missing</span>}
+                                </td>
+                                <td className="px-4 py-4 text-sm text-slate-900 font-mono">
+                                  {faculty.employeeId || <span className="text-red-500">Missing</span>}
+                                </td>
+                                <td className="px-4 py-4 text-sm text-slate-900">
+                                  {faculty.emailId || <span className="text-red-500">Missing</span>}
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap">
+                                  <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
+                                    faculty.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {faculty.role}
+                                  </span>
+                                </td>
+                                {!hasContext && (
+                                  <>
+                                    <td className="px-4 py-4 text-sm text-slate-900">
+                                      {faculty.school || <span className="text-red-500">Missing</span>}
+                                    </td>
+                                    <td className="px-4 py-4 text-sm text-slate-900">
+                                      {faculty.department || <span className="text-red-500">Missing</span>}
+                                    </td>
+                                  </>
+                                )}
+                                <td className="px-4 py-4 text-sm text-slate-900">
+                                  {faculty.specializations?.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {faculty.specializations.map((spec, idx) => (
+                                        <span key={idx} className="inline-flex px-2 py-1 text-xs rounded bg-amber-100 text-amber-800">
+                                          {specializationMap[spec] || spec}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-red-500">Missing</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-4 text-sm">
+                                  {faculty.hasErrors ? (
+                                    <div className="text-red-600">
+                                      <div className="font-semibold text-xs">Row {faculty.originalRow}:</div>
+                                      <ul className="list-disc list-inside text-xs mt-1 space-y-1">
+                                        {faculty.errors.map((error, idx) => (
+                                          <li key={idx}>{error}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  ) : (
+                                    <span className="text-emerald-600 text-xs flex items-center space-x-1">
+                                      <CheckCircle size={12} />
+                                      <span>No issues</span>
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
-                )}
-
-                {/* Empty State */}
-                {bulkData.length === 0 && (
-                  <div className="text-center py-12">
-                    <Upload className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No data uploaded yet</h3>
-                    <p className="text-gray-500">Upload an Excel file to preview faculty data</p>
+                ) : (
+                  <div className="text-center py-20">
+                    <div className="mx-auto w-32 h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-8">
+                      <Upload className="h-16 w-16 text-slate-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-600 mb-3">No Data Uploaded Yet</h3>
+                    <p className="text-slate-500 max-w-md mx-auto">
+                      Upload an Excel file to preview faculty data and create multiple accounts at once.
+                    </p>
                   </div>
                 )}
               </div>
             )}
           </div>
         </div>
+
+        {/* Enhanced Notification */}
+        {notification.isVisible && (
+          <div className="fixed top-24 right-8 z-50 max-w-md w-full">
+            <div className={`transform transition-all duration-500 ease-out ${
+              notification.isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+            }`}>
+              <div className={`rounded-xl shadow-2xl border-l-4 p-6 ${
+                notification.type === "success" 
+                  ? "bg-emerald-50 border-emerald-400" 
+                  : "bg-red-50 border-red-400"
+              }`}>
+                <div className="flex items-start">
+                  <div className={`flex-shrink-0 ${
+                    notification.type === "success" ? "text-emerald-500" : "text-red-500"
+                  }`}>
+                    {notification.type === "success" ? (
+                      <div className="relative">
+                        <div className="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-emerald-400 opacity-75"></div>
+                        <CheckCircle className="relative inline-flex h-6 w-6" />
+                      </div>
+                    ) : (
+                      <XCircle className="h-6 w-6" />
+                    )}
+                  </div>
+                  <div className="ml-4 flex-1">
+                    <h3 className={`text-sm font-bold ${
+                      notification.type === "success" ? "text-emerald-800" : "text-red-800"
+                    }`}>
+                      {notification.title}
+                    </h3>
+                    <p className={`mt-1 text-sm whitespace-pre-line ${
+                      notification.type === "success" ? "text-emerald-700" : "text-red-700"
+                    }`}>
+                      {notification.message}
+                    </p>
+                  </div>
+                  <button
+                    onClick={hideNotification}
+                    className={`flex-shrink-0 ml-3 ${
+                      notification.type === "success" 
+                        ? "text-emerald-400 hover:text-emerald-600" 
+                        : "text-red-400 hover:text-red-600"
+                    } transition-colors`}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
       </div>
     </>
   );

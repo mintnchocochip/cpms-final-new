@@ -1,6 +1,22 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
-import { Upload, Save, AlertCircle, Building2, GraduationCap, Download, Plus, Users, X } from "lucide-react";
+import { 
+  Upload, 
+  Save, 
+  AlertCircle, 
+  Building2, 
+  GraduationCap, 
+  Download, 
+  Plus, 
+  Users, 
+  X, 
+  CheckCircle,
+  XCircle,
+  FileSpreadsheet,
+  Database,
+  Settings,
+  RefreshCw
+} from "lucide-react";
 import Navbar from "../Components/UniversalNavbar";
 import { createProject, createProjectsBulk } from "../api";
 import { useAdminContext } from '../hooks/useAdminContext';
@@ -61,14 +77,39 @@ const ProjectCreationPage = () => {
   const [activeTab, setActiveTab] = useState('single');
   
   // Common states
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   
   // Individual field validation errors
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // ✅ FIXED: Updated options with correct formats
+  // Notification state
+  const [notification, setNotification] = useState({
+    isVisible: false,
+    type: "",
+    title: "",
+    message: "",
+  });
+
+  // Show notification function
+  const showNotification = useCallback((type, title, message, duration = 4000) => {
+    setNotification({
+      isVisible: true,
+      type,
+      title,
+      message,
+    });
+
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, isVisible: false }));
+    }, duration);
+  }, []);
+
+  // Hide notification function
+  const hideNotification = useCallback(() => {
+    setNotification(prev => ({ ...prev, isVisible: false }));
+  }, []);
+
+  // Updated options with correct formats
   const schoolOptions = ['SCOPE', 'SENSE', 'SELECT', 'SMEC', 'SCE', 'VITSOL'];
   const departmentOptions = [
     'BTech', 
@@ -81,7 +122,7 @@ const ProjectCreationPage = () => {
     'MDes'
   ];
 
-  // ✅ FIXED: Backend storage format (lowercase)
+  // Backend storage format (lowercase)
   const specializationOptionsBackend = [
     'ai/ml',
     'data science',
@@ -98,7 +139,7 @@ const ProjectCreationPage = () => {
     'database management'
   ];
 
-  // ✅ FIXED: Frontend display format (proper case)
+  // Frontend display format (proper case)
   const specializationOptionsDisplay = [
     'AI/ML',
     'Data Science',
@@ -115,7 +156,7 @@ const ProjectCreationPage = () => {
     'Database Management'
   ];
 
-  // ✅ Helper function to normalize specialization for backend
+  // Helper function to normalize specialization for backend
   const normalizeSpecialization = (spec) => {
     if (!spec) return '';
     
@@ -138,7 +179,7 @@ const ProjectCreationPage = () => {
     return displayMap[spec] || spec.toLowerCase().trim();
   };
 
-  // ✅ Helper function to display specialization for frontend
+  // Helper function to display specialization for frontend
   const displaySpecialization = (spec) => {
     if (!spec) return '';
     
@@ -176,14 +217,6 @@ const ProjectCreationPage = () => {
   const [fileName, setFileName] = useState("");
   const [bulkFieldErrors, setBulkFieldErrors] = useState({});
   const [bulkPreviewMode, setBulkPreviewMode] = useState(false);
-
-  // Auto-dismiss messages
-  useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => setSuccess(''), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [success]);
 
   // Update form when context changes
   useEffect(() => {
@@ -253,7 +286,7 @@ const ProjectCreationPage = () => {
     clearFieldError(name);
   };
 
-  // ✅ FIXED: Enhanced duplicate validation with stricter checks
+  // Enhanced duplicate validation with stricter checks
   const isDuplicateStudent = (students, currentIndex, field, value) => {
     if (!value.trim()) return false;
     
@@ -268,7 +301,7 @@ const ProjectCreationPage = () => {
   const handleStudentChange = (index, field, value) => {
     const fieldKey = `student_${index}_${field}`;
     
-    // ✅ FIXED: Enhanced validation for student fields
+    // Enhanced validation for student fields
     if (field === 'regNo' && value.trim()) {
       // Registration number format validation (assuming format like 21BCE1001)
       const regNoPattern = /^[0-9]{2}[A-Z]{3}[0-9]{4}$/;
@@ -324,8 +357,7 @@ const ProjectCreationPage = () => {
 
   const addStudent = () => {
     if (singleProject.students.length >= 3) {
-      setError("Maximum 3 students allowed per project.");
-      setTimeout(() => setError(""), 3000);
+      showNotification("error", "Maximum Students", "Maximum 3 students allowed per project.");
       return;
     }
     
@@ -360,7 +392,6 @@ const ProjectCreationPage = () => {
       specialization: specializationFromContext && specializationFromContext.length > 0 ? specializationFromContext[0] : "",
       students: [{ name: "", regNo: "", emailId: "" }]
     });
-    setError('');
     setFieldErrors({});
   };
 
@@ -375,13 +406,13 @@ const ProjectCreationPage = () => {
     let hasValidationErrors = false;
 
     if (!projectSchool || !projectDepartment) {
-      setError(isAllMode ? 
+      showNotification("error", "Missing Context", isAllMode ? 
         "Please select school and department for the project." : 
         "Admin context is missing. Please select school and department using the button above.");
       return;
     }
 
-    // ✅ FIXED: Enhanced validation with proper error handling
+    // Enhanced validation with proper error handling
     if (!singleProject.name.trim()) {
       setFieldError('name', 'Project name is required.');
       hasValidationErrors = true;
@@ -408,13 +439,13 @@ const ProjectCreationPage = () => {
       hasValidationErrors = true;
     }
 
-    // ✅ FIXED: Enhanced student validation
+    // Enhanced student validation
     const validStudents = singleProject.students.filter(student => 
       student.name.trim() && student.regNo.trim() && student.emailId.trim()
     );
 
     if (validStudents.length === 0) {
-      setError("At least one complete student record is required.");
+      showNotification("error", "Missing Students", "At least one complete student record is required.");
       return;
     }
 
@@ -424,17 +455,17 @@ const ProjectCreationPage = () => {
     const names = validStudents.map(s => s.name.toLowerCase().trim());
     
     if (new Set(regNos).size !== regNos.length) {
-      setError("Duplicate registration numbers found. Each student must have a unique registration number.");
+      showNotification("error", "Duplicate Data", "Duplicate registration numbers found. Each student must have a unique registration number.");
       return;
     }
     
     if (new Set(emails).size !== emails.length) {
-      setError("Duplicate email addresses found. Each student must have a unique email address.");
+      showNotification("error", "Duplicate Data", "Duplicate email addresses found. Each student must have a unique email address.");
       return;
     }
 
     if (new Set(names).size !== names.length) {
-      setError("Duplicate student names found. Please ensure all student names are unique.");
+      showNotification("error", "Duplicate Data", "Duplicate student names found. Please ensure all student names are unique.");
       return;
     }
 
@@ -460,14 +491,12 @@ const ProjectCreationPage = () => {
     }
 
     if (hasValidationErrors) {
-      setError("Please fix all validation errors before submitting.");
+      showNotification("error", "Validation Error", "Please fix all validation errors before submitting.");
       return;
     }
 
     try {
       setLoading(true);
-      setError("");
-      setSuccess("");
 
       console.log("Creating single project:", singleProject);
 
@@ -481,7 +510,7 @@ const ProjectCreationPage = () => {
           department: projectDepartment
         })),
         guideFacultyEmpId: singleProject.guideFacultyEmpId.trim().toUpperCase(),
-        specialization: normalizeSpecialization(projectSpecialization), // ✅ Normalize for backend
+        specialization: normalizeSpecialization(projectSpecialization), // Normalize for backend
         school: projectSchool,
         department: projectDepartment
       };
@@ -489,10 +518,10 @@ const ProjectCreationPage = () => {
       const response = await createProject(projectData);
 
       if (response.data?.success) {
-        setSuccess(`✅ Project "${singleProject.name}" created successfully for ${projectSchool} - ${projectDepartment}! (${validStudents.length} students enrolled)`);
+        showNotification("success", "Project Created", `Project "${singleProject.name}" created successfully for ${projectSchool} - ${projectDepartment}! (${validStudents.length} students enrolled)`);
         resetSingleForm();
       } else {
-        setError(response.data?.message || "Failed to create project");
+        showNotification("error", "Creation Failed", response.data?.message || "Failed to create project");
       }
     } catch (err) {
       console.error("Single project creation error:", err);
@@ -501,20 +530,20 @@ const ProjectCreationPage = () => {
       
       if (errorMessage.includes("E11000") || errorMessage.includes("duplicate key")) {
         const projectName = singleProject.name.trim();
-        setError(`❌ Duplicate Project: A project named "${projectName}" already exists. Please choose a different project name.`);
+        showNotification("error", "Duplicate Project", `A project named "${projectName}" already exists. Please choose a different project name.`);
       } else if (errorMessage.includes("dup key") && errorMessage.includes("name")) {
-        setError(`❌ Project Name Already Exists: "${singleProject.name}" is already taken. Please choose a unique project name.`);
+        showNotification("error", "Project Name Exists", `"${singleProject.name}" is already taken. Please choose a unique project name.`);
       } else if (err.response?.status === 409) {
-        setError(`❌ Duplicate Project: This project name already exists. Please choose a different name.`);
+        showNotification("error", "Duplicate Project", `This project name already exists. Please choose a different name.`);
       } else {
-        setError(err.response?.data?.message || "❌ Failed to create project. Please try again.");
+        showNotification("error", "Creation Failed", err.response?.data?.message || "Failed to create project. Please try again.");
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ FIXED: Dynamic template generation based on mode
+  // Dynamic template generation based on mode
   const downloadTemplate = () => {
     console.log('🔽 Template download requested');
     console.log('Mode:', isAllMode ? 'All Mode' : 'Context Mode');
@@ -524,7 +553,7 @@ const ProjectCreationPage = () => {
     let filename;
 
     if (isAllMode) {
-      // ✅ ALL MODE: Include all columns
+      // ALL MODE: Include all columns
       console.log('📊 Generating ALL MODE template with full columns');
       
       template = [
@@ -581,7 +610,7 @@ const ProjectCreationPage = () => {
       filename = "project_bulk_template_ALL_MODES.xlsx";
 
     } else if (hasContext) {
-      // ✅ CONTEXT MODE: Limited columns (school/dept pre-filled)
+      // CONTEXT MODE: Limited columns (school/dept pre-filled)
       console.log('📊 Generating CONTEXT MODE template for:', schoolFromContext, departmentFromContext);
       
       template = [
@@ -603,7 +632,7 @@ const ProjectCreationPage = () => {
 
       // Add example rows based on context
       const contextSpecialization = specializationFromContext && specializationFromContext.length > 0 
-        ? displaySpecialization(specializationFromContext[0]) // ✅ Display format for template
+        ? displaySpecialization(specializationFromContext[0]) // Display format for template
         : "AI/ML";
 
       template.push([
@@ -639,7 +668,7 @@ const ProjectCreationPage = () => {
       filename = `project_bulk_template_${schoolFromContext}_${departmentFromContext}.xlsx`;
 
     } else {
-      // ✅ FALLBACK: Generic template
+      // FALLBACK: Generic template
       console.log('📊 Generating FALLBACK template');
       
       template = [
@@ -680,7 +709,7 @@ const ProjectCreationPage = () => {
       filename = "project_bulk_template_generic.xlsx";
     }
 
-    // ✅ Generate and download Excel file
+    // Generate and download Excel file
     try {
       const ws = XLSX.utils.aoa_to_sheet(template);
       
@@ -717,19 +746,16 @@ const ProjectCreationPage = () => {
       XLSX.writeFile(wb, filename);
 
       console.log('✅ Template generated and downloaded:', filename);
-      setSuccess(`Template downloaded: ${filename}`);
-      setTimeout(() => setSuccess(''), 3000);
+      showNotification("success", "Template Downloaded", `Template downloaded: ${filename}`);
 
     } catch (error) {
       console.error('❌ Template generation failed:', error);
-      setError('Failed to generate template. Please try again.');
+      showNotification("error", "Template Error", 'Failed to generate template. Please try again.');
     }
   };
 
-  // ✅ FIXED: Enhanced file upload with strict validation
+  // Enhanced file upload with strict validation
   const handleFileUpload = (e) => {
-    setError("");
-    setSuccess("");
     setProjects([]);
     setBulkFieldErrors({});
     setBulkPreviewMode(false);
@@ -738,7 +764,7 @@ const ProjectCreationPage = () => {
     
     const file = e.target.files[0];
     
-    // ✅ File type validation
+    // File type validation
     const allowedTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-excel',
@@ -746,14 +772,14 @@ const ProjectCreationPage = () => {
     ];
     
     if (!allowedTypes.includes(file.type)) {
-      setError("❌ Invalid file type. Please upload an Excel file (.xlsx, .xls) or CSV file (.csv).");
+      showNotification("error", "Invalid File", "Invalid file type. Please upload an Excel file (.xlsx, .xls) or CSV file (.csv).");
       e.target.value = '';
       return;
     }
 
-    // ✅ File size validation (5MB limit)
+    // File size validation (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
-      setError("❌ File size too large. Please upload a file smaller than 5MB.");
+      showNotification("error", "File Too Large", "File size too large. Please upload a file smaller than 5MB.");
       e.target.value = '';
       return;
     }
@@ -784,11 +810,11 @@ const ProjectCreationPage = () => {
         console.log('📊 First few rows:', rows.slice(0, 3));
         
         if (rows.length < 2) {
-          setError("❌ File is empty or missing data rows. Please ensure you have at least one project row after the header.");
+          showNotification("error", "Empty File", "File is empty or missing data rows. Please ensure you have at least one project row after the header.");
           return;
         }
 
-        // ✅ FIXED: Enhanced parsing with proper column detection
+        // Enhanced parsing with proper column detection
         const headerRow = rows[0];
         console.log('📋 Header row:', headerRow);
 
@@ -831,7 +857,7 @@ const ProjectCreationPage = () => {
         );
 
         if (missingColumns.length > 0) {
-          setError(`❌ Invalid file format. Missing columns: ${missingColumns.join(', ')}. Please download and use the correct template.`);
+          showNotification("error", "Invalid Format", `Invalid file format. Missing columns: ${missingColumns.join(', ')}. Please download and use the correct template.`);
           return;
         }
 
@@ -843,7 +869,7 @@ const ProjectCreationPage = () => {
         console.log('📊 Data rows found:', dataRows.length);
 
         if (dataRows.length === 0) {
-          setError("❌ No data rows found. Please add project data to your file.");
+          showNotification("error", "No Data", "No data rows found. Please add project data to your file.");
           return;
         }
 
@@ -897,25 +923,25 @@ const ProjectCreationPage = () => {
         setBulkFieldErrors({});
         
         if (parsedProjects.length === 0) {
-          setError("❌ No valid projects found in the file. Please check the data format.");
+          showNotification("error", "No Valid Projects", "No valid projects found in the file. Please check the data format.");
         } else {
-          setSuccess(`✅ Successfully loaded ${parsedProjects.length} projects for preview. Review the data below before uploading.`);
+          showNotification("success", "File Processed", `Successfully loaded ${parsedProjects.length} projects for preview. Review the data below before uploading.`);
         }
 
       } catch (err) {
         console.error("❌ File parsing error:", err);
-        setError(`❌ Failed to parse the Excel file: ${err.message}. Please check the file format and try again.`);
+        showNotification("error", "File Error", `Failed to parse the Excel file: ${err.message}. Please check the file format and try again.`);
       }
     };
     
     reader.onerror = () => {
-      setError("❌ Error reading file. Please try again.");
+      showNotification("error", "File Read Error", 'Error reading file. Please try again.');
     };
 
     reader.readAsArrayBuffer(file);
   };
 
-  // ✅ FIXED: Enhanced validation for bulk projects
+  // Enhanced validation for bulk projects
   const validateBulkProjects = (projectsToValidate) => {
     let errorMap = {};
     let anyError = false;
@@ -1008,7 +1034,7 @@ const ProjectCreationPage = () => {
       }
     });
 
-    // ✅ Cross-project validation
+    // Cross-project validation
     // Check for duplicate project names
     const projectNameGroups = {};
     allProjectNames.forEach(({ name, idx }) => {
@@ -1065,89 +1091,82 @@ const ProjectCreationPage = () => {
   };
 
   const handleBulkSubmit = async () => {
-  setError("");
-  setSuccess("");
-  setBulkFieldErrors({});
-
-  if (projects.length === 0) {
-    setError("❌ No projects to upload. Please upload a file first.");
-    return;
-  }
-
-  console.log('🚀 Starting bulk validation for', projects.length, 'projects');
-  const valid = validateBulkProjects(projects);
-  
-  if (!valid) {
-    setError("❌ Please fix all validation errors before uploading.");
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    // Assuming school, department, and guideFacultyEmpId are consistent across all projects,
-    // extract from first project or from context if available
-    const school = projects[0].school.trim();
-    const department = projects[0].department.trim();
-
-    // Here you may want to decide how to handle guideFacultyEmpId if projects have different values.
-    // Assuming you want to use guideFacultyEmpId from the first project for backend validation
-    const guideFacultyEmpId = projects[0].guideFacultyEmpId.trim().toUpperCase();
-
-    // Prepare projects array without school, department, guideFacultyEmpId fields since they are root-level now
-    // But keep specialization and students as is, trimming strings
-    const cleanedProjects = projects.map(proj => ({
-      name: proj.name.trim(),
-      specialization: normalizeSpecialization(proj.specialization), // normalized for backend
-      students: proj.students.map(student => ({
-        name: student.name.trim(),
-        regNo: student.regNo.trim().toUpperCase(),
-        emailId: student.emailId.trim().toLowerCase(),
-        school,         // student school same as root school
-        department      // student department same as root department
-      }))
-    }));
-
-    const payload = {
-      school,
-      department,
-      guideFacultyEmpId,
-      projects: cleanedProjects
-    };
-
-    console.log("📤 Submitting bulk projects payload:", payload);
-
-    const response = await createProjectsBulk(payload);
-
-    if (response.data?.success) {
-      setSuccess(`✅ Successfully uploaded ${projects.length} projects! All projects have been created and students enrolled.`);
-      setProjects([]);
-      setBulkPreviewMode(false);
-      setFileName("");
-      // Reset file input
-      const fileInput = document.getElementById('bulkfileinput');
-      if (fileInput) fileInput.value = '';
-    } else {
-      setError(response.data?.message || "❌ Failed to upload bulk projects.");
+    if (projects.length === 0) {
+      showNotification("error", "No Projects", "No projects to upload. Please upload a file first.");
+      return;
     }
 
-  } catch (err) {
-    console.error("❌ Bulk upload error:", err);
-    const errMsg = err.response?.data?.message || err.message || "Unknown error occurred during bulk upload.";
-    setError("❌ Bulk upload failed: " + errMsg);
-  } finally {
-    setLoading(false);
-  }
-};
+    console.log('🚀 Starting bulk validation for', projects.length, 'projects');
+    const valid = validateBulkProjects(projects);
+    
+    if (!valid) {
+      showNotification("error", "Validation Error", "Please fix all validation errors before uploading.");
+      return;
+    }
 
+    try {
+      setLoading(true);
+
+      // Assuming school, department, and guideFacultyEmpId are consistent across all projects,
+      // extract from first project or from context if available
+      const school = projects[0].school.trim();
+      const department = projects[0].department.trim();
+
+      // Here you may want to decide how to handle guideFacultyEmpId if projects have different values.
+      // Assuming you want to use guideFacultyEmpId from the first project for backend validation
+      const guideFacultyEmpId = projects[0].guideFacultyEmpId.trim().toUpperCase();
+
+      // Prepare projects array without school, department, guideFacultyEmpId fields since they are root-level now
+      // But keep specialization and students as is, trimming strings
+      const cleanedProjects = projects.map(proj => ({
+        name: proj.name.trim(),
+        specialization: normalizeSpecialization(proj.specialization), // normalized for backend
+        students: proj.students.map(student => ({
+          name: student.name.trim(),
+          regNo: student.regNo.trim().toUpperCase(),
+          emailId: student.emailId.trim().toLowerCase(),
+          school,         // student school same as root school
+          department      // student department same as root department
+        }))
+      }));
+
+      const payload = {
+        school,
+        department,
+        guideFacultyEmpId,
+        projects: cleanedProjects
+      };
+
+      console.log("📤 Submitting bulk projects payload:", payload);
+
+      const response = await createProjectsBulk(payload);
+
+      if (response.data?.success) {
+        showNotification("success", "Bulk Upload Complete", `Successfully uploaded ${projects.length} projects! All projects have been created and students enrolled.`);
+        setProjects([]);
+        setBulkPreviewMode(false);
+        setFileName("");
+        // Reset file input
+        const fileInput = document.getElementById('bulkfileinput');
+        if (fileInput) fileInput.value = '';
+      } else {
+        showNotification("error", "Upload Failed", response.data?.message || "Failed to upload bulk projects.");
+      }
+
+    } catch (err) {
+      console.error("❌ Bulk upload error:", err);
+      const errMsg = err.response?.data?.message || err.message || "Unknown error occurred during bulk upload.";
+      showNotification("error", "Bulk Upload Failed", "Bulk upload failed: " + errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const clearBulkData = () => {
     setProjects([]);
     setBulkPreviewMode(false);
     setFileName("");
     setBulkFieldErrors({});
-    setError("");
-    setSuccess("");
     // Reset file input
     const fileInput = document.getElementById('bulkfileinput');
     if (fileInput) fileInput.value = '';
@@ -1157,11 +1176,17 @@ const ProjectCreationPage = () => {
   if (contextLoading) {
     return (
       <>
-        <Navbar userType="admin" />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
-            <div className="text-xl text-gray-600">Loading admin context...</div>
+        <Navbar />
+        <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+          <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md mx-auto text-center">
+            <div className="relative mb-8">
+              <div className="animate-spin rounded-full h-20 w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Settings className="h-8 w-8 text-blue-600 animate-pulse" />
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800 mb-3">Loading Admin Context</h3>
+            <p className="text-slate-600">Loading admin context...</p>
           </div>
         </div>
       </>
@@ -1172,15 +1197,15 @@ const ProjectCreationPage = () => {
   if (!isAllMode && (!schoolFromContext || !departmentFromContext)) {
     return (
       <>
-        <Navbar userType="admin" />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="max-w-md mx-auto text-center p-8 bg-white rounded-xl shadow-lg">
+        <Navbar />
+        <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+          <div className="max-w-md mx-auto text-center p-8 bg-white rounded-2xl shadow-2xl">
             <div className="mb-6">
               <Building2 className="h-16 w-16 mx-auto text-blue-600 mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">
                 Admin Context Required
               </h2>
-              <p className="text-gray-600 mb-6">
+              <p className="text-slate-600 mb-6">
                 {contextError || "Please select your school and department to access project creation"}
               </p>
             </div>
@@ -1188,7 +1213,7 @@ const ProjectCreationPage = () => {
             <div className="space-y-4">
               <button
                 onClick={handleSelectContext}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
               >
                 <Building2 className="h-5 w-5" />
                 Select School & Department
@@ -1196,7 +1221,7 @@ const ProjectCreationPage = () => {
               
               <button
                 onClick={() => navigate("/admin")}
-                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-3 rounded-lg font-medium transition-colors"
+                className="w-full bg-slate-500 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-medium transition-all"
               >
                 Back to Admin Dashboard
               </button>
@@ -1210,16 +1235,21 @@ const ProjectCreationPage = () => {
   if (loading) {
     return (
       <>
-        <Navbar userType="admin" />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
-            <div className="text-xl text-gray-600">
-              {activeTab === 'single' ? 'Creating project...' : 'Creating projects...'}
+        <Navbar />
+        <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+          <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md mx-auto text-center">
+            <div className="relative mb-8">
+              <div className="animate-spin rounded-full h-20 w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Database className="h-8 w-8 text-blue-600 animate-pulse" />
+              </div>
             </div>
-            <div className="text-sm text-gray-500">
+            <h3 className="text-2xl font-bold text-slate-800 mb-3">
+              {activeTab === 'single' ? 'Creating Project' : 'Creating Projects'}
+            </h3>
+            <p className="text-slate-600">
               {activeTab === 'single' ? 'Processing 1 project...' : `Processing ${projects.length} projects...`}
-            </div>
+            </p>
           </div>
         </div>
       </>
@@ -1228,165 +1258,123 @@ const ProjectCreationPage = () => {
 
   return (
     <>
-      <Navbar userType="admin" />
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="container mx-auto px-4 pt-24 pb-8 max-w-6xl">
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Project Creation</h1>
-                <p className="text-gray-600">Create and manage student projects</p>
+      <Navbar />
+      <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
+        
+        {/* Page Header */}
+        <div className="mb-8 bg-white rounded-2xl shadow-lg mx-8 overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="bg-white/20 p-3 rounded-xl">
+                  <Database className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-white">Project Creation</h1>
+                  <p className="text-indigo-100 mt-1">Create and manage student projects</p>
+                </div>
               </div>
               
-              {/* Admin Context Display */}
-              <div className="mt-4 md:mt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                {/* Display which context is currently active */}
-                {isAllMode ? (
-                  <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Users className="h-4 w-4 text-amber-600" />
-                      <span className="text-sm font-medium text-amber-900">All Schools & Departments</span>
-                    </div>
-                    <div className="text-sm text-amber-700">Managing all schools & departments</div>
-                  </div>
-                ) : (
-                  <div className="px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Building2 className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm font-medium text-blue-900">Current Context</span>
-                    </div>
-                    <div className="text-sm text-blue-700">
-                      <strong>{schoolFromContext}</strong> • <strong>{departmentFromContext}</strong>
-                      {specializationFromContext && specializationFromContext.length > 0 && (
-                        <> • <strong>{specializationFromContext.map(spec => displaySpecialization(spec)).join(', ')}</strong></>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="text-white/90 text-sm">Current Context</div>
+                    <div className="text-white font-semibold">
+                      {isAllMode ? 'All Schools & Departments' : `${schoolFromContext} - ${departmentFromContext}`}
+                      {!isAllMode && specializationFromContext && specializationFromContext.length > 0 && (
+                        <div className="text-white/80 text-xs mt-1">
+                          {specializationFromContext.map(spec => displaySpecialization(spec)).join(', ')}
+                        </div>
                       )}
                     </div>
                   </div>
-                )}
-
-                {/* Change Context Button: Always visible */}
-                <button
-                  onClick={handleSelectContext}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                >
-                  <Building2 className="h-4 w-4" />
-                  Change Context
-                </button>
-              </div>
-            </div>
-
-            {/* Tab Navigation */}
-            <div className="mb-8">
-              <div className="flex bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setActiveTab('single')}
-                  className={`flex-1 px-4 py-3 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-2 ${
-                    activeTab === 'single'
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  <Plus size={16} />
-                  Single Project
-                </button>
-                <button
-                  onClick={() => setActiveTab('bulk')}
-                  className={`flex-1 px-4 py-3 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-2 ${
-                    activeTab === 'bulk'
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  <Upload size={16} />
-                  Bulk Upload
-                </button>
-              </div>
-            </div>
-
-            {/* Success/Error Messages */}
-            {success && (
-              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-green-800">{success}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <AlertCircle className="h-5 w-5 text-red-400" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-red-800 whitespace-pre-line">{error}</p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setError('')}
-                    className="ml-4 text-red-400 hover:text-red-600"
+                  <button
+                    onClick={handleSelectContext}
+                    className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-all duration-200 font-medium"
                   >
-                    <X className="h-5 w-5" />
+                    Change Context
                   </button>
                 </div>
               </div>
-            )}
+            </div>
+          </div>
+        </div>
 
-            {/* Tab Content */}
+        {/* Tab Navigation */}
+        <div className="mx-8 mb-8">
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
+                <Settings className="h-5 w-5 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800">Project Creation Mode</h2>
+            </div>
+            
+            <div className="inline-flex bg-slate-100 rounded-xl p-1.5 shadow-inner">
+              <button
+                onClick={() => setActiveTab('single')}
+                className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 ${
+                  activeTab === 'single'
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transform scale-105"
+                    : "text-slate-600 hover:text-slate-800 hover:bg-slate-200"
+                }`}
+              >
+                <Plus size={16} />
+                <span>Single Project</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('bulk')}
+                className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 ${
+                  activeTab === 'bulk'
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transform scale-105"
+                    : "text-slate-600 hover:text-slate-800 hover:bg-slate-200"
+                }`}
+              >
+                <Upload size={16} />
+                <span>Bulk Upload</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="mx-8 mb-8">
+          <div className="bg-white rounded-2xl shadow-lg">
             {activeTab === 'single' ? (
               // Single Project Form
-              <div className="bg-gray-50 rounded-xl p-8">
-                <div className="text-center mb-8">
-                  <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                    <Plus className="h-8 w-8 text-blue-600" />
+              <div className="p-8">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
+                    <Plus className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Create Single Project</h3>
-                  <p className="text-gray-600">Add one project with its team members</p>
-                  {!isAllMode && hasContext && specializationFromContext && specializationFromContext.length > 0 && (
-                    <p className="text-sm text-blue-600 mt-2">
-                      Using specialization: <strong>{specializationFromContext.map(spec => displaySpecialization(spec)).join(', ')}</strong>
-                    </p>
-                  )}
+                  <h2 className="text-2xl font-bold text-slate-800">Create Single Project</h2>
                 </div>
 
-                {/* ✅ SUBMIT BUTTON MOVED TO TOP */}
-                <div className="max-w-2xl mx-auto mb-8">
-                  <button
-                    onClick={handleSingleSubmit}
-                    disabled={loading}
-                    className="w-full flex justify-center items-center bg-blue-600 hover:bg-blue-700 text-white py-4 px-6 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-                  >
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Creating Project...
-                      </>
-                    ) : (
-                      <>
-                        <Save size={20} className="mr-2" />
-                        Create Project
-                      </>
-                    )}
-                  </button>
-                </div>
+                <div className="max-w-3xl mx-auto space-y-6">
+                  {/* Submit Button at Top */}
+                  <div className="mb-8">
+                    <button
+                      onClick={handleSingleSubmit}
+                      disabled={loading}
+                      className="w-full flex justify-center items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                          Creating Project...
+                        </>
+                      ) : (
+                        <>
+                          <Save size={20} className="mr-2" />
+                          Create Project
+                        </>
+                      )}
+                    </button>
+                  </div>
 
-                <div className="max-w-2xl mx-auto space-y-6">
                   {/* Project Name */}
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="name" className="block text-sm font-semibold text-slate-700 mb-3">
                       Project Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -1394,15 +1382,15 @@ const ProjectCreationPage = () => {
                       name="name"
                       type="text"
                       placeholder="AI Chatbot System"
-                      className={`block w-full px-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        fieldErrors.name ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                      className={`block w-full px-4 py-4 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-slate-700 placeholder-slate-400 ${
+                        fieldErrors.name ? 'border-red-500 bg-red-50' : 'border-slate-200'
                       }`}
                       value={singleProject.name}
                       onChange={handleSingleProjectChange}
                       required
                     />
                     {fieldErrors.name && (
-                      <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                      <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
                         <AlertCircle className="h-4 w-4" />
                         {fieldErrors.name}
                       </p>
@@ -1412,7 +1400,7 @@ const ProjectCreationPage = () => {
                   {/* School Selection (Only in All Mode) */}
                   {isAllMode && (
                     <div>
-                      <label htmlFor="school" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="school" className="block text-sm font-semibold text-slate-700 mb-3">
                         School <span className="text-red-500">*</span>
                       </label>
                       <select
@@ -1420,7 +1408,7 @@ const ProjectCreationPage = () => {
                         name="school"
                         value={singleProject.school}
                         onChange={handleSingleProjectChange}
-                        className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="block w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-slate-700"
                         required
                       >
                         <option value="">Select School</option>
@@ -1434,7 +1422,7 @@ const ProjectCreationPage = () => {
                   {/* Department Selection (Only in All Mode) */}
                   {isAllMode && (
                     <div>
-                      <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="department" className="block text-sm font-semibold text-slate-700 mb-3">
                         Department <span className="text-red-500">*</span>
                       </label>
                       <select
@@ -1442,7 +1430,7 @@ const ProjectCreationPage = () => {
                         name="department"
                         value={singleProject.department}
                         onChange={handleSingleProjectChange}
-                        className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        className="block w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-slate-700"
                         required
                       >
                         <option value="">Select Department</option>
@@ -1455,7 +1443,7 @@ const ProjectCreationPage = () => {
 
                   {/* Guide Faculty Employee ID */}
                   <div>
-                    <label htmlFor="guideFacultyEmpId" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="guideFacultyEmpId" className="block text-sm font-semibold text-slate-700 mb-3">
                       Guide Faculty Employee ID <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -1463,30 +1451,30 @@ const ProjectCreationPage = () => {
                       name="guideFacultyEmpId"
                       type="text"
                       placeholder="FAC101"
-                      className={`block w-full px-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                        fieldErrors.guideFacultyEmpId ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                      className={`block w-full px-4 py-4 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-slate-700 placeholder-slate-400 ${
+                        fieldErrors.guideFacultyEmpId ? 'border-red-500 bg-red-50' : 'border-slate-200'
                       }`}
                       value={singleProject.guideFacultyEmpId}
                       onChange={handleSingleProjectChange}
                       required
                     />
                     {fieldErrors.guideFacultyEmpId && (
-                      <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                      <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
                         <AlertCircle className="h-4 w-4" />
                         {fieldErrors.guideFacultyEmpId}
                       </p>
                     )}
                   </div>
 
-                  {/* ✅ FIXED: Specialization Selection with proper display */}
+                  {/* Specialization Selection */}
                   <div>
-                    <label htmlFor="specialization" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="specialization" className="block text-sm font-semibold text-slate-700 mb-3">
                       Specialization <span className="text-red-500">*</span>
                     </label>
                     {!isAllMode && specializationFromContext && specializationFromContext.length > 0 ? (
                       // Show context value if available (Context Mode)
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <span className="text-blue-800 font-medium">
+                      <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
+                        <span className="text-blue-800 font-semibold">
                           {specializationFromContext.map(spec => displaySpecialization(spec)).join(', ')}
                         </span>
                         <p className="text-xs text-blue-600 mt-1">From admin context</p>
@@ -1499,8 +1487,8 @@ const ProjectCreationPage = () => {
                           name="specialization"
                           value={singleProject.specialization}
                           onChange={handleSingleProjectChange}
-                          className={`block w-full px-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                            fieldErrors.specialization ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                          className={`block w-full px-4 py-4 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-slate-700 ${
+                            fieldErrors.specialization ? 'border-red-500 bg-red-50' : 'border-slate-200'
                           }`}
                           required
                         >
@@ -1510,7 +1498,7 @@ const ProjectCreationPage = () => {
                           ))}
                         </select>
                         {fieldErrors.specialization && (
-                          <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                          <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
                             <AlertCircle className="h-4 w-4" />
                             {fieldErrors.specialization}
                           </p>
@@ -1522,9 +1510,9 @@ const ProjectCreationPage = () => {
                   {/* Students Section */}
                   <div>
                     <div className="flex items-center justify-between mb-4">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-semibold text-slate-700">
                         Team Members <span className="text-red-500">*</span>
-                        <span className="text-xs text-gray-500 ml-2">
+                        <span className="text-xs text-slate-500 ml-2">
                           ({singleProject.students.length}/3 students)
                         </span>
                       </label>
@@ -1532,10 +1520,10 @@ const ProjectCreationPage = () => {
                         type="button"
                         onClick={addStudent}
                         disabled={singleProject.students.length >= 3}
-                        className={`flex items-center px-3 py-2 rounded-lg transition-colors text-sm ${
+                        className={`flex items-center px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
                           singleProject.students.length >= 3
-                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                            : "bg-green-600 text-white hover:bg-green-700"
+                            ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                            : "bg-emerald-600 text-white hover:bg-emerald-700"
                         }`}
                       >
                         <Plus size={16} className="mr-1" />
@@ -1545,14 +1533,14 @@ const ProjectCreationPage = () => {
 
                     <div className="space-y-4">
                       {singleProject.students.map((student, index) => (
-                        <div key={index} className="p-4 bg-white rounded-lg border border-gray-200">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium text-gray-800">Student {index + 1}</h4>
+                        <div key={index} className="p-6 bg-slate-50 rounded-xl border border-slate-200">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-semibold text-slate-800 text-lg">Student {index + 1}</h4>
                             {singleProject.students.length > 1 && (
                               <button
                                 type="button"
                                 onClick={() => removeStudent(index)}
-                                className="text-red-600 hover:text-red-800 text-sm"
+                                className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
                               >
                                 Remove
                               </button>
@@ -1561,7 +1549,7 @@ const ProjectCreationPage = () => {
                           
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                              <label className="block text-xs font-semibold text-slate-600 mb-2">
                                 Student Name <span className="text-red-500">*</span>
                               </label>
                               <input
@@ -1569,8 +1557,8 @@ const ProjectCreationPage = () => {
                                 value={student.name}
                                 onChange={(e) => handleStudentChange(index, 'name', e.target.value)}
                                 placeholder="John Doe"
-                                className={`w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
-                                  fieldErrors[`student_${index}_name`] ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                className={`w-full p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all ${
+                                  fieldErrors[`student_${index}_name`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
                                 }`}
                               />
                               {fieldErrors[`student_${index}_name`] && (
@@ -1582,7 +1570,7 @@ const ProjectCreationPage = () => {
                             </div>
                             
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                              <label className="block text-xs font-semibold text-slate-600 mb-2">
                                 Registration No. <span className="text-red-500">*</span>
                               </label>
                               <input
@@ -1590,8 +1578,8 @@ const ProjectCreationPage = () => {
                                 value={student.regNo}
                                 onChange={(e) => handleStudentChange(index, 'regNo', e.target.value)}
                                 placeholder="21BCE1001"
-                                className={`w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
-                                  fieldErrors[`student_${index}_regNo`] ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                className={`w-full p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all ${
+                                  fieldErrors[`student_${index}_regNo`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
                                 }`}
                               />
                               {fieldErrors[`student_${index}_regNo`] && (
@@ -1603,7 +1591,7 @@ const ProjectCreationPage = () => {
                             </div>
                             
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                              <label className="block text-xs font-semibold text-slate-600 mb-2">
                                 Email ID <span className="text-red-500">*</span>
                               </label>
                               <input
@@ -1611,8 +1599,8 @@ const ProjectCreationPage = () => {
                                 value={student.emailId}
                                 onChange={(e) => handleStudentChange(index, 'emailId', e.target.value)}
                                 placeholder="john.doe@vitstudent.ac.in"
-                                className={`w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
-                                  fieldErrors[`student_${index}_emailId`] ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                className={`w-full p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all ${
+                                  fieldErrors[`student_${index}_emailId`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
                                 }`}
                               />
                               {fieldErrors[`student_${index}_emailId`] && (
@@ -1628,19 +1616,16 @@ const ProjectCreationPage = () => {
                     </div>
                   </div>
 
-                  {/* ✅ DUPLICATE SUBMIT BUTTON AT BOTTOM FOR CONVENIENCE */}
-                  <div className="pt-4">
+                  {/* Submit Button at Bottom */}
+                  <div className="pt-6">
                     <button
                       onClick={handleSingleSubmit}
                       disabled={loading}
-                      className="w-full flex justify-center items-center bg-blue-600 hover:bg-blue-700 text-white py-4 px-6 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full flex justify-center items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading ? (
                         <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
                           Creating Project...
                         </>
                       ) : (
@@ -1655,24 +1640,21 @@ const ProjectCreationPage = () => {
               </div>
             ) : (
               // Bulk Upload Form
-              <div className="bg-gray-50 rounded-xl p-8">
-                <div className="text-center mb-8">
-                  <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                    <Upload className="h-8 w-8 text-blue-600" />
+              <div className="p-8">
+                <div className="flex items-center space-x-3 mb-8">
+                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
+                    <Upload className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Bulk Upload Projects</h3>
-                  <p className="text-gray-600">
-                    Upload multiple projects at once using an Excel file (max 3 students per team)
-                  </p>
+                  <h2 className="text-2xl font-bold text-slate-800">Bulk Upload Projects</h2>
                 </div>
 
-                {/* Download Template & Upload Section - MOVED TO TOP */}
+                {/* Download Template & Upload Section */}
                 <div className="max-w-4xl mx-auto mb-6">
                   <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
                     <button
                       type="button"
                       onClick={downloadTemplate}
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-md hover:shadow-lg"
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
                     >
                       <Download size={18} />
                       Download Template
@@ -1687,7 +1669,7 @@ const ProjectCreationPage = () => {
                     />
                     <label 
                       htmlFor="bulkfileinput" 
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors cursor-pointer shadow-md hover:shadow-lg"
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all duration-200 cursor-pointer shadow-lg hover:shadow-xl"
                     >
                       <Upload size={18} />
                       {fileName ? `Uploaded: ${fileName}` : "Upload Excel File"}
@@ -1697,7 +1679,7 @@ const ProjectCreationPage = () => {
                       <button
                         type="button"
                         onClick={clearBulkData}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-500 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all duration-200"
                       >
                         <X size={18} />
                         Clear
@@ -1705,24 +1687,21 @@ const ProjectCreationPage = () => {
                     )}
                   </div>
 
-                  {/* ✅ MOVED UPLOAD BUTTON TO TOP */}
+                  {/* Upload Button */}
                   {bulkPreviewMode && projects.length > 0 && (
                     <div className="flex justify-center mb-6">
                       <button
                         onClick={handleBulkSubmit}
                         disabled={loading || Object.keys(bulkFieldErrors).length > 0}
-                        className={`flex items-center gap-2 px-8 py-4 rounded-lg font-medium transition-colors ${
+                        className={`flex items-center gap-2 px-8 py-4 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl ${
                           loading || Object.keys(bulkFieldErrors).length > 0
-                            ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-                            : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl"
+                            ? "bg-slate-400 text-slate-600 cursor-not-allowed"
+                            : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
                         }`}
                       >
                         {loading ? (
                           <>
-                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                             Uploading Projects...
                           </>
                         ) : (
@@ -1737,73 +1716,79 @@ const ProjectCreationPage = () => {
                 </div>
 
                 {/* Bulk Preview Table */}
-                {bulkPreviewMode && projects.length > 0 && (
-                  <div className="max-w-4xl mx-auto mb-6">
+                {bulkPreviewMode && projects.length > 0 ? (
+                  <div className="max-w-6xl mx-auto mb-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-lg font-semibold text-gray-900">
+                      <h4 className="text-xl font-bold text-slate-800">
                         Preview ({projects.length} Projects)
                       </h4>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-slate-600">
                         {Object.keys(bulkFieldErrors).length > 0 && (
-                          <span className="text-red-600 font-medium">
+                          <span className="text-red-600 font-semibold">
                             {Object.keys(bulkFieldErrors).length} error(s) found
                           </span>
                         )}
                       </div>
                     </div>
                     
-                    <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg">
-                      <table className="min-w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Row</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Faculty ID</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">School/Dept</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Specialization</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {projects.map((proj, idx) => (
-                            <tr key={idx} className={bulkFieldErrors[idx] ? 'bg-red-50' : ''}>
-                              <td className="px-4 py-3 text-sm text-gray-900">{proj.idx}</td>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{proj.name}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{proj.guideFacultyEmpId}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{proj.school}/{proj.department}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{proj.specialization}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
-                                <div className="space-y-1">
-                                  {proj.students.map((s, sidx) => (
-                                    <div key={sidx} className="text-xs">
-                                      <strong>{s.name}</strong> ({s.regNo})
-                                    </div>
-                                  ))}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                {bulkFieldErrors[idx] ? (
-                                  <div className="text-red-600 text-xs">
-                                    <AlertCircle className="inline h-4 w-4 mr-1" />
-                                    {bulkFieldErrors[idx]}
-                                  </div>
-                                ) : (
-                                  <span className="text-green-600 text-xs">✓ Valid</span>
-                                )}
-                              </td>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gradient-to-r from-slate-100 to-blue-100">
+                            <tr>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Row</th>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Project Name</th>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Faculty ID</th>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">School/Dept</th>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Specialization</th>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Students</th>
+                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {projects.map((proj, idx) => (
+                              <tr key={idx} className={`${bulkFieldErrors[idx] ? 'bg-red-50' : ''} hover:bg-slate-50 transition-colors`}>
+                                <td className="px-4 py-4 text-sm text-slate-900">{proj.idx}</td>
+                                <td className="px-4 py-4 text-sm font-semibold text-slate-900">{proj.name}</td>
+                                <td className="px-4 py-4 text-sm text-slate-900 font-mono">{proj.guideFacultyEmpId}</td>
+                                <td className="px-4 py-4 text-sm text-slate-900">{proj.school}/{proj.department}</td>
+                                <td className="px-4 py-4 text-sm text-slate-900">{proj.specialization}</td>
+                                <td className="px-4 py-4 text-sm text-slate-900">
+                                  <div className="space-y-1">
+                                    {proj.students.map((s, sidx) => (
+                                      <div key={sidx} className="text-xs">
+                                        <strong>{s.name}</strong> ({s.regNo})
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 text-sm">
+                                  {bulkFieldErrors[idx] ? (
+                                    <div className="text-red-600 text-xs">
+                                      <AlertCircle className="inline h-4 w-4 mr-1" />
+                                      {bulkFieldErrors[idx]}
+                                    </div>
+                                  ) : (
+                                    <span className="text-emerald-600 text-xs flex items-center">
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Valid
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
-                )}
-
-                {/* Instructions */}
-                {!bulkPreviewMode && (
-                  <div className="max-w-4xl mx-auto mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-                    <h4 className="text-lg font-semibold text-blue-900 mb-3">📋 Instructions:</h4>
+                ) : (
+                  // Instructions when no preview
+                  <div className="max-w-4xl mx-auto mt-8 bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
+                    <h4 className="text-lg font-bold text-blue-900 mb-3 flex items-center">
+                      <FileSpreadsheet className="h-5 w-5 mr-2" />
+                      Instructions:
+                    </h4>
                     <ul className="text-sm text-blue-800 space-y-2">
                       <li>• Download the Excel template and fill in your project data</li>
                       <li>• Each row represents one project (max 3 students per project)</li>
@@ -1826,6 +1811,59 @@ const ProjectCreationPage = () => {
             )}
           </div>
         </div>
+
+        {/* Enhanced Notification */}
+        {notification.isVisible && (
+          <div className="fixed top-24 right-8 z-50 max-w-md w-full">
+            <div className={`transform transition-all duration-500 ease-out ${
+              notification.isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+            }`}>
+              <div className={`rounded-xl shadow-2xl border-l-4 p-6 ${
+                notification.type === "success" 
+                  ? "bg-emerald-50 border-emerald-400" 
+                  : "bg-red-50 border-red-400"
+              }`}>
+                <div className="flex items-start">
+                  <div className={`flex-shrink-0 ${
+                    notification.type === "success" ? "text-emerald-500" : "text-red-500"
+                  }`}>
+                    {notification.type === "success" ? (
+                      <div className="relative">
+                        <div className="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-emerald-400 opacity-75"></div>
+                        <CheckCircle className="relative inline-flex h-6 w-6" />
+                      </div>
+                    ) : (
+                      <XCircle className="h-6 w-6" />
+                    )}
+                  </div>
+                  <div className="ml-4 flex-1">
+                    <h3 className={`text-sm font-bold ${
+                      notification.type === "success" ? "text-emerald-800" : "text-red-800"
+                    }`}>
+                      {notification.title}
+                    </h3>
+                    <p className={`mt-1 text-sm ${
+                      notification.type === "success" ? "text-emerald-700" : "text-red-700"
+                    }`}>
+                      {notification.message}
+                    </p>
+                  </div>
+                  <button
+                    onClick={hideNotification}
+                    className={`flex-shrink-0 ml-3 ${
+                      notification.type === "success" 
+                        ? "text-emerald-400 hover:text-emerald-600" 
+                        : "text-red-400 hover:text-red-600"
+                    } transition-colors`}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
       </div>
     </>
   );
