@@ -138,8 +138,8 @@ function Profile1({ userType = "auto" }) {
     if (!userData) {
         return (
             <div className="relative">
-                <div className="flex items-center p-1 sm:p-2 rounded-md">
-                    <div className="mr-1 sm:mr-2 text-white font-semibold text-sm sm:text-base">Loading...</div>
+                <div className="flex items-center p-2 rounded-md">
+                    <div className="mr-2 text-white font-semibold">Loading...</div>
                 </div>
             </div>
         );
@@ -147,41 +147,41 @@ function Profile1({ userType = "auto" }) {
     
     return (
         <div className="relative" ref={dropdownRef}>
-            <div className="flex items-center cursor-pointer p-1 sm:p-2 rounded-md hover:bg-white hover:bg-opacity-10 transition-colors"
+            <div className="flex items-center cursor-pointer p-2 rounded-md hover:bg-white hover:bg-opacity-10 transition-colors"
                 onClick={toggleDropdown}>
-                <div className="mr-1 sm:mr-2 text-white font-semibold text-sm sm:text-base">{userData.name}</div>
-                <div className="text-xs sm:text-sm text-white font-semibold">
+                <div className="mr-2 text-white font-semibold">{userData.name}</div>
+                <div className="text-sm text-white font-semibold">
                     ({userData.role ? userData.role.charAt(0).toUpperCase() + userData.role.slice(1) : 'User'})
                 </div>
-                <div className="ml-1 sm:ml-2">
-                    {isOpen ? <ChevronUp size={16} color="white" /> : <ChevronDown size={16} color="white" />}
+                <div className="ml-2">
+                    {isOpen ? <ChevronUp size={20} color="white" /> : <ChevronDown size={20} color="white" />}
                 </div>
             </div>
             
             {isOpen && (
-                <div className="absolute right-0 mt-1 sm:mt-2 w-40 sm:w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                    <div className="p-2 sm:p-4 border-b border-gray-200 flex justify-evenly items-center">
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                    <div className="p-4 border-b border-gray-200 flex justify-evenly">
                         <div>
                             <img 
                                 src={userData.imageUrl || "/api/placeholder/50/50"} 
                                 alt="profile pic" 
-                                className="h-10 w-10 sm:h-14 w-14 bg-white rounded-full border-black border-2" 
+                                className="h-14 w-14 bg-white rounded-full border-black border-2" 
                             />
                         </div>
-                        <div className="text-center sm:text-left">
-                            <div className="font-medium text-sm sm:text-base">{userData.name}</div>
-                            <div className="text-xs sm:text-sm text-gray-500">{userData.employeeId}</div>
+                        <div>
+                            <div className="font-medium">{userData.name}</div>
+                            <div className="text-sm text-gray-500">{userData.employeeId}</div>
                         </div>
                     </div>
                     
                     {error && (
-                        <div className="p-1 sm:p-2 bg-red-100 text-red-600 text-xs sm:text-sm">
+                        <div className="p-2 bg-red-100 text-red-600 text-sm">
                             {error}
                         </div>
                     )}
                     
                     <div 
-                        className={`p-1 sm:p-2 flex items-center cursor-pointer ${
+                        className={`p-2 flex items-center cursor-pointer ${
                             isLoading 
                                 ? "bg-gray-400" 
                                 : "bg-red-600 hover:bg-red-700"
@@ -190,13 +190,13 @@ function Profile1({ userType = "auto" }) {
                     >
                         {isLoading ? (
                             <>
-                                <div className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                <span className="text-white font-semibold text-sm sm:text-base">Signing Out...</span>
+                                <div className="mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                <span className="text-white font-semibold">Signing Out...</span>
                             </>
                         ) : (
                             <>
-                                <LogOut className="mr-1 sm:mr-2" color="white" size={16} />
-                                <span className="text-white font-semibold text-sm sm:text-base">Sign Out</span>
+                                <LogOut className="mr-2" color="white" />
+                                <span className="text-white font-semibold">Sign Out</span>
                             </>
                         )}
                     </div>

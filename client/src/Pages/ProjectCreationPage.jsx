@@ -1173,20 +1173,20 @@ const ProjectCreationPage = () => {
   };
 
   // Context loading and error handling
-  if (contextLoading) {
+if (contextLoading) {
     return (
       <>
         <Navbar />
-        <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-          <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md mx-auto text-center">
-            <div className="relative mb-8">
-              <div className="animate-spin rounded-full h-20 w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+        <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center px-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-12 max-w-sm sm:max-w-md mx-auto text-center">
+            <div className="relative mb-6 sm:mb-8">
+              <div className="animate-spin rounded-full h-16 w-16 sm:h-20 sm:w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
               <div className="absolute inset-0 flex items-center justify-center">
-                <Settings className="h-8 w-8 text-blue-600 animate-pulse" />
+                <Settings className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 animate-pulse" />
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-slate-800 mb-3">Loading Admin Context</h3>
-            <p className="text-slate-600">Loading admin context...</p>
+            <h3 className="text-lg sm:text-2xl font-bold text-slate-800 mb-3">Loading Admin Context</h3>
+            <p className="text-sm sm:text-base text-slate-600">Loading admin context...</p>
           </div>
         </div>
       </>
@@ -1198,14 +1198,14 @@ const ProjectCreationPage = () => {
     return (
       <>
         <Navbar />
-        <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-          <div className="max-w-md mx-auto text-center p-8 bg-white rounded-2xl shadow-2xl">
+        <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center px-4">
+          <div className="max-w-sm sm:max-w-md mx-auto text-center p-6 sm:p-8 bg-white rounded-2xl shadow-2xl">
             <div className="mb-6">
-              <Building2 className="h-16 w-16 mx-auto text-blue-600 mb-4" />
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">
+              <Building2 className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-blue-600 mb-4" />
+              <h2 className="text-lg sm:text-2xl font-bold text-slate-900 mb-2">
                 Admin Context Required
               </h2>
-              <p className="text-slate-600 mb-6">
+              <p className="text-sm sm:text-base text-slate-600 mb-6">
                 {contextError || "Please select your school and department to access project creation"}
               </p>
             </div>
@@ -1213,15 +1213,15 @@ const ProjectCreationPage = () => {
             <div className="space-y-4">
               <button
                 onClick={handleSelectContext}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm sm:text-base"
               >
-                <Building2 className="h-5 w-5" />
+                <Building2 className="h-4 w-4 sm:h-5 sm:w-5" />
                 Select School & Department
               </button>
               
               <button
                 onClick={() => navigate("/admin")}
-                className="w-full bg-slate-500 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-medium transition-all"
+                className="w-full bg-slate-500 hover:bg-slate-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium transition-all text-sm sm:text-base"
               >
                 Back to Admin Dashboard
               </button>
@@ -1236,18 +1236,18 @@ const ProjectCreationPage = () => {
     return (
       <>
         <Navbar />
-        <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-          <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md mx-auto text-center">
-            <div className="relative mb-8">
-              <div className="animate-spin rounded-full h-20 w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+        <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center px-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-12 max-w-sm sm:max-w-md mx-auto text-center">
+            <div className="relative mb-6 sm:mb-8">
+              <div className="animate-spin rounded-full h-16 w-16 sm:h-20 sm:w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
               <div className="absolute inset-0 flex items-center justify-center">
-                <Database className="h-8 w-8 text-blue-600 animate-pulse" />
+                <Database className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 animate-pulse" />
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-slate-800 mb-3">
+            <h3 className="text-lg sm:text-2xl font-bold text-slate-800 mb-3">
               {activeTab === 'single' ? 'Creating Project' : 'Creating Projects'}
             </h3>
-            <p className="text-slate-600">
+            <p className="text-sm sm:text-base text-slate-600">
               {activeTab === 'single' ? 'Processing 1 project...' : `Processing ${projects.length} projects...`}
             </p>
           </div>
@@ -1259,27 +1259,27 @@ const ProjectCreationPage = () => {
   return (
     <>
       <Navbar />
-      <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
+      <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
         
         {/* Page Header */}
-        <div className="mb-8 bg-white rounded-2xl shadow-lg mx-8 overflow-hidden">
-          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="bg-white/20 p-3 rounded-xl">
-                  <Database className="h-8 w-8 text-white" />
+        <div className="mb-6 sm:mb-8 mx-4 sm:mx-8 bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-4 sm:px-8 py-4 sm:py-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <Database className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-white">Project Creation</h1>
-                  <p className="text-indigo-100 mt-1">Create and manage student projects</p>
+                  <h1 className="text-xl sm:text-3xl font-bold text-white">Project Creation</h1>
+                  <p className="text-indigo-100 mt-1 text-sm sm:text-base">Create and manage student projects</p>
                 </div>
               </div>
               
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="text-white/90 text-sm">Current Context</div>
-                    <div className="text-white font-semibold">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                  <div className="text-left sm:text-right">
+                    <div className="text-white/90 text-xs sm:text-sm">Current Context</div>
+                    <div className="text-white font-semibold text-sm sm:text-base">
                       {isAllMode ? 'All Schools & Departments' : `${schoolFromContext} - ${departmentFromContext}`}
                       {!isAllMode && specializationFromContext && specializationFromContext.length > 0 && (
                         <div className="text-white/80 text-xs mt-1">
@@ -1290,7 +1290,7 @@ const ProjectCreationPage = () => {
                   </div>
                   <button
                     onClick={handleSelectContext}
-                    className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-all duration-200 font-medium"
+                    className="bg-white/20 hover:bg-white/30 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-all duration-200 font-medium text-sm sm:text-base w-full sm:w-auto"
                   >
                     Change Context
                   </button>
@@ -1301,19 +1301,19 @@ const ProjectCreationPage = () => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="mx-8 mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="flex items-center space-x-3 mb-6">
+        <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
+          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-8">
+            <div className="flex items-center space-x-3 mb-4 sm:mb-6">
               <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
-                <Settings className="h-5 w-5 text-white" />
+                <Settings className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-800">Project Creation Mode</h2>
+              <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Project Creation Mode</h2>
             </div>
             
-            <div className="inline-flex bg-slate-100 rounded-xl p-1.5 shadow-inner">
+            <div className="inline-flex bg-slate-100 rounded-xl p-1.5 shadow-inner w-full sm:w-auto justify-center">
               <button
                 onClick={() => setActiveTab('single')}
-                className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 ${
+                className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 ${
                   activeTab === 'single'
                     ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transform scale-105"
                     : "text-slate-600 hover:text-slate-800 hover:bg-slate-200"
@@ -1324,7 +1324,7 @@ const ProjectCreationPage = () => {
               </button>
               <button
                 onClick={() => setActiveTab('bulk')}
-                className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 ${
+                className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 ${
                   activeTab === 'bulk'
                     ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transform scale-105"
                     : "text-slate-600 hover:text-slate-800 hover:bg-slate-200"
@@ -1338,34 +1338,34 @@ const ProjectCreationPage = () => {
         </div>
 
         {/* Tab Content */}
-        <div className="mx-8 mb-8">
+        <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
           <div className="bg-white rounded-2xl shadow-lg">
             {activeTab === 'single' ? (
               // Single Project Form
-              <div className="p-8">
-                <div className="flex items-center space-x-3 mb-8">
+              <div className="p-4 sm:p-8">
+                <div className="flex items-center space-x-3 mb-4 sm:mb-8">
                   <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
-                    <Plus className="h-5 w-5 text-white" />
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-800">Create Single Project</h2>
+                  <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Create Single Project</h2>
                 </div>
 
-                <div className="max-w-3xl mx-auto space-y-6">
+                <div className="max-w-xl sm:max-w-3xl mx-auto space-y-6">
                   {/* Submit Button at Top */}
-                  <div className="mb-8">
+                  <div className="mb-6 sm:mb-8">
                     <button
                       onClick={handleSingleSubmit}
                       disabled={loading}
-                      className="w-full flex justify-center items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full flex justify-center items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 sm:px-6 py-2 sm:py-4 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                     >
                       {loading ? (
                         <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                          <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white mr-3"></div>
                           Creating Project...
                         </>
                       ) : (
                         <>
-                          <Save size={20} className="mr-2" />
+                          <Save size={16} className="mr-2" />
                           Create Project
                         </>
                       )}
@@ -1374,7 +1374,7 @@ const ProjectCreationPage = () => {
 
                   {/* Project Name */}
                   <div>
-                    <label htmlFor="name" className="block text-sm font-semibold text-slate-700 mb-3">
+                    <label htmlFor="name" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                       Project Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -1382,7 +1382,7 @@ const ProjectCreationPage = () => {
                       name="name"
                       type="text"
                       placeholder="AI Chatbot System"
-                      className={`block w-full px-4 py-4 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-slate-700 placeholder-slate-400 ${
+                      className={`block w-full px-3 sm:px-4 py-2 sm:py-4 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm sm:text-base placeholder-slate-400 ${
                         fieldErrors.name ? 'border-red-500 bg-red-50' : 'border-slate-200'
                       }`}
                       value={singleProject.name}
@@ -1390,8 +1390,8 @@ const ProjectCreationPage = () => {
                       required
                     />
                     {fieldErrors.name && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                        <AlertCircle className="h-4 w-4" />
+                      <p className="mt-2 text-xs sm:text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                         {fieldErrors.name}
                       </p>
                     )}
@@ -1400,7 +1400,7 @@ const ProjectCreationPage = () => {
                   {/* School Selection (Only in All Mode) */}
                   {isAllMode && (
                     <div>
-                      <label htmlFor="school" className="block text-sm font-semibold text-slate-700 mb-3">
+                      <label htmlFor="school" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                         School <span className="text-red-500">*</span>
                       </label>
                       <select
@@ -1408,7 +1408,7 @@ const ProjectCreationPage = () => {
                         name="school"
                         value={singleProject.school}
                         onChange={handleSingleProjectChange}
-                        className="block w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-slate-700"
+                        className="block w-full px-3 sm:px-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm sm:text-base"
                         required
                       >
                         <option value="">Select School</option>
@@ -1422,7 +1422,7 @@ const ProjectCreationPage = () => {
                   {/* Department Selection (Only in All Mode) */}
                   {isAllMode && (
                     <div>
-                      <label htmlFor="department" className="block text-sm font-semibold text-slate-700 mb-3">
+                      <label htmlFor="department" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                         Department <span className="text-red-500">*</span>
                       </label>
                       <select
@@ -1430,7 +1430,7 @@ const ProjectCreationPage = () => {
                         name="department"
                         value={singleProject.department}
                         onChange={handleSingleProjectChange}
-                        className="block w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-slate-700"
+                        className="block w-full px-3 sm:px-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm sm:text-base"
                         required
                       >
                         <option value="">Select Department</option>
@@ -1443,7 +1443,7 @@ const ProjectCreationPage = () => {
 
                   {/* Guide Faculty Employee ID */}
                   <div>
-                    <label htmlFor="guideFacultyEmpId" className="block text-sm font-semibold text-slate-700 mb-3">
+                    <label htmlFor="guideFacultyEmpId" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                       Guide Faculty Employee ID <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -1451,7 +1451,7 @@ const ProjectCreationPage = () => {
                       name="guideFacultyEmpId"
                       type="text"
                       placeholder="FAC101"
-                      className={`block w-full px-4 py-4 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-slate-700 placeholder-slate-400 ${
+                      className={`block w-full px-3 sm:px-4 py-2 sm:py-4 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm sm:text-base placeholder-slate-400 ${
                         fieldErrors.guideFacultyEmpId ? 'border-red-500 bg-red-50' : 'border-slate-200'
                       }`}
                       value={singleProject.guideFacultyEmpId}
@@ -1459,8 +1459,8 @@ const ProjectCreationPage = () => {
                       required
                     />
                     {fieldErrors.guideFacultyEmpId && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                        <AlertCircle className="h-4 w-4" />
+                      <p className="mt-2 text-xs sm:text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                         {fieldErrors.guideFacultyEmpId}
                       </p>
                     )}
@@ -1468,13 +1468,13 @@ const ProjectCreationPage = () => {
 
                   {/* Specialization Selection */}
                   <div>
-                    <label htmlFor="specialization" className="block text-sm font-semibold text-slate-700 mb-3">
+                    <label htmlFor="specialization" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                       Specialization <span className="text-red-500">*</span>
                     </label>
                     {!isAllMode && specializationFromContext && specializationFromContext.length > 0 ? (
                       // Show context value if available (Context Mode)
-                      <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
-                        <span className="text-blue-800 font-semibold">
+                      <div className="p-3 sm:p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
+                        <span className="text-blue-800 font-semibold text-sm sm:text-base">
                           {specializationFromContext.map(spec => displaySpecialization(spec)).join(', ')}
                         </span>
                         <p className="text-xs text-blue-600 mt-1">From admin context</p>
@@ -1487,7 +1487,7 @@ const ProjectCreationPage = () => {
                           name="specialization"
                           value={singleProject.specialization}
                           onChange={handleSingleProjectChange}
-                          className={`block w-full px-4 py-4 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-slate-700 ${
+                          className={`block w-full px-3 sm:px-4 py-2 sm:py-4 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm sm:text-base ${
                             fieldErrors.specialization ? 'border-red-500 bg-red-50' : 'border-slate-200'
                           }`}
                           required
@@ -1498,8 +1498,8 @@ const ProjectCreationPage = () => {
                           ))}
                         </select>
                         {fieldErrors.specialization && (
-                          <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                            <AlertCircle className="h-4 w-4" />
+                          <p className="mt-2 text-xs sm:text-sm text-red-600 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                             {fieldErrors.specialization}
                           </p>
                         )}
@@ -1510,7 +1510,7 @@ const ProjectCreationPage = () => {
                   {/* Students Section */}
                   <div>
                     <div className="flex items-center justify-between mb-4">
-                      <label className="block text-sm font-semibold text-slate-700">
+                      <label className="block text-xs sm:text-sm font-semibold text-slate-700">
                         Team Members <span className="text-red-500">*</span>
                         <span className="text-xs text-slate-500 ml-2">
                           ({singleProject.students.length}/3 students)
@@ -1520,7 +1520,7 @@ const ProjectCreationPage = () => {
                         type="button"
                         onClick={addStudent}
                         disabled={singleProject.students.length >= 3}
-                        className={`flex items-center px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                        className={`flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-colors text-sm font-medium ${
                           singleProject.students.length >= 3
                             ? "bg-slate-300 text-slate-500 cursor-not-allowed"
                             : "bg-emerald-600 text-white hover:bg-emerald-700"
@@ -1533,31 +1533,33 @@ const ProjectCreationPage = () => {
 
                     <div className="space-y-4">
                       {singleProject.students.map((student, index) => (
-                        <div key={index} className="p-6 bg-slate-50 rounded-xl border border-slate-200">
+                        <div key={index} className="p-4 sm:p-6 bg-slate-50 rounded-xl border border-slate-200">
                           <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-semibold text-slate-800 text-lg">Student {index + 1}</h4>
+                            <h4 className="font-semibold text-base sm:text-lg text-slate-800">Student {index + 1}</h4>
                             {singleProject.students.length > 1 && (
                               <button
                                 type="button"
                                 onClick={() => removeStudent(index)}
-                                className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
+                                className="text-red-600 hover:text-red-800 text-xs sm:text-sm font-medium transition-colors"
                               >
                                 Remove
                               </button>
                             )}
                           </div>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                             <div>
                               <label className="block text-xs font-semibold text-slate-600 mb-2">
                                 Student Name <span className="text-red-500">*</span>
                               </label>
                               <input
                                 type="text"
+
+
                                 value={student.name}
                                 onChange={(e) => handleStudentChange(index, 'name', e.target.value)}
                                 placeholder="John Doe"
-                                className={`w-full p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all ${
+                                className={`w-full p-2 sm:p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all ${
                                   fieldErrors[`student_${index}_name`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
                                 }`}
                               />
@@ -1578,7 +1580,7 @@ const ProjectCreationPage = () => {
                                 value={student.regNo}
                                 onChange={(e) => handleStudentChange(index, 'regNo', e.target.value)}
                                 placeholder="21BCE1001"
-                                className={`w-full p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all ${
+                                className={`w-full p-2 sm:p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all ${
                                   fieldErrors[`student_${index}_regNo`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
                                 }`}
                               />
@@ -1599,7 +1601,7 @@ const ProjectCreationPage = () => {
                                 value={student.emailId}
                                 onChange={(e) => handleStudentChange(index, 'emailId', e.target.value)}
                                 placeholder="john.doe@vitstudent.ac.in"
-                                className={`w-full p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all ${
+                                className={`w-full p-2 sm:p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all ${
                                   fieldErrors[`student_${index}_emailId`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
                                 }`}
                               />
@@ -1617,20 +1619,20 @@ const ProjectCreationPage = () => {
                   </div>
 
                   {/* Submit Button at Bottom */}
-                  <div className="pt-6">
+                  <div className="pt-4 sm:pt-6">
                     <button
                       onClick={handleSingleSubmit}
                       disabled={loading}
-                      className="w-full flex justify-center items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full flex justify-center items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 sm:px-6 py-2 sm:py-4 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                     >
                       {loading ? (
                         <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                          <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white mr-3"></div>
                           Creating Project...
                         </>
                       ) : (
                         <>
-                          <Save size={20} className="mr-2" />
+                          <Save size={16} className="mr-2" />
                           Create Project
                         </>
                       )}
@@ -1640,23 +1642,23 @@ const ProjectCreationPage = () => {
               </div>
             ) : (
               // Bulk Upload Form
-              <div className="p-8">
-                <div className="flex items-center space-x-3 mb-8">
+              <div className="p-4 sm:p-8">
+                <div className="flex items-center space-x-3 mb-4 sm:mb-8">
                   <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
-                    <Upload className="h-5 w-5 text-white" />
+                    <Upload className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-800">Bulk Upload Projects</h2>
+                  <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Bulk Upload Projects</h2>
                 </div>
 
                 {/* Download Template & Upload Section */}
-                <div className="max-w-4xl mx-auto mb-6">
-                  <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
+                <div className="max-w-xl sm:max-w-4xl mx-auto mb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-6">
                     <button
                       type="button"
                       onClick={downloadTemplate}
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+                      className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base w-full sm:w-auto"
                     >
-                      <Download size={18} />
+                      <Download size={16} />
                       Download Template
                     </button>
                     
@@ -1669,9 +1671,9 @@ const ProjectCreationPage = () => {
                     />
                     <label 
                       htmlFor="bulkfileinput" 
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all duration-200 cursor-pointer shadow-lg hover:shadow-xl"
+                      className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all duration-200 cursor-pointer shadow-lg hover:shadow-xl text-sm sm:text-base w-full sm:w-auto"
                     >
-                      <Upload size={18} />
+                      <Upload size={16} />
                       {fileName ? `Uploaded: ${fileName}` : "Upload Excel File"}
                     </label>
 
@@ -1679,9 +1681,9 @@ const ProjectCreationPage = () => {
                       <button
                         type="button"
                         onClick={clearBulkData}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-500 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all duration-200"
+                        className="flex items-center justify-center gap-2 px-4 sm:px-4 py-2 sm:py-3 bg-slate-500 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all duration-200 text-sm sm:text-base w-full sm:w-auto"
                       >
-                        <X size={18} />
+                        <X size={16} />
                         Clear
                       </button>
                     )}
@@ -1693,7 +1695,7 @@ const ProjectCreationPage = () => {
                       <button
                         onClick={handleBulkSubmit}
                         disabled={loading || Object.keys(bulkFieldErrors).length > 0}
-                        className={`flex items-center gap-2 px-8 py-4 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl ${
+                        className={`flex items-center gap-2 px-6 sm:px-8 py-2 sm:py-4 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base ${
                           loading || Object.keys(bulkFieldErrors).length > 0
                             ? "bg-slate-400 text-slate-600 cursor-not-allowed"
                             : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
@@ -1701,12 +1703,12 @@ const ProjectCreationPage = () => {
                       >
                         {loading ? (
                           <>
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
                             Uploading Projects...
                           </>
                         ) : (
                           <>
-                            <Upload size={20} />
+                            <Upload size={16} />
                             Upload {projects.length} Projects
                           </>
                         )}
@@ -1717,12 +1719,12 @@ const ProjectCreationPage = () => {
 
                 {/* Bulk Preview Table */}
                 {bulkPreviewMode && projects.length > 0 ? (
-                  <div className="max-w-6xl mx-auto mb-6">
+                  <div className="max-w-full sm:max-w-6xl mx-auto mb-6 overflow-x-auto">
                     <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-xl font-bold text-slate-800">
+                      <h4 className="text-lg sm:text-xl font-bold text-slate-800">
                         Preview ({projects.length} Projects)
                       </h4>
-                      <div className="text-sm text-slate-600">
+                      <div className="text-xs sm:text-sm text-slate-600">
                         {Object.keys(bulkFieldErrors).length > 0 && (
                           <span className="text-red-600 font-semibold">
                             {Object.keys(bulkFieldErrors).length} error(s) found
@@ -1733,27 +1735,27 @@ const ProjectCreationPage = () => {
                     
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                       <div className="overflow-x-auto">
-                        <table className="w-full">
+                        <table className="w-full min-w-[640px]">
                           <thead className="bg-gradient-to-r from-slate-100 to-blue-100">
                             <tr>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Row</th>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Project Name</th>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Faculty ID</th>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">School/Dept</th>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Specialization</th>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Students</th>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
+                              <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Row</th>
+                              <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Project Name</th>
+                              <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Faculty ID</th>
+                              <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">School/Dept</th>
+                              <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Specialization</th>
+                              <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Students</th>
+                              <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200">
                             {projects.map((proj, idx) => (
                               <tr key={idx} className={`${bulkFieldErrors[idx] ? 'bg-red-50' : ''} hover:bg-slate-50 transition-colors`}>
-                                <td className="px-4 py-4 text-sm text-slate-900">{proj.idx}</td>
-                                <td className="px-4 py-4 text-sm font-semibold text-slate-900">{proj.name}</td>
-                                <td className="px-4 py-4 text-sm text-slate-900 font-mono">{proj.guideFacultyEmpId}</td>
-                                <td className="px-4 py-4 text-sm text-slate-900">{proj.school}/{proj.department}</td>
-                                <td className="px-4 py-4 text-sm text-slate-900">{proj.specialization}</td>
-                                <td className="px-4 py-4 text-sm text-slate-900">
+                                <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">{proj.idx}</td>
+                                <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-slate-900">{proj.name}</td>
+                                <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900 font-mono">{proj.guideFacultyEmpId}</td>
+                                <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">{proj.school}/{proj.department}</td>
+                                <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">{proj.specialization}</td>
+                                <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">
                                   <div className="space-y-1">
                                     {proj.students.map((s, sidx) => (
                                       <div key={sidx} className="text-xs">
@@ -1762,10 +1764,10 @@ const ProjectCreationPage = () => {
                                     ))}
                                   </div>
                                 </td>
-                                <td className="px-4 py-4 text-sm">
+                                <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm">
                                   {bulkFieldErrors[idx] ? (
                                     <div className="text-red-600 text-xs">
-                                      <AlertCircle className="inline h-4 w-4 mr-1" />
+                                      <AlertCircle className="inline h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                       {bulkFieldErrors[idx]}
                                     </div>
                                   ) : (
@@ -1784,12 +1786,12 @@ const ProjectCreationPage = () => {
                   </div>
                 ) : (
                   // Instructions when no preview
-                  <div className="max-w-4xl mx-auto mt-8 bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
-                    <h4 className="text-lg font-bold text-blue-900 mb-3 flex items-center">
-                      <FileSpreadsheet className="h-5 w-5 mr-2" />
+                  <div className="max-w-xl sm:max-w-4xl mx-auto mt-6 sm:mt-8 bg-blue-50 border-2 border-blue-200 rounded-xl p-4 sm:p-6">
+                    <h4 className="text-base sm:text-lg font-bold text-blue-900 mb-3 flex items-center">
+                      <FileSpreadsheet className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                       Instructions:
                     </h4>
-                    <ul className="text-sm text-blue-800 space-y-2">
+                    <ul className="text-xs sm:text-sm text-blue-800 space-y-2">
                       <li>• Download the Excel template and fill in your project data</li>
                       <li>• Each row represents one project (max 3 students per project)</li>
                       <li>• Required fields: Project Name, Guide Faculty ID{isAllMode ? ', School, Department' : ''}, Specialization</li>
@@ -1814,11 +1816,11 @@ const ProjectCreationPage = () => {
 
         {/* Enhanced Notification */}
         {notification.isVisible && (
-          <div className="fixed top-24 right-8 z-50 max-w-md w-full">
+          <div className="fixed top-20 sm:top-24 right-4 sm:right-8 z-50 max-w-xs sm:max-w-md w-full">
             <div className={`transform transition-all duration-500 ease-out ${
               notification.isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
             }`}>
-              <div className={`rounded-xl shadow-2xl border-l-4 p-6 ${
+              <div className={`rounded-xl shadow-2xl border-l-4 p-4 sm:p-6 ${
                 notification.type === "success" 
                   ? "bg-emerald-50 border-emerald-400" 
                   : "bg-red-50 border-red-400"
@@ -1829,20 +1831,20 @@ const ProjectCreationPage = () => {
                   }`}>
                     {notification.type === "success" ? (
                       <div className="relative">
-                        <div className="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-emerald-400 opacity-75"></div>
-                        <CheckCircle className="relative inline-flex h-6 w-6" />
+                        <div className="animate-ping absolute inline-flex h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-emerald-400 opacity-75"></div>
+                        <CheckCircle className="relative inline-flex h-5 w-5 sm:h-6 sm:w-6" />
                       </div>
                     ) : (
-                      <XCircle className="h-6 w-6" />
+                      <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
                     )}
                   </div>
-                  <div className="ml-4 flex-1">
-                    <h3 className={`text-sm font-bold ${
+                  <div className="ml-3 sm:ml-4 flex-1">
+                    <h3 className={`text-xs sm:text-sm font-bold ${
                       notification.type === "success" ? "text-emerald-800" : "text-red-800"
                     }`}>
                       {notification.title}
                     </h3>
-                    <p className={`mt-1 text-sm ${
+                    <p className={`mt-1 text-xs sm:text-sm ${
                       notification.type === "success" ? "text-emerald-700" : "text-red-700"
                     }`}>
                       {notification.message}
@@ -1856,14 +1858,13 @@ const ProjectCreationPage = () => {
                         : "text-red-400 hover:text-red-600"
                     } transition-colors`}
                   >
-                    <X className="h-5 w-5" />
+                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
                   </button>
                 </div>
               </div>
             </div>
           </div>
         )}
-        
       </div>
     </>
   );

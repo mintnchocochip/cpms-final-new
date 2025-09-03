@@ -365,20 +365,20 @@ const AdminStudentManagement = () => {
     }
   }, [filteredStudents, adminContext, showNotification]);
 
-  if (loading) {
+if (loading) {
     return (
       <>
         <Navbar />
-        <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-          <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md mx-auto text-center">
-            <div className="relative mb-8">
-              <div className="animate-spin rounded-full h-20 w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+        <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center px-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-12 max-w-sm sm:max-w-md mx-auto text-center">
+            <div className="relative mb-6 sm:mb-8">
+              <div className="animate-spin rounded-full h-16 w-16 sm:h-20 sm:w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
               <div className="absolute inset-0 flex items-center justify-center">
-                <Database className="h-8 w-8 text-blue-600 animate-pulse" />
+                <Database className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 animate-pulse" />
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-slate-800 mb-3">Loading Student Database</h3>
-            <p className="text-slate-600">Retrieving student records and academic data...</p>
+            <h3 className="text-lg sm:text-2xl font-bold text-slate-800 mb-3">Loading Student Database</h3>
+            <p className="text-sm sm:text-base text-slate-600">Retrieving student records and academic data...</p>
           </div>
         </div>
       </>
@@ -388,34 +388,34 @@ const AdminStudentManagement = () => {
   return (
     <>
       <Navbar />
-      <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
+      <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
         
         {/* Page Header with Context */}
-        <div className="mb-8 bg-white rounded-2xl shadow-lg mx-8 overflow-hidden">
-          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="bg-white/20 p-3 rounded-xl">
-                  <Database className="h-8 w-8 text-white" />
+        <div className="mb-6 sm:mb-8 mx-4 sm:mx-8 bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-4 sm:px-8 py-4 sm:py-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <Database className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-white">Student Database Management</h1>
-                  <p className="text-indigo-100 mt-1">Comprehensive student records and academic tracking</p>
+                  <h1 className="text-xl sm:text-3xl font-bold text-white">Student Database Management</h1>
+                  <p className="text-indigo-100 mt-1 text-sm sm:text-base">Comprehensive student records and academic tracking</p>
                 </div>
               </div>
               
               {adminContext && (
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="text-white/90 text-sm">Current Context</div>
-                      <div className="text-white font-semibold">
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                    <div className="text-left sm:text-right">
+                      <div className="text-white/90 text-xs sm:text-sm">Current Context</div>
+                      <div className="text-white font-semibold text-sm sm:text-base">
                         {adminContext.skipped ? 'All Schools & Departments' : `${adminContext.school} - ${adminContext.department}`}
                       </div>
                     </div>
                     <button
                       onClick={handleChangeSchoolDepartment}
-                      className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-all duration-200 font-medium"
+                      className="bg-white/20 hover:bg-white/30 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-all duration-200 font-medium text-sm sm:text-base w-full sm:w-auto"
                     >
                       Change Context
                     </button>
@@ -427,52 +427,52 @@ const AdminStudentManagement = () => {
         </div>
 
         {/* Statistics Dashboard */}
-        <div className="mx-8 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+        <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-100 text-sm font-medium">Total Students</p>
-                  <p className="text-3xl font-bold mt-1">{students.length.toLocaleString()}</p>
+                  <p className="text-blue-100 text-xs sm:text-sm font-medium">Total Students</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-1">{students.length.toLocaleString()}</p>
                 </div>
-                <div className="bg-white/20 p-3 rounded-xl">
-                  <Users className="h-8 w-8" />
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <Users className="h-6 w-6 sm:h-8 sm:w-8" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-emerald-100 text-sm font-medium">Filtered Results</p>
-                  <p className="text-3xl font-bold mt-1">{filteredStudents.length.toLocaleString()}</p>
+                  <p className="text-emerald-100 text-xs sm:text-sm font-medium">Filtered Results</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-1">{filteredStudents.length.toLocaleString()}</p>
                 </div>
-                <div className="bg-white/20 p-3 rounded-xl">
-                  <Filter className="h-8 w-8" />
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <Filter className="h-6 w-6 sm:h-8 sm:w-8" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-purple-100 text-sm font-medium">Schools</p>
-                  <p className="text-3xl font-bold mt-1">{availableSchools.length}</p>
+                  <p className="text-purple-100 text-xs sm:text-sm font-medium">Schools</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-1">{availableSchools.length}</p>
                 </div>
-                <div className="bg-white/20 p-3 rounded-xl">
-                  <Building2 className="h-8 w-8" />
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <Building2 className="h-6 w-6 sm:h-8 sm:w-8" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-orange-100 text-sm font-medium">Departments</p>
-                  <p className="text-3xl font-bold mt-1">{availableDepartments.length}</p>
+                  <p className="text-orange-100 text-xs sm:text-sm font-medium">Departments</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-1">{availableDepartments.length}</p>
                 </div>
-                <div className="bg-white/20 p-3 rounded-xl">
-                  <GraduationCap className="h-8 w-8" />
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <GraduationCap className="h-6 w-6 sm:h-8 sm:w-8" />
                 </div>
               </div>
             </div>
@@ -480,19 +480,19 @@ const AdminStudentManagement = () => {
         </div>
 
         {/* Search and Filters Panel */}
-        <div className="mx-8 mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="flex items-center justify-between mb-8">
+        <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
+          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-8 gap-4">
               <div className="flex items-center space-x-3">
                 <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
-                  <Search className="h-5 w-5 text-white" />
+                  <Search className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-800">Search & Filter Controls</h2>
+                <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Search & Filter Controls</h2>
               </div>
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 space-x-0 sm:space-x-4 w-full sm:w-auto">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium"
+                  className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium text-sm sm:text-base w-full sm:w-auto"
                 >
                   <Grid3X3 className="h-4 w-4" />
                   <span>Advanced Filters</span>
@@ -501,7 +501,7 @@ const AdminStudentManagement = () => {
                 <button
                   onClick={downloadExcel}
                   disabled={filteredStudents.length === 0}
-                  className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
+                  className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
                 >
                   <Download className="h-4 w-4" />
                   <span>Export Excel ({filteredStudents.length})</span>
@@ -510,37 +510,37 @@ const AdminStudentManagement = () => {
             </div>
 
             {/* Search Bar */}
-            <div className="relative mb-6">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-slate-400" />
+            <div className="relative mb-4 sm:mb-6">
+              <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
               </div>
               <input
                 type="text"
                 placeholder="Search by student name, registration number, email, school, or department..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-12 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400 text-lg"
+                className="w-full pl-10 sm:pl-12 pr-10 sm:pr-12 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700 placeholder-slate-400"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                  className="absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center"
                 >
-                  <X className="h-5 w-5 text-slate-400 hover:text-slate-600 transition-colors" />
+                  <X className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 hover:text-slate-600 transition-colors" />
                 </button>
               )}
             </div>
 
             {/* Advanced Filters */}
             {showFilters && (
-              <div className="border-t border-slate-200 pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+              <div className="border-t border-slate-200 pt-4 sm:pt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-3">School Filter</label>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">School Filter</label>
                     <select
                       value={selectedSchool}
                       onChange={(e) => setSelectedSchool(e.target.value)}
-                      className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
                     >
                       <option value="">All Schools</option>
                       {availableSchools.map(school => (
@@ -550,11 +550,11 @@ const AdminStudentManagement = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-3">Department Filter</label>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Department Filter</label>
                     <select
                       value={selectedDepartment}
                       onChange={(e) => setSelectedDepartment(e.target.value)}
-                      className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
                     >
                       <option value="">All Departments</option>
                       {availableDepartments.map(dept => (
@@ -564,11 +564,11 @@ const AdminStudentManagement = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-3">Review Type</label>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Review Type</label>
                     <select
                       value={selectedReviewFilter}
                       onChange={(e) => setSelectedReviewFilter(e.target.value)}
-                      className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
                     >
                       <option value="all">All Reviews</option>
                       {availableReviewTypes.map(reviewType => (
@@ -578,12 +578,12 @@ const AdminStudentManagement = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-3">Review Status</label>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Review Status</label>
                     <select
                       value={reviewStatusFilter}
                       onChange={(e) => setReviewStatusFilter(e.target.value)}
                       disabled={selectedReviewFilter === "all"}
-                      className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all disabled:bg-slate-100 disabled:cursor-not-allowed"
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all disabled:bg-slate-100 disabled:cursor-not-allowed text-sm sm:text-base"
                     >
                       <option value="all">All Statuses</option>
                       <option value="locked">Locked</option>
@@ -607,7 +607,7 @@ const AdminStudentManagement = () => {
                       setSelectedReviewFilter("all");
                       setReviewStatusFilter("all");
                     }}
-                    className="flex items-center space-x-2 px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200"
+                    className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
                   >
                     <RefreshCw className="h-4 w-4" />
                     <span>Clear All Filters</span>
@@ -619,40 +619,40 @@ const AdminStudentManagement = () => {
         </div>
 
         {/* Students Data Display */}
-        <div className="mx-8 mb-8">
+        <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
           <div className="bg-white rounded-2xl shadow-lg">
             {filteredStudents.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="mx-auto w-32 h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-8">
-                  <Users className="h-16 w-16 text-slate-400" />
+              <div className="text-center py-12 sm:py-20 px-4">
+                <div className="mx-auto w-24 sm:w-32 h-24 sm:h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-6 sm:mb-8">
+                  <Users className="h-12 w-12 sm:h-16 sm:w-16 text-slate-400" />
                 </div>
-                <h3 className="text-2xl font-bold text-slate-600 mb-3">No Students Found</h3>
-                <p className="text-slate-500 max-w-md mx-auto">
+                <h3 className="text-lg sm:text-2xl font-bold text-slate-600 mb-3">No Students Found</h3>
+                <p className="text-sm sm:text-base text-slate-500 max-w-sm sm:max-w-md mx-auto">
                   No students match your current search and filter criteria. Try adjusting your filters to find the records you're looking for.
                 </p>
               </div>
             ) : (
-              <div className="p-8">
-                <div className="flex justify-between items-center mb-8">
+              <div className="p-4 sm:p-8">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-8 gap-4">
                   <div className="flex items-center space-x-3">
                     <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
-                      <BarChart3 className="h-5 w-5 text-white" />
+                      <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-800">
+                    <h2 className="text-lg sm:text-2xl font-bold text-slate-800">
                       Student Records ({filteredStudents.length.toLocaleString()})
                     </h2>
                   </div>
-                  <div className="flex space-x-3">
+                  <div className="flex space-x-3 w-full sm:w-auto">
                     <button
                       onClick={() => setExpandedStudents(new Set(filteredStudents.map(s => s.regNo)))}
-                      className="flex items-center space-x-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-all"
+                      className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-all w-full sm:w-auto"
                     >
                       <Eye className="h-4 w-4" />
                       <span>Expand All</span>
                     </button>
                     <button
                       onClick={() => setExpandedStudents(new Set())}
-                      className="flex items-center space-x-2 px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-all"
+                      className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-all w-full sm:w-auto"
                     >
                       <EyeOff className="h-4 w-4" />
                       <span>Collapse All</span>
@@ -670,24 +670,24 @@ const AdminStudentManagement = () => {
                         className="border border-slate-200 rounded-xl bg-gradient-to-r from-white to-slate-50 hover:shadow-lg transition-all duration-300"
                       >
                         <div
-                          className="flex justify-between items-center p-6 cursor-pointer hover:bg-slate-50 transition-colors"
+                          className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 cursor-pointer hover:bg-slate-50 transition-colors"
                           onClick={() => toggleStudentExpanded(student.regNo)}
                         >
-                          <div className="flex items-center space-x-4">
-                            <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl">
+                          <div className="flex items-center space-x-3 sm:space-x-4">
+                            <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl">
                               {isExpanded ? (
-                                <ChevronDown className="text-blue-600 h-6 w-6" />
+                                <ChevronDownIcon className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
                               ) : (
-                                <ChevronRight className="text-blue-600 h-6 w-6" />
+                                <ChevronRightIcon className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
                               )}
                             </div>
                             <div>
-                              <h4 className="font-bold text-xl text-slate-800 mb-1">
+                              <h4 className="font-bold text-base sm:text-xl text-slate-800 mb-1">
                                 {student.name}
                               </h4>
-                              <div className="flex items-center space-x-6 text-sm text-slate-600">
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 text-xs sm:text-sm text-slate-600">
                                 <span className="flex items-center space-x-1">
-                                  <BookOpen className="h-4 w-4" />
+                                  <BookOpen className="h-3 w-3 sm:h-4 sm:w-4" />
                                   <span>{student.regNo}</span>
                                 </span>
                                 <span>{student.emailId}</span>
@@ -697,16 +697,16 @@ const AdminStudentManagement = () => {
                             </div>
                           </div>
                           
-                          <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-3 mt-3 sm:mt-0">
                             {student.reviews && Object.keys(student.reviews).length > 0 && (
-                              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold flex items-center space-x-1">
-                                <FileSpreadsheet className="h-4 w-4" />
+                              <span className="bg-blue-100 text-blue-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
+                                <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4" />
                                 <span>{Object.keys(student.reviews).length} reviews</span>
                               </span>
                             )}
                             {student.pptApproved?.approved && (
-                              <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-semibold flex items-center space-x-1">
-                                <Award className="h-4 w-4" />
+                              <span className="bg-emerald-100 text-emerald-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
+                                <Award className="h-3 w-3 sm:h-4 sm:w-4" />
                                 <span>PPT Approved</span>
                               </span>
                             )}
@@ -714,23 +714,23 @@ const AdminStudentManagement = () => {
                         </div>
 
                         {isExpanded && (
-                          <div className="border-t border-slate-200 p-6 bg-slate-50">
+                          <div className="border-t border-slate-200 p-4 sm:p-6 bg-slate-50">
                             {/* Reviews Section */}
                             {student.reviews && Object.keys(student.reviews).length > 0 ? (
-                              <div className="mb-8">
-                                <h5 className="font-bold text-xl mb-6 text-slate-800 flex items-center space-x-2">
-                                  <FileSpreadsheet className="h-5 w-5 text-blue-600" />
+                              <div className="mb-6 sm:mb-8">
+                                <h5 className="font-bold text-base sm:text-xl mb-4 sm:mb-6 text-slate-800 flex items-center space-x-2">
+                                  <FileSpreadsheet className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                                   <span>Academic Review History</span>
                                 </h5>
-                                <div className="grid gap-6 md:grid-cols-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                   {Object.entries(student.reviews).map(([reviewType, review]) => {
                                     const status = getReviewStatus(student, reviewType);
                                     
                                     return (
-                                      <div key={reviewType} className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
-                                        <div className="flex justify-between items-start mb-4">
-                                          <h6 className="font-bold text-lg text-slate-800">{reviewType}</h6>
-                                          <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                                      <div key={reviewType} className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 shadow-sm">
+                                        <div className="flex justify-between items-start mb-3 sm:mb-4">
+                                          <h6 className="font-bold text-base sm:text-lg text-slate-800">{reviewType}</h6>
+                                          <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${
                                             status.color === 'green' ? 'bg-emerald-100 text-emerald-800' :
                                             status.color === 'yellow' ? 'bg-amber-100 text-amber-800' :
                                             status.color === 'blue' ? 'bg-blue-100 text-blue-800' :
@@ -742,49 +742,49 @@ const AdminStudentManagement = () => {
                                         </div>
                                         
                                         <div className="space-y-3">
-                                          <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
-                                            <span className="font-semibold text-slate-700">Status:</span>
+                                          <div className="flex items-center space-x-3 p-2 sm:p-3 bg-slate-50 rounded-lg">
+                                            <span className="font-semibold text-slate-700 text-xs sm:text-sm">Status:</span>
                                             {review.locked ? (
-                                              <span className="flex items-center space-x-2 text-red-600">
-                                                <XCircle className="h-4 w-4" />
+                                              <span className="flex items-center space-x-2 text-red-600 text-xs sm:text-sm">
+                                                <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                                                 <span>Locked</span>
                                               </span>
                                             ) : (
-                                              <span className="flex items-center space-x-2 text-emerald-600">
-                                                <CheckCircle className="h-4 w-4" />
+                                              <span className="flex items-center space-x-2 text-emerald-600 text-xs sm:text-sm">
+                                                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                                                 <span>Unlocked</span>
                                               </span>
                                             )}
                                           </div>
                                           
-                                          <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
-                                            <span className="font-semibold text-slate-700">Grading:</span>
-                                            <span className="text-slate-600">
+                                          <div className="flex items-center space-x-3 p-2 sm:p-3 bg-slate-50 rounded-lg">
+                                            <span className="font-semibold text-slate-700 text-xs sm:text-sm">Grading:</span>
+                                            <span className="text-slate-600 text-xs sm:text-sm">
                                               {review.marks && Object.keys(review.marks).length > 0 
                                                 ? `${Object.keys(review.marks).length} components graded` 
                                                 : 'Not yet graded'}
                                             </span>
                                           </div>
                                           
-                                          <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
-                                            <span className="font-semibold text-slate-700">Attendance:</span>
+                                          <div className="flex items-center space-x-3 p-2 sm:p-3 bg-slate-50 rounded-lg">
+                                            <span className="font-semibold text-slate-700 text-xs sm:text-sm">Attendance:</span>
                                             {review.attendance?.value ? (
-                                              <span className="flex items-center space-x-2 text-emerald-600">
-                                                <CheckCircle className="h-4 w-4" />
+                                              <span className="flex items-center space-x-2 text-emerald-600 text-xs sm:text-sm">
+                                                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                                                 <span>Present</span>
                                               </span>
                                             ) : (
-                                              <span className="flex items-center space-x-2 text-red-600">
-                                                <XCircle className="h-4 w-4" />
+                                              <span className="flex items-center space-x-2 text-red-600 text-xs sm:text-sm">
+                                                <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                                                 <span>Absent</span>
                                               </span>
                                             )}
                                           </div>
                                           
                                           {review.comments && (
-                                            <div className="p-3 bg-blue-50 rounded-lg">
-                                              <span className="font-semibold text-slate-700 block mb-2">Faculty Comments:</span>
-                                              <p className="text-slate-700 text-sm leading-relaxed">
+                                            <div className="p-2 sm:p-3 bg-blue-50 rounded-lg">
+                                              <span className="font-semibold text-slate-700 block mb-2 text-xs sm:text-sm">Faculty Comments:</span>
+                                              <p className="text-slate-700 text-xs sm:text-sm leading-relaxed">
                                                 {review.comments}
                                               </p>
                                             </div>
@@ -796,13 +796,13 @@ const AdminStudentManagement = () => {
                                 </div>
                               </div>
                             ) : (
-                              <div className="mb-8">
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
+                              <div className="mb-6 sm:mb-8">
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-6">
                                   <div className="flex items-center space-x-3 text-amber-800">
-                                    <AlertTriangle className="h-6 w-6" />
+                                    <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
                                     <div>
-                                      <span className="font-bold block">No Academic Reviews</span>
-                                      <span className="text-sm text-amber-700">This student has not undergone any academic reviews yet.</span>
+                                      <span className="font-bold block text-sm sm:text-base">No Academic Reviews</span>
+                                      <span className="text-xs sm:text-sm text-amber-700">This student has not undergone any academic reviews yet.</span>
                                     </div>
                                   </div>
                                 </div>
@@ -810,27 +810,27 @@ const AdminStudentManagement = () => {
                             )}
 
                             {/* PPT Approval Section */}
-                            <div className="mb-8">
-                              <h5 className="font-bold text-xl mb-4 text-slate-800 flex items-center space-x-2">
-                                <Award className="h-5 w-5 text-purple-600" />
+                            <div className="mb-6 sm:mb-8">
+                              <h5 className="font-bold text-base sm:text-xl mb-3 sm:mb-4 text-slate-800 flex items-center space-x-2">
+                                <Award className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                                 <span>Presentation Status</span>
                               </h5>
-                              <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
-                                <div className="flex items-center space-x-4">
-                                  <span className="font-semibold text-slate-700">Approval Status:</span>
+                              <div className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 shadow-sm">
+                                <div className="flex items-center space-x-3 sm:space-x-4">
+                                  <span className="font-semibold text-slate-700 text-xs sm:text-sm">Approval Status:</span>
                                   {student.pptApproved?.approved ? (
-                                    <span className="flex items-center space-x-2 text-emerald-600">
-                                      <CheckCircle className="h-5 w-5" />
+                                    <span className="flex items-center space-x-2 text-emerald-600 text-xs sm:text-sm">
+                                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                                       <span>Approved</span>
                                     </span>
                                   ) : (
-                                    <span className="flex items-center space-x-2 text-red-600">
-                                      <XCircle className="h-5 w-5" />
+                                    <span className="flex items-center space-x-2 text-red-600 text-xs sm:text-sm">
+                                      <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                                       <span>Pending Approval</span>
                                     </span>
                                   )}
                                   {student.pptApproved?.locked && (
-                                    <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg text-sm font-semibold">
+                                    <span className="bg-slate-100 text-slate-700 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm font-semibold">
                                       Status Locked
                                     </span>
                                   )}
@@ -841,17 +841,17 @@ const AdminStudentManagement = () => {
                             {/* Deadlines Section */}
                             {student.deadline && Object.keys(student.deadline).length > 0 && (
                               <div>
-                                <h5 className="font-bold text-xl mb-4 text-slate-800 flex items-center space-x-2">
-                                  <CalendarDays className="h-5 w-5 text-orange-600" />
+                                <h5 className="font-bold text-base sm:text-xl mb-3 sm:mb-4 text-slate-800 flex items-center space-x-2">
+                                  <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
                                   <span>Academic Deadlines</span>
                                 </h5>
-                                <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+                                <div className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 shadow-sm">
                                   <div className="space-y-3">
                                     {Object.entries(student.deadline).map(([type, deadline]) => (
-                                      <div key={type} className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
-                                        <Clock className="h-4 w-4 text-slate-500" />
-                                        <span className="font-semibold text-slate-700">{type}:</span>
-                                        <span className="text-slate-600">
+                                      <div key={type} className="flex items-center space-x-3 p-2 sm:p-3 bg-slate-50 rounded-lg">
+                                        <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-slate-500" />
+                                        <span className="font-semibold text-slate-700 text-xs sm:text-sm">{type}:</span>
+                                        <span className="text-slate-600 text-xs sm:text-sm">
                                           {deadline.from && new Date(deadline.from).toLocaleDateString()} 
                                           {deadline.from && deadline.to && ' - '}
                                           {deadline.to && new Date(deadline.to).toLocaleDateString()}
@@ -875,11 +875,11 @@ const AdminStudentManagement = () => {
 
         {/* Enhanced Notification */}
         {notification.isVisible && (
-          <div className="fixed top-24 right-8 z-50 max-w-md w-full">
+          <div className="fixed top-20 sm:top-24 right-4 sm:right-8 z-50 max-w-xs sm:max-w-md w-full">
             <div className={`transform transition-all duration-500 ease-out ${
               notification.isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
             }`}>
-              <div className={`rounded-xl shadow-2xl border-l-4 p-6 ${
+              <div className={`rounded-xl shadow-2xl border-l-4 p-4 sm:p-6 ${
                 notification.type === "success" 
                   ? "bg-emerald-50 border-emerald-400" 
                   : "bg-red-50 border-red-400"
@@ -890,20 +890,20 @@ const AdminStudentManagement = () => {
                   }`}>
                     {notification.type === "success" ? (
                       <div className="relative">
-                        <div className="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-emerald-400 opacity-75"></div>
-                        <CheckCircle className="relative inline-flex h-6 w-6" />
+                        <div className="animate-ping absolute inline-flex h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-emerald-400 opacity-75"></div>
+                        <CheckCircle className="relative inline-flex h-5 w-5 sm:h-6 sm:w-6" />
                       </div>
                     ) : (
-                      <XCircle className="h-6 w-6" />
+                      <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
                     )}
                   </div>
-                  <div className="ml-4 flex-1">
-                    <h3 className={`text-sm font-bold ${
+                  <div className="ml-3 sm:ml-4 flex-1">
+                    <h3 className={`text-xs sm:text-sm font-bold ${
                       notification.type === "success" ? "text-emerald-800" : "text-red-800"
                     }`}>
                       {notification.title}
                     </h3>
-                    <p className={`mt-1 text-sm ${
+                    <p className={`mt-1 text-xs sm:text-sm ${
                       notification.type === "success" ? "text-emerald-700" : "text-red-700"
                     }`}>
                       {notification.message}
@@ -917,7 +917,7 @@ const AdminStudentManagement = () => {
                         : "text-red-400 hover:text-red-600"
                     } transition-colors`}
                   >
-                    <X className="h-5 w-5" />
+                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
                   </button>
                 </div>
               </div>

@@ -532,18 +532,18 @@ const FacultyManagement = () => {
     return (
       <>
         <Navbar />
-        <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-          <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md mx-auto text-center">
-            <div className="relative mb-8">
-              <div className="animate-spin rounded-full h-20 w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+        <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center px-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-12 max-w-sm sm:max-w-md mx-auto text-center">
+            <div className="relative mb-6 sm:mb-8">
+              <div className="animate-spin rounded-full h-16 w-16 sm:h-20 sm:w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
               <div className="absolute inset-0 flex items-center justify-center">
-                <Users className="h-8 w-8 text-blue-600 animate-pulse" />
+                <Users className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 animate-pulse" />
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-slate-800 mb-3">
+            <h3 className="text-lg sm:text-2xl font-bold text-slate-800 mb-3">
               {activeTab === 'single' ? 'Creating Faculty Account' : 'Creating Faculty Accounts'}
             </h3>
-            <p className="text-slate-600">Please wait while we process your request...</p>
+            <p className="text-sm sm:text-base text-slate-600">Please wait while we process your request...</p>
           </div>
         </div>
       </>
@@ -553,33 +553,33 @@ const FacultyManagement = () => {
   return (
     <>
       <Navbar />
-      <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
+      <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
         
         {/* Page Header */}
-        <div className="mb-8 bg-white rounded-2xl shadow-lg mx-8 overflow-hidden">
-          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="bg-white/20 p-3 rounded-xl">
-                  <Users className="h-8 w-8 text-white" />
+        <div className="mb-6 sm:mb-8 mx-4 sm:mx-8 bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-4 sm:px-8 py-4 sm:py-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <Users className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-white">Faculty Management</h1>
-                  <p className="text-indigo-100 mt-1">Create and manage faculty accounts</p>
+                  <h1 className="text-xl sm:text-3xl font-bold text-white">Faculty Management</h1>
+                  <p className="text-indigo-100 mt-1 text-sm sm:text-base">Create and manage faculty accounts</p>
                 </div>
               </div>
               
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="text-white/90 text-sm">Current Context</div>
-                    <div className="text-white font-semibold">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                  <div className="text-left sm:text-right">
+                    <div className="text-white/90 text-xs sm:text-sm">Current Context</div>
+                    <div className="text-white font-semibold text-sm sm:text-base">
                       {hasContext ? `${schoolFromContext} - ${departmentFromContext}` : 'All Schools & Departments'}
                     </div>
                   </div>
                   <button
                     onClick={handleSelectContext}
-                    className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-all duration-200 font-medium"
+                    className="bg-white/20 hover:bg-white/30 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-all duration-200 font-medium text-sm sm:text-base w-full sm:w-auto"
                   >
                     {hasContext ? 'Change Context' : 'Select Context'}
                   </button>
@@ -589,25 +589,20 @@ const FacultyManagement = () => {
           </div>
         </div>
 
-           
-
-      
-
-
         {/* Tab Navigation */}
-        <div className="mx-8 mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="flex items-center space-x-3 mb-6">
+        <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
+          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-8">
+            <div className="flex items-center space-x-3 mb-4 sm:mb-6">
               <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
-                <Settings className="h-5 w-5 text-white" />
+                <Settings className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-800">Creation Mode</h2>
+              <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Creation Mode</h2>
             </div>
             
-            <div className="inline-flex bg-slate-100 rounded-xl p-1.5 shadow-inner">
+            <div className="inline-flex bg-slate-100 rounded-xl p-1.5 shadow-inner w-full sm:w-auto">
               <button
                 onClick={() => setActiveTab('single')}
-                className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 ${
+                className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center space-x-2 ${
                   activeTab === 'single'
                     ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transform scale-105"
                     : "text-slate-600 hover:text-slate-800 hover:bg-slate-200"
@@ -618,7 +613,7 @@ const FacultyManagement = () => {
               </button>
               <button
                 onClick={() => setActiveTab('bulk')}
-                className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center space-x-2 ${
+                className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center space-x-2 ${
                   activeTab === 'bulk'
                     ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transform scale-105"
                     : "text-slate-600 hover:text-slate-800 hover:bg-slate-200"
@@ -632,67 +627,67 @@ const FacultyManagement = () => {
         </div>
 
         {/* Main Content */}
-        <div className="mx-8 mb-8">
+        <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
           <div className="bg-white rounded-2xl shadow-lg">
             {activeTab === 'single' ? (
-              <div className="p-8">
-                <div className="flex items-center space-x-3 mb-8">
+              <div className="p-4 sm:p-8">
+                <div className="flex items-center space-x-3 mb-4 sm:mb-8">
                   <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
-                    <Plus className="h-5 w-5 text-white" />
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-800">Create Faculty Account</h2>
+                  <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Create Faculty Account</h2>
                 </div>
 
-                <div className="max-w-3xl mx-auto space-y-6">
+                <div className="max-w-2xl sm:max-w-3xl mx-auto space-y-6">
                   {/* Role Selection */}
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-3">
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                       Account Type <span className="text-red-500">*</span>
                     </label>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, role: 'faculty' }))}
-                        className={`p-4 rounded-xl border-2 transition-all flex items-center justify-center space-x-3 ${
+                        className={`p-3 sm:p-4 rounded-xl border-2 transition-all flex items-center justify-center space-x-2 sm:space-x-3 text-sm sm:text-base ${
                           formData.role === 'faculty' 
                             ? 'border-blue-500 bg-blue-50 text-blue-700' 
                             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         }`}
                       >
-                        <User size={20} />
+                        <User size={16} className="sm:h-5 sm:w-5" />
                         <span className="font-medium">Faculty</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, role: 'admin' }))}
-                        className={`p-4 rounded-xl border-2 transition-all flex items-center justify-center space-x-3 ${
+                        className={`p-3 sm:p-4 rounded-xl border-2 transition-all flex items-center justify-center space-x-2 sm:space-x-3 text-sm sm:text-base ${
                           formData.role === 'admin' 
                             ? 'border-blue-500 bg-blue-50 text-blue-700' 
                             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         }`}
                       >
-                        <Shield size={20} />
+                        <Shield size={16} className="sm:h-5 sm:w-5" />
                         <span className="font-medium">Admin</span>
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     {/* Name */}
                     <div>
-                      <label htmlFor="name" className="block text-sm font-semibold text-slate-700 mb-3">
+                      <label htmlFor="name" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                         Full Name <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <User size={18} className="text-slate-400" />
+                        <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                          <User size={16} className="sm:h-5 sm:w-5 text-slate-400" />
                         </div>
                         <input
                           id="name"
                           name="name"
                           type="text"
                           placeholder="Dr. John Doe"
-                          className="block w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400"
+                          className="block w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700 placeholder-slate-400"
                           value={formData.name}
                           onChange={handleInputChange}
                           required
@@ -702,19 +697,19 @@ const FacultyManagement = () => {
 
                     {/* Employee ID */}
                     <div>
-                      <label htmlFor="employeeId" className="block text-sm font-semibold text-slate-700 mb-3">
+                      <label htmlFor="employeeId" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                         Employee ID <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <Hash size={18} className="text-slate-400" />
+                        <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                          <Hash size={16} className="sm:h-5 sm:w-5 text-slate-400" />
                         </div>
                         <input
                           id="employeeId"
                           name="employeeId"
                           type="text"
                           placeholder="FAC001"
-                          className="block w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400"
+                          className="block w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700 placeholder-slate-400"
                           value={formData.employeeId}
                           onChange={handleInputChange}
                           required
@@ -725,19 +720,19 @@ const FacultyManagement = () => {
 
                   {/* Email */}
                   <div>
-                    <label htmlFor="emailId" className="block text-sm font-semibold text-slate-700 mb-3">
+                    <label htmlFor="emailId" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                       Email Address <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Mail size={18} className="text-slate-400" />
+                      <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                        <Mail size={16} className="sm:h-5 sm:w-5 text-slate-400" />
                       </div>
                       <input
                         id="emailId"
                         name="emailId"
                         type="email"
                         placeholder="john.doe@vit.ac.in"
-                        className="block w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400"
+                        className="block w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700 placeholder-slate-400"
                         value={formData.emailId}
                         onChange={handleInputChange}
                         required
@@ -747,56 +742,56 @@ const FacultyManagement = () => {
 
                   {/* Password */}
                   <div>
-                    <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-3">
+                    <label htmlFor="password" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                       Password <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Shield size={18} className="text-slate-400" />
+                      <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                        <Shield size={16} className="sm:h-5 sm:w-5 text-slate-400" />
                       </div>
                       <input
                         id="password"
                         name="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Password123!"
-                        className="block w-full pl-12 pr-16 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400"
+                        className="block w-full pl-10 sm:pl-12 pr-12 sm:pr-16 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700 placeholder-slate-400"
                         value={formData.password}
                         onChange={handleInputChange}
                         required
                       />
-                      <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                      <div className="absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center">
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
                           className="text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
                         >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                          {showPassword ? <EyeOff size={16} className="sm:h-5 sm:w-5" /> : <Eye size={16} className="sm:h-5 sm:w-5" />}
                         </button>
                       </div>
                     </div>
-                    <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                      <p className="text-xs font-semibold text-slate-700 mb-2">Password Requirements:</p>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                    <div className="mt-3 p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <p className="text-xs sm:text-sm font-semibold text-slate-700 mb-2">Password Requirements:</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm text-slate-600">
                         <span>• 8+ characters</span>
                         <span>• Uppercase letter</span>
                         <span>• Lowercase letter</span>
                         <span>• Number</span>
-                        <span className="col-span-2">• Special character (!@#$%^&*)</span>
+                        <span className="col-span-1 sm:col-span-2">• Special character (!@#$%^&*)</span>
                       </div>
                     </div>
                   </div>
 
                   {/* School & Department Selection */}
                   {!hasContext && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                       <div>
-                        <label htmlFor="school" className="block text-sm font-semibold text-slate-700 mb-3">
+                        <label htmlFor="school" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                           School <span className="text-red-500">*</span>
                         </label>
                         <select
                           id="school"
                           name="school"
-                          className="block w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700"
+                          className="block w-full px-3 sm:px-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700"
                           value={formData.school}
                           onChange={handleInputChange}
                           required
@@ -809,13 +804,13 @@ const FacultyManagement = () => {
                       </div>
 
                       <div>
-                        <label htmlFor="department" className="block text-sm font-semibold text-slate-700 mb-3">
+                        <label htmlFor="department" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                           Department <span className="text-red-500">*</span>
                         </label>
                         <select
                           id="department"
                           name="department"
-                          className="block w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700"
+                          className="block w-full px-3 sm:px-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700"
                           value={formData.department}
                           onChange={handleInputChange}
                           required
@@ -831,14 +826,14 @@ const FacultyManagement = () => {
 
                   {/* Specialization Selection */}
                   <div>
-                    <label htmlFor="specializations" className="block text-sm font-semibold text-slate-700 mb-3">
+                    <label htmlFor="specializations" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                       Specializations <span className="text-red-500">*</span>
                     </label>
                     <select
                       id="specializations"
                       multiple
                       size={5}
-                      className="block w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700"
+                      className="block w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700"
                       value={formData.specializations}
                       onChange={handleSpecializationChange}
                       required
@@ -847,24 +842,24 @@ const FacultyManagement = () => {
                         <option key={option} value={option}>{specializationMap[option] || option}</option>
                       ))}
                     </select>
-                    <p className="mt-2 text-xs text-slate-500">Hold Ctrl (Cmd on Mac) to select multiple specializations</p>
+                    <p className="mt-2 text-xs sm:text-sm text-slate-500">Hold Ctrl (Cmd on Mac) to select multiple specializations</p>
                   </div>
 
                   {/* Profile Image URL */}
                   <div>
-                    <label htmlFor="imageUrl" className="block text-sm font-semibold text-slate-700 mb-3">
+                    <label htmlFor="imageUrl" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                       Profile Image URL <span className="text-slate-400">(Optional)</span>
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Upload size={18} className="text-slate-400" />
+                      <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                        <Upload size={16} className="sm:h-5 sm:w-5 text-slate-400" />
                       </div>
                       <input
                         id="imageUrl"
                         name="imageUrl"
                         type="url"
                         placeholder="https://example.com/profile.jpg"
-                        className="block w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700 placeholder-slate-400"
+                        className="block w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700 placeholder-slate-400"
                         value={formData.imageUrl}
                         onChange={handleInputChange}
                       />
@@ -872,11 +867,11 @@ const FacultyManagement = () => {
                   </div>
 
                   {/* Submit Button */}
-                  <div className="pt-6">
+                  <div className="pt-4 sm:pt-6">
                     <button
                       onClick={handleSingleSubmit}
                       disabled={isLoading}
-                      className="w-full flex justify-center items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      className="w-full flex justify-center items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     >
                       {isLoading ? (
                         <>
@@ -885,7 +880,7 @@ const FacultyManagement = () => {
                         </>
                       ) : (
                         <>
-                          <Save size={20} className="mr-2" />
+                          <Save size={16} className="sm:h-5 sm:w-5 mr-2" />
                           Create {formData.role === 'faculty' ? 'Faculty' : 'Admin'} Account
                         </>
                       )}
@@ -894,20 +889,20 @@ const FacultyManagement = () => {
                 </div>
               </div>
             ) : (
-              <div className="p-8">
-                <div className="flex items-center space-x-3 mb-8">
+              <div className="p-4 sm:p-8">
+                <div className="flex items-center space-x-3 mb-4 sm:mb-8">
                   <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
-                    <Upload className="h-5 w-5 text-white" />
+                    <Upload className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-800">Bulk Faculty Upload</h2>
+                  <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Bulk Faculty Upload</h2>
                 </div>
 
                 {/* Template Download */}
-                <div className="mb-8 p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
+                <div className="mb-6 sm:mb-8 p-4 sm:p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                      <h4 className="font-semibold text-blue-900 mb-2">Download Excel Template</h4>
-                      <p className="text-sm text-blue-700">
+                      <h4 className="font-semibold text-blue-900 mb-2 text-sm sm:text-base">Download Excel Template</h4>
+                      <p className="text-xs sm:text-sm text-blue-700">
                         {hasContext 
                           ? `Template for ${schoolFromContext} - ${departmentFromContext} (school & department will be auto-filled)`
                           : 'Template includes all required columns including school and department'
@@ -916,7 +911,7 @@ const FacultyManagement = () => {
                     </div>
                     <button
                       onClick={downloadTemplate}
-                      className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg font-medium"
+                      className="flex items-center space-x-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg font-medium text-sm sm:text-base w-full sm:w-auto"
                     >
                       <Download size={16} />
                       <span>Download Template</span>
@@ -925,19 +920,19 @@ const FacultyManagement = () => {
                 </div>
 
                 {/* File Upload */}
-                <div className="mb-8">
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">
+                <div className="mb-6 sm:mb-8">
+                  <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                     Excel File <span className="text-red-500">*</span>
                   </label>
                   <div className="flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Upload className="w-12 h-12 mb-4 text-slate-400" />
-                        <p className="mb-2 text-sm text-slate-600">
+                    <label className="flex flex-col items-center justify-center w-full h-40 sm:h-48 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
+                      <div className="flex flex-col items-center justify-center pt-4 sm:pt-5 pb-5 sm:pb-6">
+                        <Upload className="w-10 h-10 sm:w-12 sm:h-12 mb-3 sm:mb-4 text-slate-400" />
+                        <p className="mb-2 text-xs sm:text-sm text-slate-600">
                           <span className="font-semibold">Click to upload</span> or drag and drop
                         </p>
                         <p className="text-xs text-slate-500 mb-2">Excel files only (.xlsx, .xls)</p>
-                        <p className="text-xs text-blue-600 text-center max-w-sm">
+                        <p className="text-xs text-blue-600 text-center max-w-xs sm:max-w-sm">
                           {hasContext 
                             ? 'Required: name, employeeId, emailId, password, role, specializations'
                             : 'Required: name, employeeId, emailId, password, role, school, department, specializations'
@@ -953,8 +948,8 @@ const FacultyManagement = () => {
                     </label>
                   </div>
                   {fileName && (
-                    <div className="mt-4 p-4 bg-emerald-50 border-2 border-emerald-200 rounded-xl">
-                      <p className="text-sm text-emerald-700 font-semibold flex items-center space-x-2">
+                    <div className="mt-4 p-3 sm:p-4 bg-emerald-50 border-2 border-emerald-200 rounded-xl">
+                      <p className="text-xs sm:text-sm text-emerald-700 font-semibold flex items-center space-x-2">
                         <CheckCircle size={16} />
                         <span>File selected: {fileName}</span>
                       </p>
@@ -965,21 +960,21 @@ const FacultyManagement = () => {
                 {/* Bulk Data Preview */}
                 {bulkData.length > 0 ? (
                   <div>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-4">
                       <div>
-                        <h3 className="text-xl font-bold text-slate-800">
+                        <h3 className="text-base sm:text-xl font-bold text-slate-800">
                           Faculty Preview ({bulkData.length} records)
                         </h3>
                         {bulkData.filter(f => f.hasErrors).length > 0 && (
-                          <p className="text-sm text-red-600 mt-1">
+                          <p className="text-xs sm:text-sm text-red-600 mt-1">
                             {bulkData.filter(f => f.hasErrors).length} records have errors
                           </p>
                         )}
                       </div>
-                      <div className="flex space-x-3">
+                      <div className="flex space-x-3 w-full sm:w-auto">
                         <button
                           onClick={handleBulkSubmit}
-                          className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed flex items-center space-x-2"
+                          className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm sm:text-base"
                           disabled={isLoading || bulkData.filter(f => !f.hasErrors).length === 0}
                         >
                           <Save className="h-4 w-4" />
@@ -988,117 +983,115 @@ const FacultyManagement = () => {
                         <button
                           onClick={resetBulkData}
                           disabled={isLoading}
-                          className="px-6 py-3 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-semibold transition-all duration-200"
+                          className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-semibold transition-all duration-200 text-sm sm:text-base"
                         >
                           Clear
                         </button>
                       </div>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-gradient-to-r from-slate-100 to-blue-100">
-                            <tr>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Name</th>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Employee ID</th>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Email</th>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Role</th>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+                      <table className="w-full min-w-[800px]">
+                        <thead className="bg-gradient-to-r from-slate-100 to-blue-100">
+                          <tr>
+                            <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
+                            <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Name</th>
+                            <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Employee ID</th>
+                            <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Email</th>
+                            <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Role</th>
+                            {!hasContext && (
+                              <>
+                                <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">School</th>
+                                <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Department</th>
+                              </>
+                            )}
+                            <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Specializations</th>
+                            <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Issues</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                          {bulkData.map((faculty, index) => (
+                            <tr key={index} className={`${faculty.hasErrors ? 'bg-red-25' : ''} hover:bg-slate-50 transition-colors duration-150`}>
+                              <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap">
+                                {faculty.hasErrors ? (
+                                  <span className="inline-flex px-2 sm:px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                    Error
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex px-2 sm:px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                                    Valid
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">
+                                {faculty.name || <span className="text-red-500">Missing</span>}
+                              </td>
+                              <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900 font-mono">
+                                {faculty.employeeId || <span className="text-red-500">Missing</span>}
+                              </td>
+                              <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">
+                                {faculty.emailId || <span className="text-red-500">Missing</span>}
+                              </td>
+                              <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-2 sm:px-3 py-1 text-xs font-semibold rounded-full ${
+                                  faculty.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                  {faculty.role}
+                                </span>
+                              </td>
                               {!hasContext && (
                                 <>
-                                  <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">School</th>
-                                  <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Department</th>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">
+                                    {faculty.school || <span className="text-red-500">Missing</span>}
+                                  </td>
+                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">
+                                    {faculty.department || <span className="text-red-500">Missing</span>}
+                                  </td>
                                 </>
                               )}
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Specializations</th>
-                              <th className="px-4 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Issues</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200">
-                            {bulkData.map((faculty, index) => (
-                              <tr key={index} className={`${faculty.hasErrors ? 'bg-red-25' : ''} hover:bg-slate-50 transition-colors duration-150`}>
-                                <td className="px-4 py-4 whitespace-nowrap">
-                                  {faculty.hasErrors ? (
-                                    <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                                      Error
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">
-                                      Valid
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-4 text-sm text-slate-900">
-                                  {faculty.name || <span className="text-red-500">Missing</span>}
-                                </td>
-                                <td className="px-4 py-4 text-sm text-slate-900 font-mono">
-                                  {faculty.employeeId || <span className="text-red-500">Missing</span>}
-                                </td>
-                                <td className="px-4 py-4 text-sm text-slate-900">
-                                  {faculty.emailId || <span className="text-red-500">Missing</span>}
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap">
-                                  <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                                    faculty.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                                  }`}>
-                                    {faculty.role}
-                                  </span>
-                                </td>
-                                {!hasContext && (
-                                  <>
-                                    <td className="px-4 py-4 text-sm text-slate-900">
-                                      {faculty.school || <span className="text-red-500">Missing</span>}
-                                    </td>
-                                    <td className="px-4 py-4 text-sm text-slate-900">
-                                      {faculty.department || <span className="text-red-500">Missing</span>}
-                                    </td>
-                                  </>
+                              <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">
+                                {faculty.specializations?.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {faculty.specializations.map((spec, idx) => (
+                                      <span key={idx} className="inline-flex px-2 py-1 text-xs rounded bg-amber-100 text-amber-800">
+                                        {specializationMap[spec] || spec}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-red-500">Missing</span>
                                 )}
-                                <td className="px-4 py-4 text-sm text-slate-900">
-                                  {faculty.specializations?.length > 0 ? (
-                                    <div className="flex flex-wrap gap-1">
-                                      {faculty.specializations.map((spec, idx) => (
-                                        <span key={idx} className="inline-flex px-2 py-1 text-xs rounded bg-amber-100 text-amber-800">
-                                          {specializationMap[spec] || spec}
-                                        </span>
+                              </td>
+                              <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm">
+                                {faculty.hasErrors ? (
+                                  <div className="text-red-600">
+                                    <div className="font-semibold text-xs">Row {faculty.originalRow}:</div>
+                                    <ul className="list-disc list-inside text-xs mt-1 space-y-1">
+                                      {faculty.errors.map((error, idx) => (
+                                        <li key={idx}>{error}</li>
                                       ))}
-                                    </div>
-                                  ) : (
-                                    <span className="text-red-500">Missing</span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-4 text-sm">
-                                  {faculty.hasErrors ? (
-                                    <div className="text-red-600">
-                                      <div className="font-semibold text-xs">Row {faculty.originalRow}:</div>
-                                      <ul className="list-disc list-inside text-xs mt-1 space-y-1">
-                                        {faculty.errors.map((error, idx) => (
-                                          <li key={idx}>{error}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  ) : (
-                                    <span className="text-emerald-600 text-xs flex items-center space-x-1">
-                                      <CheckCircle size={12} />
-                                      <span>No issues</span>
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                                    </ul>
+                                  </div>
+                                ) : (
+                                  <span className="text-emerald-600 text-xs flex items-center space-x-1">
+                                    <CheckCircle size={12} />
+                                    <span>No issues</span>
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-20">
-                    <div className="mx-auto w-32 h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-8">
-                      <Upload className="h-16 w-16 text-slate-400" />
+                  <div className="text-center py-12 sm:py-20 px-4">
+                    <div className="mx-auto w-24 sm:w-32 h-24 sm:h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-6 sm:mb-8">
+                      <Upload className="h-12 w-12 sm:h-16 sm:w-16 text-slate-400" />
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-600 mb-3">No Data Uploaded Yet</h3>
-                    <p className="text-slate-500 max-w-md mx-auto">
+                    <h3 className="text-lg sm:text-2xl font-bold text-slate-600 mb-3">No Data Uploaded Yet</h3>
+                    <p className="text-sm sm:text-base text-slate-500 max-w-sm sm:max-w-md mx-auto">
                       Upload an Excel file to preview faculty data and create multiple accounts at once.
                     </p>
                   </div>
@@ -1110,11 +1103,11 @@ const FacultyManagement = () => {
 
         {/* Enhanced Notification */}
         {notification.isVisible && (
-          <div className="fixed top-24 right-8 z-50 max-w-md w-full">
+          <div className="fixed top-20 sm:top-24 right-4 sm:right-8 z-50 max-w-xs sm:max-w-md w-full">
             <div className={`transform transition-all duration-500 ease-out ${
               notification.isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
             }`}>
-              <div className={`rounded-xl shadow-2xl border-l-4 p-6 ${
+              <div className={`rounded-xl shadow-2xl border-l-4 p-4 sm:p-6 ${
                 notification.type === "success" 
                   ? "bg-emerald-50 border-emerald-400" 
                   : "bg-red-50 border-red-400"
@@ -1125,20 +1118,20 @@ const FacultyManagement = () => {
                   }`}>
                     {notification.type === "success" ? (
                       <div className="relative">
-                        <div className="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-emerald-400 opacity-75"></div>
-                        <CheckCircle className="relative inline-flex h-6 w-6" />
+                        <div className="animate-ping absolute inline-flex h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-emerald-400 opacity-75"></div>
+                        <CheckCircle className="relative inline-flex h-5 w-5 sm:h-6 sm:w-6" />
                       </div>
                     ) : (
-                      <XCircle className="h-6 w-6" />
+                      <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
                     )}
                   </div>
-                  <div className="ml-4 flex-1">
-                    <h3 className={`text-sm font-bold ${
+                  <div className="ml-3 sm:ml-4 flex-1">
+                    <h3 className={`text-xs sm:text-sm font-bold ${
                       notification.type === "success" ? "text-emerald-800" : "text-red-800"
                     }`}>
                       {notification.title}
                     </h3>
-                    <p className={`mt-1 text-sm whitespace-pre-line ${
+                    <p className={`mt-1 text-xs sm:text-sm whitespace-pre-line ${
                       notification.type === "success" ? "text-emerald-700" : "text-red-700"
                     }`}>
                       {notification.message}
@@ -1152,7 +1145,7 @@ const FacultyManagement = () => {
                         : "text-red-400 hover:text-red-600"
                     } transition-colors`}
                   >
-                    <X className="h-5 w-5" />
+                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
                   </button>
                 </div>
               </div>

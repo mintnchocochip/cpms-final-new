@@ -1,14 +1,188 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PopupReview from '../Components/PopupReview';
 import ReviewTable from '../Components/ReviewTable';
 import Navbar from '../Components/UniversalNavbar';
-import { ChevronRight, RefreshCw } from 'lucide-react';
+import { Database, ChevronRight, RefreshCw, BookOpen, Users, AlertCircle, Calendar } from 'lucide-react';
 import { 
   getGuideProjects, 
   updateProject,
   createReviewRequest,
   batchCheckRequestStatuses,
 } from '../api';
+
+// Memoized inner content component to prevent unnecessary re-renders
+const GuideContent = React.memo(({ 
+  teams, 
+  expandedTeam, 
+  setExpandedTeam, 
+  requestStatuses, 
+  getReviewTypes, 
+  getDeadlines,
+  getTeamRequestStatus, 
+  isTeamDeadlinePassed,
+  isReviewLocked,
+  getButtonColor,
+  setActivePopup,
+  refreshKey // This will force re-render when changed
+}) => {
+  console.log('🔄 [GuideContent] Rendering inner content with refreshKey:', refreshKey);
+  
+  return (
+    <div className="bg-white shadow-xl rounded-2xl overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
+        <h2 className="text-xl sm:text-2xl font-bold text-white">My Guided Projects</h2>
+        <p className="text-blue-100 mt-1">Projects under your guidance and mentorship</p>
+      </div>
+      
+      {teams.length === 0 ? (
+        <div className="p-8 sm:p-12 text-center">
+          <div className="bg-gray-50 rounded-2xl p-8 max-w-md mx-auto">
+            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <div className="text-lg sm:text-xl text-gray-600 mb-2 font-semibold">No Guided Projects</div>
+            <p className="text-sm sm:text-base text-gray-500">Projects assigned to you as guide will appear here</p>
+          </div>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {teams.map(team => {
+            const reviewTypes = getReviewTypes(team.markingSchema);
+            const deadlines = getDeadlines(team.markingSchema);
+            
+            if (!reviewTypes.length) {
+              return (
+                <div key={team.id} className="bg-yellow-50 border-l-4 border-yellow-400 p-6 m-4 sm:m-6 rounded-r-xl">
+                  <div className="flex items-center space-x-3">
+                    <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-yellow-800 text-sm sm:text-base">{team.title}</p>
+                      <p className="text-xs sm:text-sm text-yellow-700 mt-1">No marking schema configured for this project</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            
+            return (
+              <div key={team.id} className="bg-white hover:bg-gray-50 transition-colors duration-200">
+                <div className="p-4 sm:p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-3">
+                        <button
+                          onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
+                          className="flex items-center flex-shrink-0 mt-1 p-1 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          <ChevronRight className={`w-5 h-5 text-gray-600 transition-transform duration-200 ${
+                            expandedTeam === team.id ? 'rotate-90' : ''
+                          }`} />
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-semibold text-gray-900 text-base sm:text-lg lg:text-xl break-words mb-2">
+                            {team.title}
+                          </h3>
+                          <p className="text-sm sm:text-base text-gray-600 mb-3">{team.description}</p>
+                          
+                          <div className="flex items-center gap-4 mb-3">
+                            <div className="flex items-center gap-2 text-blue-600">
+                              <Users className="w-4 h-4" />
+                              <span className="text-sm font-medium">
+                                {team.students.length} Student{team.students.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Status Information */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                            {reviewTypes.map(reviewType => {
+                              const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
+                              const requestStatus = getTeamRequestStatus(team, reviewType.key);
+                              return (
+                                <div key={reviewType.key} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                                  <span className="font-medium text-gray-700 truncate">{reviewType.name}:</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      isPassed 
+                                        ? 'bg-red-100 text-red-700' 
+                                        : 'bg-green-100 text-green-700'
+                                    }`}>
+                                      {isPassed ? 'Deadline Passed' : 'Active'}
+                                    </span>
+                                    {requestStatus === 'approved' && (
+                                      <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">Extended</span>
+                                    )}
+                                    {requestStatus === 'pending' && (
+                                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">Pending</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Review Buttons */}
+                    <div className="flex flex-wrap gap-3 justify-start lg:justify-end">
+                      {reviewTypes.map(reviewType => {
+                        const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
+                        const requestStatus = getTeamRequestStatus(team, reviewType.key);
+                        
+                        return (
+                          <button
+                            key={reviewType.key}
+                            onClick={() => setActivePopup({ 
+                              type: reviewType.key, 
+                              teamId: team.id,
+                              teamTitle: team.title,
+                              students: team.students,
+                              markingSchema: team.markingSchema
+                            })}
+                            className={`px-4 py-3 text-white text-sm font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${getButtonColor(reviewType.key)} ${
+                              isPassed ? 'opacity-75' : ''
+                            } flex items-center gap-2 whitespace-nowrap min-w-0`}
+                          >
+                            <span className="truncate max-w-24 sm:max-w-none">{reviewType.name}</span>
+                            {reviewType.requiresPPT && (
+                              <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">PPT</span>
+                            )}
+                            {requestStatus === 'approved' && (
+                              <span className="text-xs bg-purple-500 px-2 py-1 rounded-full flex-shrink-0 font-bold">EXT</span>
+                            )}
+                            {isPassed && (
+                              <span className="text-xs bg-red-500 px-2 py-1 rounded-full flex-shrink-0">🔒</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  
+                  {/* Expanded Content */}
+                  {expandedTeam === team.id && (
+                    <div className="mt-6 -mx-4 sm:-mx-6 bg-gray-50 rounded-xl overflow-hidden">
+                      <div className="p-4 sm:p-6">
+                        <ReviewTable 
+                          team={team} 
+                          deadlines={deadlines}
+                          requestStatuses={requestStatuses}
+                          isDeadlinePassed={(reviewType) => isTeamDeadlinePassed(reviewType, team.id)}
+                          isReviewLocked={(student, reviewType) => isReviewLocked(student, reviewType, team.id)}
+                          markingSchema={team.markingSchema}
+                          panelMode={false}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+});
 
 const Guide = () => {
   const [teams, setTeams] = useState([]);
@@ -18,12 +192,9 @@ const Guide = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [requestStatuses, setRequestStatuses] = useState({});
   const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Key to force GuideContent re-render
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const getReviewTypes = (markingSchema) => {
+  const getReviewTypes = useCallback((markingSchema) => {
     console.log('🔍 [Guide] Getting review types from schema:', markingSchema);
     if (markingSchema?.reviews) {
       const guideReviews = markingSchema.reviews
@@ -41,9 +212,9 @@ const Guide = () => {
     
     console.log('❌ [Guide] No schema found - returning empty reviews');
     return [];
-  };
+  }, []);
 
-  const getDeadlines = (markingSchema) => {
+  const getDeadlines = useCallback((markingSchema) => {
     console.log('📅 [Guide] Getting deadlines from schema:', markingSchema);
     const deadlineData = {};
     if (markingSchema?.reviews) {
@@ -56,10 +227,10 @@ const Guide = () => {
         });
     }
     return deadlineData;
-  };
+  }, []);
 
   // ✅ FIXED: Proper student data normalization
-  const normalizeStudentData = (student) => {
+  const normalizeStudentData = useCallback((student) => {
     console.log('🔧 [normalizeStudentData] Processing student:', student.name);
     console.log('🔧 [normalizeStudentData] Raw student reviews:', student.reviews);
     
@@ -99,26 +270,25 @@ const Guide = () => {
 
     console.log('✅ [normalizeStudentData] Final normalized student:', normalizedStudent.name, normalizedStudent.reviews);
     return normalizedStudent;
-  };
+  }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       console.log('=== [fetchData] GUIDE FETCH DATA STARTED ===');
-
+      
       const projectsRes = await getGuideProjects();
       console.log('📊 [fetchData] Projects API Response:', projectsRes.data);
 
       let mappedTeams = [];
-
       if (projectsRes.data?.success) {
         const projects = projectsRes.data.data;
         console.log('✅ [fetchData] Processing projects:', projects.length);
-
+        
         const guideProjects = projects.filter(project => project.guideFaculty != null);
         console.log('✅ [fetchData] Guide projects filtered:', guideProjects.length);
-
+        
         mappedTeams = guideProjects.map(project => {
           console.log(`📋 [fetchData] Processing project: ${project.name}`);
           
@@ -162,7 +332,7 @@ const Guide = () => {
           setRequestStatuses(statuses);
         }
       }
-
+      
       console.log('✅ [fetchData] GUIDE FETCH DATA COMPLETED');
     } catch (error) {
       console.error('❌ [fetchData] Error fetching guide data:', error);
@@ -170,20 +340,30 @@ const Guide = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getReviewTypes, normalizeStudentData]);
 
-  const handleRefresh = async () => {
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // ✅ FIXED: Only refresh inner content, not entire page
+  const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
+      console.log('🔄 [Guide] Starting partial refresh...');
+      
       await fetchData();
+      setRefreshKey(prev => prev + 1); // This forces GuideContent to re-render
+      
+      console.log('✅ [Guide] Partial refresh completed');
     } catch (error) {
       console.error('❌ [handleRefresh] Error refreshing guide data:', error);
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [fetchData]);
 
-  const getTeamRequestStatus = (team, reviewType) => {
+  const getTeamRequestStatus = useCallback((team, reviewType) => {
     if (!team) return 'none';
     
     const statuses = team.students.map(student => {
@@ -195,9 +375,9 @@ const Guide = () => {
     if (statuses.includes('pending')) return 'pending';
     if (statuses.includes('approved')) return 'approved';
     return 'none';
-  };
+  }, [requestStatuses]);
 
-  const isTeamDeadlinePassed = (reviewType, teamId) => {
+  const isTeamDeadlinePassed = useCallback((reviewType, teamId) => {
     const team = teams.find(t => t.id === teamId);
     if (!team) return false;
 
@@ -223,9 +403,9 @@ const Guide = () => {
     }
     
     return false;
-  };
+  }, [teams, getDeadlines]);
 
-  const isReviewLocked = (student, reviewType, teamId) => {
+  const isReviewLocked = useCallback((student, reviewType, teamId) => {
     const reviewData = student.reviews?.get ? student.reviews.get(reviewType) : student.reviews?.[reviewType];
     if (reviewData?.locked) {
       return true;
@@ -233,9 +413,9 @@ const Guide = () => {
     
     const deadlinePassed = isTeamDeadlinePassed(reviewType, teamId);
     return deadlinePassed;
-  };
+  }, [isTeamDeadlinePassed]);
 
-  const handleReviewSubmit = async (teamId, reviewType, reviewData, pptObj) => {
+  const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pptObj) => {
     try {
       console.log('=== [FRONTEND] GUIDE REVIEW SUBMIT STARTED ===');
       
@@ -312,7 +492,7 @@ const Guide = () => {
         setActivePopup(null);
         
         setTimeout(async () => {
-          await fetchData();
+          await handleRefresh(); // This will only refresh the inner content
           alert('Guide review submitted and saved successfully!');
         }, 300);
         
@@ -324,9 +504,9 @@ const Guide = () => {
       console.error('❌ [FRONTEND] Critical error during submission:', error);
       alert(`Error submitting review: ${error.message}`);
     }
-  };
+  }, [teams, getReviewTypes, handleRefresh]);
 
-  const handleRequestEdit = async (teamId, reviewType) => {
+  const handleRequestEdit = useCallback(async (teamId, reviewType) => {
     try {
       const team = teams.find(t => t.id === teamId);
       if (!team) return;
@@ -359,20 +539,26 @@ const Guide = () => {
       console.error('❌ Error submitting guide request:', error);
       alert('Error submitting guide request. Please try again.');
     }
-  };
+  }, [teams, getTeamRequestStatus, handleRefresh]);
 
-  const getButtonColor = (reviewType) => {
-    return 'bg-blue-500 hover:bg-blue-600';
-  };
+  const getButtonColor = useCallback((reviewType) => {
+    return 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700';
+  }, []);
 
   if (loading) {
     return (
       <>
-        <Navbar userType="faculty" />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-          <div className="flex flex-col items-center space-y-4 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <div className="text-lg sm:text-xl text-gray-600">Loading guide projects...</div>
+        <Navbar />
+        <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center px-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-12 max-w-sm sm:max-w-md mx-auto text-center">
+            <div className="relative mb-6 sm:mb-8">
+              <div className="animate-spin rounded-full h-16 w-16 sm:h-20 sm:w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Users className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 animate-pulse" />
+              </div>
+            </div>
+            <h3 className="text-lg sm:text-2xl font-bold text-slate-800 mb-3">Loading Guide Data</h3>
+            <p className="text-sm sm:text-base text-slate-600">Retrieving student records and academic data...</p>
           </div>
         </div>
       </>
@@ -383,16 +569,21 @@ const Guide = () => {
     return (
       <>
         <Navbar userType="faculty" />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-          <div className="text-center max-w-md w-full">
-            <div className="text-lg sm:text-xl text-red-600 mb-4">Error Loading Data</div>
-            <p className="text-sm sm:text-base text-gray-600 mb-4">{error}</p>
-            <button
-              onClick={fetchData}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm sm:text-base"
-            >
-              Retry
-            </button>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 pt-14">
+          <div className="lg:ml-64 xl:ml-16 transition-all duration-300">
+            <div className="flex items-center justify-center min-h-[80vh] px-4">
+              <div className="text-center max-w-md w-full bg-white p-8 rounded-2xl shadow-lg">
+                <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                <div className="text-xl sm:text-2xl text-red-600 mb-4 font-semibold">Error Loading Data</div>
+                <p className="text-sm sm:text-base text-gray-600 mb-6">{error}</p>
+                <button
+                  onClick={fetchData}
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 rounded-lg text-sm sm:text-base font-medium transition-all duration-300 transform hover:scale-105"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </>
@@ -402,170 +593,83 @@ const Guide = () => {
   return (
     <>
       <Navbar userType="faculty" />
-      <div className='min-h-screen bg-gray-50 overflow-x-hidden'>
-        <div className='p-4 sm:p-6 lg:p-24 pt-20 sm:pt-24 lg:pt-24'>
-          <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6 gap-4'>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Guide Dashboard</h1>
+      <div className='min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 pt-14'>
+        {/* Content with proper spacing for menu */}
+        <div className="lg:ml-64 xl:ml-16 transition-all duration-300">
+          <div className='p-4 sm:p-6 lg:p-8 xl:p-12 max-w-7xl mx-auto'>
+            {/* Header Section - This stays static and doesn't re-render */}
+            <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-8 gap-4'>
+              <div className="flex items-center space-x-3">
+                <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-3 rounded-xl">
+                  <BookOpen className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800">Guide Dashboard</h1>
+                  <p className="text-sm sm:text-base text-gray-600 mt-1">Monitor and evaluate your guided projects</p>
+                </div>
+              </div>
+              
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className={`flex items-center justify-center gap-3 px-6 py-3 rounded-xl text-white transition-all duration-300 text-sm sm:text-base font-medium transform hover:scale-105 ${
+                  refreshing 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl'
+                }`}
+              >
+                <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{refreshing ? 'Refreshing...' : 'Refresh Status'}</span>
+                <span className="sm:hidden">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+              </button>
             </div>
             
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-white transition-colors text-sm sm:text-base ${
-                refreshing 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
-              }`}
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{refreshing ? 'Refreshing...' : 'Refresh Status'}</span>
-              <span className="sm:hidden">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
-            </button>
+            {/* Inner content that gets refreshed - Key changes to force re-render */}
+            <GuideContent
+              key={refreshKey} // This key changes on refresh, forcing re-render
+              teams={teams}
+              expandedTeam={expandedTeam}
+              setExpandedTeam={setExpandedTeam}
+              requestStatuses={requestStatuses}
+              getReviewTypes={getReviewTypes}
+              getDeadlines={getDeadlines}
+              getTeamRequestStatus={getTeamRequestStatus}
+              isTeamDeadlinePassed={isTeamDeadlinePassed}
+              isReviewLocked={isReviewLocked}
+              getButtonColor={getButtonColor}
+              setActivePopup={setActivePopup}
+              refreshKey={refreshKey}
+            />
+
+            {/* Popup Review Modal */}
+            {activePopup && (() => {
+              const team = teams.find(t => t.id === activePopup.teamId);
+              const reviewTypes = getReviewTypes(team.markingSchema);
+              const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
+              const requestStatus = getTeamRequestStatus(team, activePopup.type);
+              
+              const showRequestEdit = isLocked && (requestStatus === 'none' || requestStatus === 'rejected');
+              
+              return (
+                <PopupReview
+                  title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
+                  teamMembers={activePopup.students}
+                  reviewType={activePopup.type}
+                  isOpen={true}
+                  locked={isLocked}
+                  markingSchema={activePopup.markingSchema}
+                  onClose={() => setActivePopup(null)}
+                  onSubmit={(data, pptObj) => {
+                    handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj);
+                  }}
+                  onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
+                  requestEditVisible={showRequestEdit}
+                  requestPending={requestStatus === 'pending'}
+                  requiresPPT={reviewTypes.find(r => r.key === activePopup.type)?.requiresPPT || false}
+                />
+              );
+            })()}
           </div>
-          
-          <div className="bg-white shadow-md rounded-md">
-            <div className="flex justify-between items-center p-4 sm:p-5">
-              <h2 className="text-lg sm:text-2xl font-semibold text-black">My Guided Projects</h2>
-            </div>
-            
-            {teams.length === 0 ? (
-              <div className="p-6 sm:p-8 text-center text-gray-500">
-                <div className="text-base sm:text-lg mb-2">No projects assigned as guide</div>
-                <p className="text-sm">Projects you guide will appear here</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-200">
-                {teams.map(team => {
-                  const reviewTypes = getReviewTypes(team.markingSchema);
-                  const deadlines = getDeadlines(team.markingSchema);
-
-                  if (!reviewTypes.length) {
-                    return (
-                      <div key={team.id} className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mx-4 sm:mx-5 mb-4 rounded-r">
-                        <div className="flex items-center">
-                          <div className="text-yellow-800">
-                            <p className="font-medium text-sm sm:text-base">{team.title}</p>
-                            <p className="text-xs sm:text-sm">No marking schema configured for this project</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div key={team.id} className="bg-white">
-                      <div className="p-4 sm:p-5">
-                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start gap-2">
-                              <button
-                                onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
-                                className="flex items-center flex-shrink-0 mt-1"
-                              >
-                                <span className={`inline-block transition-transform duration-200 ${
-                                  expandedTeam === team.id ? 'rotate-90' : ''
-                                }`}>
-                                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-                                </span>
-                              </button>
-                              <div className="min-w-0 flex-1">
-                                <h3 className="font-medium text-black text-sm sm:text-base lg:text-lg break-words">
-                                  {team.title}
-                                </h3>
-                                <p className="text-xs sm:text-sm text-gray-600 mt-1">{team.description}</p>
-                                <p className="text-xs text-blue-600 mt-1">
-                                  {team.students.length} student{team.students.length !== 1 ? 's' : ''}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-wrap gap-2 justify-start lg:justify-end">
-                            {reviewTypes.map(reviewType => {
-                              const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
-                              const requestStatus = getTeamRequestStatus(team, reviewType.key);
-                              
-                              return (
-                                <button
-                                  key={reviewType.key}
-                                  onClick={() => setActivePopup({ 
-                                    type: reviewType.key, 
-                                    teamId: team.id,
-                                    teamTitle: team.title,
-                                    students: team.students,
-                                    markingSchema: team.markingSchema
-                                  })}
-                                  className={`px-3 py-2 sm:px-4 text-white text-xs sm:text-sm rounded transition-colors ${getButtonColor(reviewType.key)} ${
-                                    isPassed ? 'opacity-75' : ''
-                                  } flex items-center gap-1 whitespace-nowrap`}
-                                >
-                                  <span className="truncate max-w-24 sm:max-w-none">{reviewType.name}</span>
-                                  {reviewType.requiresPPT && (
-                                    <span className="text-xs bg-white bg-opacity-20 px-1 rounded flex-shrink-0">PPT</span>
-                                  )}
-                                  {requestStatus === 'approved' && (
-                                    <span className="text-xs bg-purple-500 px-1 rounded flex-shrink-0">EXT</span>
-                                  )}
-                                  {isPassed && (
-                                    <span className="text-xs bg-red-500 px-1 rounded flex-shrink-0">🔒</span>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        
-                        {expandedTeam === team.id && (
-                          <div className="mt-4 -mx-4 sm:-mx-5 overflow-x-auto">
-                            <div className="px-4 sm:px-5">
-                              <ReviewTable 
-                                team={team} 
-                                deadlines={deadlines}
-                                requestStatuses={requestStatuses}
-                                isDeadlinePassed={(reviewType) => isTeamDeadlinePassed(reviewType, team.id)}
-                                isReviewLocked={(student, reviewType) => isReviewLocked(student, reviewType, team.id)}
-                                markingSchema={team.markingSchema}
-                                panelMode={false}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {activePopup && (() => {
-            const team = teams.find(t => t.id === activePopup.teamId);
-            const reviewTypes = getReviewTypes(team.markingSchema);
-            const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
-            const requestStatus = getTeamRequestStatus(team, activePopup.type);
-            
-            const showRequestEdit = isLocked && (requestStatus === 'none' || requestStatus === 'rejected');
-            
-            return (
-              <PopupReview
-                title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
-                teamMembers={activePopup.students}
-                reviewType={activePopup.type}
-                isOpen={true}
-                locked={isLocked}
-                markingSchema={activePopup.markingSchema}
-                onClose={() => setActivePopup(null)}
-                onSubmit={(data, pptObj) => {
-                  handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj);
-                }}
-                onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
-                requestEditVisible={showRequestEdit}
-                requestPending={requestStatus === 'pending'}
-                requiresPPT={reviewTypes.find(r => r.key === activePopup.type)?.requiresPPT || false}
-              />
-            );
-          })()}
         </div>
       </div>
     </>

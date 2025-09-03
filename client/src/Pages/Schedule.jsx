@@ -394,27 +394,27 @@ function Schedule() {
     const disabled = !selectedSchool || !selectedDepartment;
 
     return (
-      <div className="mb-8">
+      <div className="mb-6 sm:mb-8 mx-4 sm:mx-8">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           <div className={`bg-gradient-to-r ${
             reviewType === 'guide' 
               ? 'from-blue-600 via-indigo-600 to-purple-600' 
               : 'from-purple-600 via-pink-600 to-red-600'
-          } px-8 py-6`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="bg-white/20 p-3 rounded-xl">
-                  {icon}
+          } px-4 sm:px-8 py-4 sm:py-6`}>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  {React.cloneElement(icon, { className: 'h-5 w-5 sm:h-6 sm:w-6 text-white' })}
                 </div>
                 <div>
-                  <h3 className="text-2xl font-bold text-white">{title}</h3>
-                  <div className="flex items-center space-x-4 mt-1">
-                    <span className="text-white/90 text-sm">
+                  <h3 className="text-lg sm:text-2xl font-bold text-white">{title}</h3>
+                  <div className="flex items-center space-x-3 sm:space-x-4 mt-1">
+                    <span className="text-white/90 text-xs sm:text-sm">
                       {reviews.length} review{reviews.length !== 1 ? 's' : ''}
                     </span>
                     {shouldShowWeightTracker && (
-                      <span className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-1 text-white/90 text-sm font-medium">
-                        <TrendingUp className="h-4 w-4 inline mr-1" />
+                      <span className="bg-white/20 backdrop-blur-sm rounded-lg px-2 sm:px-3 py-1 text-white/90 text-xs sm:text-sm font-medium">
+                        <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 inline mr-1" />
                         {sectionWeight} marks
                       </span>
                     )}
@@ -425,7 +425,7 @@ function Schedule() {
               <button
                 onClick={addFunction}
                 disabled={disabled || !canAddReview}
-                className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2 ${
+                className={`px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2 text-sm sm:text-base w-full sm:w-auto ${
                   disabled || !canAddReview
                     ? 'bg-white/20 text-white/50 cursor-not-allowed'
                     : 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm'
@@ -438,21 +438,21 @@ function Schedule() {
             </div>
           </div>
 
-          <div className="p-8">
+          <div className="p-4 sm:p-8">
             <div className="space-y-6">
               {reviews.map((review) => (
-                <div key={review.id} className={`bg-gradient-to-r from-white to-slate-50 border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-200 ${disabled ? 'opacity-50' : ''}`}>
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center space-x-4">
+                <div key={review.id} className={`bg-gradient-to-r from-white to-slate-50 border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-all duration-200 ${disabled ? 'opacity-50' : ''}`}>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 w-full">
                       <input
                         type="text"
                         value={review.displayName}
                         onChange={(e) => updateReview(reviewType, review.id, 'displayName', e.target.value)}
                         disabled={disabled}
-                        className="text-lg font-bold text-slate-800 border-2 border-slate-200 px-4 py-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all"
+                        className="text-base sm:text-lg font-bold text-slate-800 border-2 border-slate-200 px-3 sm:px-4 py-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all w-full sm:w-auto"
                         placeholder="Review Name"
                       />
-                      <div className="flex items-center space-x-3 bg-slate-50 px-4 py-2 rounded-lg">
+                      <div className="flex items-center space-x-3 bg-slate-50 px-3 sm:px-4 py-2 rounded-lg">
                         <input
                           type="checkbox"
                           checked={review.requiresPPT}
@@ -460,21 +460,21 @@ function Schedule() {
                           disabled={disabled}
                           className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
                         />
-                        <span className="text-sm font-medium text-slate-700">PPT Required</span>
+                        <span className="text-xs sm:text-sm font-medium text-slate-700">PPT Required</span>
                       </div>
                     </div>
                     <button
                       onClick={() => removeFunction(review.id)}
                       disabled={disabled || reviews.length <= 1}
-                      className="text-red-600 hover:text-red-800 hover:bg-red-50 p-3 rounded-lg transition-colors disabled:text-slate-400 disabled:cursor-not-allowed"
+                      className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 sm:p-3 rounded-lg transition-colors disabled:text-slate-400 disabled:cursor-not-allowed"
                     >
-                      <Trash2 className="h-5 w-5" />
+                      <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-3">From Date</label>
+                      <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">From Date</label>
                       <DatePicker
                         selected={review.from}
                         onChange={(date) => updateReview(reviewType, review.id, 'from', date)}
@@ -482,11 +482,11 @@ function Schedule() {
                         showTimeSelect
                         timeIntervals={15}
                         dateFormat="MMMM d, yyyy h:mm aa"
-                        className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all"
+                        className="w-full border-2 border-slate-200 p-2 sm:p-3 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all text-sm sm:text-base"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-3">To Date</label>
+                      <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">To Date</label>
                       <DatePicker
                         selected={review.to}
                         onChange={(date) => updateReview(reviewType, review.id, 'to', date)}
@@ -494,37 +494,37 @@ function Schedule() {
                         showTimeSelect
                         timeIntervals={15}
                         dateFormat="MMMM d, yyyy h:mm aa"
-                        className="w-full border-2 border-slate-200 p-3 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all"
+                        className="w-full border-2 border-slate-200 p-2 sm:p-3 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all text-sm sm:text-base"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <label className="text-sm font-semibold text-slate-700 flex items-center space-x-2">
-                        <Target className="h-4 w-4" />
+                    <div className="flex items-center justify-between mb-3 sm:mb-4">
+                      <label className="text-xs sm:text-sm font-semibold text-slate-700 flex items-center space-x-2">
+                        <Target className="h-3 w-3 sm:h-4 sm:w-4" />
                         <span>Components</span>
                       </label>
                       <button
                         onClick={() => addComponent(reviewType, review.id)}
                         disabled={disabled}
-                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-lg transition-colors disabled:text-slate-400 disabled:cursor-not-allowed"
+                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 sm:p-2 rounded-lg transition-colors disabled:text-slate-400 disabled:cursor-not-allowed"
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                       </button>
                     </div>
                     <div className="space-y-3">
                       {review.components.map((component, index) => (
-                        <div key={index} className="flex items-center space-x-3 p-4 bg-slate-50 rounded-lg">
+                        <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 space-x-0 sm:space-x-3 p-3 sm:p-4 bg-slate-50 rounded-lg">
                           <input
                             type="text"
                             value={component.name}
                             onChange={(e) => updateComponent(reviewType, review.id, index, 'name', e.target.value)}
                             disabled={disabled}
                             placeholder="Component Name"
-                            className="flex-1 border-2 border-slate-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all"
+                            className="flex-1 border-2 border-slate-200 p-2 sm:p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all text-sm sm:text-base"
                           />
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 w-full sm:w-auto">
                             <input
                               type="number"
                               value={component.weight}
@@ -533,24 +533,24 @@ function Schedule() {
                               placeholder="Weight"
                               min="0"
                               max="100"
-                              className="w-20 border-2 border-slate-200 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-center font-bold"
+                              className="w-20 border-2 border-slate-200 p-2 sm:p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-center font-bold text-sm sm:text-base"
                               style={{ 
                                 MozAppearance: 'textfield',
                                 WebkitAppearance: 'none'
                               }}
                             />
-                            <span className="text-sm font-medium text-slate-500">marks</span>
+                            <span className="text-xs sm:text-sm font-medium text-slate-500">marks</span>
                           </div>
                           <button
                             onClick={() => removeComponent(reviewType, review.id, index)}
                             disabled={disabled || review.components.length === 1}
-                            className={`p-2 rounded-lg transition-colors ${
+                            className={`p-1 sm:p-2 rounded-lg transition-colors ${
                               disabled || review.components.length === 1
                                 ? 'text-slate-300 cursor-not-allowed'
                                 : 'text-red-600 hover:text-red-800 hover:bg-red-50'
                             }`}
                           >
-                            <Minus className="h-4 w-4" />
+                            <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
                           </button>
                         </div>
                       ))}
@@ -569,16 +569,16 @@ function Schedule() {
     return (
       <>
         <Navbar />
-        <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-          <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md mx-auto text-center">
-            <div className="relative mb-8">
-              <div className="animate-spin rounded-full h-20 w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+        <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center px-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-12 max-w-sm sm:max-w-md mx-auto text-center">
+            <div className="relative mb-6 sm:mb-8">
+              <div className="animate-spin rounded-full h-16 w-16 sm:h-20 sm:w-20 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
               <div className="absolute inset-0 flex items-center justify-center">
-                <Settings className="h-8 w-8 text-blue-600 animate-pulse" />
+                <Settings className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 animate-pulse" />
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-slate-800 mb-3">Loading Schedule Configuration</h3>
-            <p className="text-slate-600">Retrieving existing marking schema and deadlines...</p>
+            <h3 className="text-lg sm:text-2xl font-bold text-slate-800 mb-3">Loading Schedule Configuration</h3>
+            <p className="text-sm sm:text-base text-slate-600">Retrieving existing marking schema and deadlines...</p>
           </div>
         </div>
       </>
@@ -588,19 +588,19 @@ function Schedule() {
   return (
     <>
       <Navbar />
-      <div className="pt-20 pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
+      <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
         
         {/* Page Header */}
-        <div className="mb-8 bg-white rounded-2xl shadow-lg mx-8 overflow-hidden">
-          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="bg-white/20 p-3 rounded-xl">
-                  <CalendarDays className="h-8 w-8 text-white" />
+        <div className="mb-6 sm:mb-8 mx-4 sm:mx-8 bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-4 sm:px-8 py-4 sm:py-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <CalendarDays className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-white">Schedule Management</h1>
-                  <p className="text-indigo-100 mt-1">Configure review schedules and marking components</p>
+                  <h1 className="text-xl sm:text-3xl font-bold text-white">Schedule Management</h1>
+                  <p className="text-indigo-100 mt-1 text-sm sm:text-base">Configure review schedules and marking components</p>
                 </div>
               </div>
             </div>
@@ -608,55 +608,52 @@ function Schedule() {
         </div>
 
         {/* Statistics Dashboard */}
-        <div className="mx-10 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+        <div className="mx-4 sm:mx-10 mb-6 sm:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-100 text-sm font-medium">Guide Reviews</p>
-                  <p className="text-3xl font-bold mt-1">{guideReviews.length}</p>
+                  <p className="text-blue-100 text-xs sm:text-sm font-medium">Guide Reviews</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-1">{guideReviews.length}</p>
                 </div>
-                <div className="bg-white/20 p-3 rounded-xl">
-                  <GraduationCap className="h-8 w-8" />
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <GraduationCap className="h-6 w-6 sm:h-8 sm:w-8" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-purple-100 text-sm font-medium">Panel Reviews</p>
-                  <p className="text-3xl font-bold mt-1">{panelReviews.length}</p>
+                  <p className="text-purple-100 text-xs sm:text-sm font-medium">Panel Reviews</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-1">{panelReviews.length}</p>
                 </div>
-                <div className="bg-white/20 p-3 rounded-xl">
-                  <Users className="h-8 w-8" />
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <Users className="h-6 w-6 sm:h-8 sm:w-8" />
                 </div>
               </div>
             </div>
-
-
-
           </div>
         </div>
 
         {/* School/Department Selector */}
-        <div className="mx-8 mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="flex items-center space-x-3 mb-6">
+        <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
+          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-8">
+            <div className="flex items-center space-x-3 mb-4 sm:mb-6">
               <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
-                <Building2 className="h-5 w-5 text-white" />
+                <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-800">Select School & Department</h2>
+              <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Select School & Department</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                   School <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedSchool}
                   onChange={(e) => setSelectedSchool(e.target.value)}
-                  className="block w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-lg"
+                  className="block w-full px-3 sm:px-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm sm:text-base"
                   required
                 >
                   <option value="">Select School</option>
@@ -667,13 +664,13 @@ function Schedule() {
               </div>
               
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                   Department <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedDepartment}
                   onChange={(e) => setSelectedDepartment(e.target.value)}
-                  className="block w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-lg"
+                  className="block w-full px-3 sm:px-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm sm:text-base"
                   required
                 >
                   <option value="">Select Department</option>
@@ -688,8 +685,8 @@ function Schedule() {
 
         {/* Conditional Weight Summary */}
         {shouldShowWeightTracker && (
-          <div className="fixed top-28 right-8 z-50">
-            <div className={`px-6 py-4 rounded-2xl shadow-2xl border-2 backdrop-blur-sm transition-all duration-300 ${
+          <div className="fixed top-20 sm:top-28 right-4 sm:right-8 z-50">
+            <div className={`px-4 sm:px-6 py-3 sm:py-4 rounded-2xl shadow-2xl border-2 backdrop-blur-sm transition-all duration-300 ${
               totalWeight === 100 
                 ? 'bg-emerald-50/90 border-emerald-300 text-emerald-800'
                 : totalWeight > 100 
@@ -697,24 +694,24 @@ function Schedule() {
                   : 'bg-blue-50/90 border-blue-300 text-blue-800'
             }`}>
               <div className="flex items-center space-x-3">
-                <div className={`p-2 rounded-xl ${
+                <div className={`p-1 sm:p-2 rounded-xl ${
                   totalWeight === 100 
                     ? 'bg-emerald-100' 
                     : totalWeight > 100 
                       ? 'bg-red-100' 
                       : 'bg-blue-100'
                 }`}>
-                  <Calculator className="h-5 w-5" />
+                  <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
                 <div>
-                  <div className="font-bold text-lg">Total Weight: {totalWeight}/100</div>
-                  <div className="text-sm opacity-80">
+                  <div className="font-bold text-base sm:text-lg">Total Weight: {totalWeight}/100</div>
+                  <div className="text-xs sm:text-sm opacity-80">
                     Guide: {guideWeight} • Panel: {panelWeight}
                   </div>
                 </div>
               </div>
               {totalWeight !== 100 && (
-                <div className="text-sm mt-2 opacity-90">
+                <div className="text-xs sm:text-sm mt-2 opacity-90">
                   {totalWeight < 100 ? `Need ${100 - totalWeight} more marks` : `Exceeded by ${totalWeight - 100} marks`}
                 </div>
               )}
@@ -724,14 +721,14 @@ function Schedule() {
 
         {/* Selection Prompt */}
         {!selectedSchool || !selectedDepartment ? (
-          <div className="mx-8 mb-8">
+          <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
             <div className="bg-white rounded-2xl shadow-lg">
-              <div className="text-center py-20">
-                <div className="mx-auto w-32 h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-8">
-                  <Building2 className="h-16 w-16 text-slate-400" />
+              <div className="text-center py-12 sm:py-20 px-4">
+                <div className="mx-auto w-24 sm:w-32 h-24 sm:h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-6 sm:mb-8">
+                  <Building2 className="h-12 w-12 sm:h-16 sm:w-16 text-slate-400" />
                 </div>
-                <h3 className="text-2xl font-bold text-slate-600 mb-3">Choose School & Department</h3>
-                <p className="text-slate-500 max-w-md mx-auto">
+                <h3 className="text-lg sm:text-2xl font-bold text-slate-600 mb-3">Choose School & Department</h3>
+                <p className="text-sm sm:text-base text-slate-500 max-w-sm sm:max-w-md mx-auto">
                   Please select a school and department above to configure schedules and marking components.
                 </p>
               </div>
@@ -762,12 +759,12 @@ function Schedule() {
             )}
 
             {/* Save Button */}
-            <div className="mx-8 mb-8">
+            <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
               <div className="flex justify-center">
                 <button
                   onClick={handleSaveDeadlines}
                   disabled={saving || loading || !canSave || justSaved}
-                  className={`px-12 py-5 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300 font-bold text-xl shadow-2xl hover:shadow-3xl ${
+                  className={`px-8 sm:px-12 py-3 sm:py-5 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300 font-bold text-base sm:text-xl shadow-2xl hover:shadow-3xl w-full sm:w-auto ${
                     justSaved
                       ? 'bg-gradient-to-r from-emerald-600 to-emerald-600 text-white transform scale-105'
                       : canSave && !saving && !loading
@@ -778,12 +775,12 @@ function Schedule() {
                 >
                   {saving ? (
                     <div className="flex items-center space-x-3">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                      <div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-b-2 border-white"></div>
                       <span>Saving Schema...</span>
                     </div>
                   ) : justSaved ? (
                     <div className="flex items-center space-x-3">
-                      <CheckCircle className="h-6 w-6 animate-pulse" />
+                      <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 animate-pulse" />
                       <span>Saved Successfully!</span>
                     </div>
                   ) : (
@@ -794,15 +791,15 @@ function Schedule() {
             </div>
 
             {/* Enhanced Weight Distribution Info */}
-            <div className="mx-8 mb-8">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-8 shadow-lg">
-                <h3 className="text-2xl font-bold text-blue-900 mb-6 flex items-center space-x-3">
+            <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-4 sm:p-8 shadow-lg">
+                <h3 className="text-lg sm:text-2xl font-bold text-blue-900 mb-4 sm:mb-6 flex items-center space-x-3">
                   <div className="bg-blue-100 p-2 rounded-xl">
-                    <Target className="h-6 w-6 text-blue-600" />
+                    <Target className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                   </div>
                   <span>Weight Distribution Rules</span>
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-blue-800">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-xs sm:text-sm text-blue-800">
                   <div className="space-y-4">
                     <div className="flex items-start space-x-3">
                       <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
@@ -839,13 +836,13 @@ function Schedule() {
 
         {/* Enhanced Notification */}
         {notification.isVisible && (
-          <div className="fixed top-24 right-8 z-50 max-w-md w-full">
+          <div className="fixed top-20 sm:top-24 right-4 sm:right-8 z-50 max-w-xs sm:max-w-md w-full">
             <div className={`transform transition-all duration-500 ease-out ${
               notification.isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
             }`}>
-              <div className={`rounded-xl shadow-2xl border-l-4 p-6 ${
+              <div className={`rounded-xl shadow-2xl border-l-4 p-4 sm:p-6 ${
                 notification.type === "success" 
-                  ? "bg-emerald-50 border-emerald-400" 
+                  ? "bg-emerald-50 border-emerald-400"
                   : notification.type === "error"
                   ? "bg-red-50 border-red-400"
                   : "bg-blue-50 border-blue-400"
@@ -860,17 +857,17 @@ function Schedule() {
                   }`}>
                     {notification.type === "success" ? (
                       <div className="relative">
-                        <div className="animate-ping absolute inline-flex h-6 w-6 rounded-full bg-emerald-400 opacity-75"></div>
-                        <CheckCircle className="relative inline-flex h-6 w-6" />
+                        <div className="animate-ping absolute inline-flex h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-emerald-400 opacity-75"></div>
+                        <CheckCircle className="relative inline-flex h-5 w-5 sm:h-6 sm:w-6" />
                       </div>
                     ) : notification.type === "error" ? (
-                      <XCircle className="h-6 w-6" />
+                      <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
                     ) : (
-                      <AlertTriangle className="h-6 w-6" />
+                      <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
                     )}
                   </div>
-                  <div className="ml-4 flex-1">
-                    <h3 className={`text-sm font-bold ${
+                  <div className="ml-3 sm:ml-4 flex-1">
+                    <h3 className={`text-xs sm:text-sm font-bold ${
                       notification.type === "success" 
                         ? "text-emerald-800" 
                         : notification.type === "error"
@@ -879,7 +876,7 @@ function Schedule() {
                     }`}>
                       {notification.title}
                     </h3>
-                    <p className={`mt-1 text-sm ${
+                    <p className={`mt-1 text-xs sm:text-sm ${
                       notification.type === "success" 
                         ? "text-emerald-700" 
                         : notification.type === "error"
@@ -899,17 +896,16 @@ function Schedule() {
                         : "text-blue-400 hover:text-blue-600"
                     } transition-colors`}
                   >
-                    <X className="h-5 w-5" />
+                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
                   </button>
                 </div>
               </div>
             </div>
           </div>
         )}
-        
       </div>
     </>
   );
-}
+};
 
 export default Schedule;
