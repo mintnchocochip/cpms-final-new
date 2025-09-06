@@ -676,9 +676,9 @@ if (loading) {
                           <div className="flex items-center space-x-3 sm:space-x-4">
                             <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl">
                               {isExpanded ? (
-                                <ChevronDownIcon className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
+                                <ChevronDown className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
                               ) : (
-                                <ChevronRightIcon className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
+                                <ChevronRight className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
                               )}
                             </div>
                             <div>

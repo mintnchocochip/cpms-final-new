@@ -1,5 +1,5 @@
 import Navbar from "../Components/UniversalNavbar";
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { setHours, setMinutes } from "date-fns";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -24,6 +24,8 @@ import {
   BookOpen,
   X
 } from "lucide-react";
+
+
 
 function Schedule() {
   const defaultDate = setHours(setMinutes(new Date(), 30), 16);
@@ -622,10 +624,10 @@ function Schedule() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-purple-100 text-xs sm:text-sm font-medium">Panel Reviews</p>
+                  <p className="text-blue-100 text-xs sm:text-sm font-medium">Panel Reviews</p>
                   <p className="text-2xl sm:text-3xl font-bold mt-1">{panelReviews.length}</p>
                 </div>
                 <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
