@@ -645,7 +645,7 @@ function Schedule() {
               <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
                 <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
-              <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Select School & Department</h2>
+              <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Select Faculty's School & Department</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div>
