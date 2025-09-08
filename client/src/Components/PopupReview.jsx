@@ -23,6 +23,7 @@ const PopupReview = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [hasAttendance, setHasAttendance] = useState(true);
+  const [sub, setSub] = useState('Locked'); // ✅ Initialize sub as 'Locked'
 
   // ✅ Load schema and initialize components
   useEffect(() => {
@@ -47,7 +48,7 @@ const PopupReview = ({
           components = reviewConfig.components.map((comp, index) => ({
             key: `component${index + 1}`,
             label: comp.name,
-            name: comp.name, // ✅ Component name from schema
+            name: comp.name,
             points: comp.weight || 10
           }));
           console.log('✅ [PopupReview] Schema components loaded:', components);
@@ -73,7 +74,7 @@ const PopupReview = ({
     }
   }, [isOpen, reviewType, markingSchema]);
 
-  // ✅ FIXED: Initialize form data from existing student data
+  // ✅ Initialize form data from existing student data
   useEffect(() => {
     if (!isOpen || loading || componentLabels.length === 0) return;
     
@@ -86,7 +87,6 @@ const PopupReview = ({
     teamMembers.forEach(member => {
       console.log(`🔍 [PopupReview] Processing ${member.name}:`, member);
       
-      // ✅ FIXED: Get review data with proper Map handling
       let reviewData = null;
       if (member.reviews?.get) {
         reviewData = member.reviews.get(reviewType);
@@ -96,12 +96,10 @@ const PopupReview = ({
 
       console.log(`📋 [PopupReview] Review data for ${member.name}:`, reviewData);
 
-      // Initialize marks using component names
       const componentMarks = {};
       componentLabels.forEach(comp => {
         let markValue = '';
         if (reviewData?.marks) {
-          // ✅ FIXED: Get mark by component name directly
           markValue = reviewData.marks[comp.name] || '';
         }
         componentMarks[comp.key] = markValue || '';
@@ -122,7 +120,12 @@ const PopupReview = ({
       setAttendance(initialAttendance);
     }
 
-    // Team PPT status
+    // ✅ Update sub state based on comments
+    const allCommentsFilled = teamMembers.every(member => 
+      initialComments[member._id]?.trim() !== ''
+    );
+    setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
+
     if (requiresPPT) {
       setTeamPptApproved(
         teamMembers.length > 0 && 
@@ -172,17 +175,28 @@ const PopupReview = ({
       });
       setMarks(prev => ({ ...prev, [memberId]: zeroedMarks }));
       setComments(prev => ({ ...prev, [memberId]: '' }));
+      // ✅ Update sub state after clearing comments
+      const allCommentsFilled = teamMembers.every(member => 
+        member._id === memberId ? true : (comments[member._id]?.trim() !== '')
+      );
+      setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
     }
   };
 
   const handleCommentsChange = (memberId, value) => {
     if (locked) return;
+    
     setComments(prev => ({ ...prev, [memberId]: value }));
+    
+    // ✅ Update sub state based on all comments
+    const allCommentsFilled = teamMembers.every(member => 
+      member._id === memberId ? value.trim() !== '' : (comments[member._id]?.trim() !== '')
+    );
+    setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
   };
 
-  // ✅ FIXED: Submission format - uses component.name as keys
   const handleSubmit = () => {
-    if (locked) return;
+    if (locked || sub === 'Locked') return;
     
     console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
     
@@ -194,7 +208,6 @@ const PopupReview = ({
         comments: comments[member._id] || ''
       };
 
-      // ✅ KEY FIX: Use comp.name as the key for backend
       componentLabels.forEach(comp => {
         submissionData[comp.name] = Number(memberMarks[comp.key]) || 0;
         console.log(`📤 [PopupReview] Setting ${comp.name} = ${submissionData[comp.name]} for ${member.name}`);
@@ -371,7 +384,8 @@ const PopupReview = ({
                 <textarea
                   value={comments[member._id] || ''}
                   onChange={(e) => handleCommentsChange(member._id, e.target.value)}
-                  disabled={locked || (hasAttendance && attendance[member._id] === false)}
+                  // disabled={locked || (hasAttendance && attendance[member._id] === false)}
+                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   rows="3"
                   placeholder="Add comments..."
@@ -408,14 +422,14 @@ const PopupReview = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={locked || loading}
+              disabled={locked || sub === 'Locked'}
               className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                locked || loading
+                locked || sub === 'Locked'
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 text-white'
               }`}
             >
-              {locked ? 'Locked' : 'Submit Review'}
+              {locked ? 'Locked' : sub === 'Locked' ? 'Comments Required' : 'Submit Review'}
             </button>
           </div>
         </div>

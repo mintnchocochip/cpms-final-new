@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import * as XLSX from "xlsx"; // Import xlsx library for Excel processing
 import {
   getFacultyBySchoolAndDept,
   getAllPanels,
@@ -10,7 +11,7 @@ import {
   assignPanelToProject,
   autoAssignPanelsToProjects,
   autoCreatePanelManual,
-} from "../api";
+} from "../api"; // Note: uploadFacultyExcel API is assumed to be added
 import TeamPopup from "../Components/TeamPopup";
 import ConfirmPopup from "../Components/ConfirmDialog";
 import Navbar from "../Components/UniversalNavbar";
@@ -35,7 +36,9 @@ import {
   BarChart3,
   RefreshCw,
   Filter,
-  Settings
+  Settings,
+  Upload,
+  Download,
 } from "lucide-react";
 
 const AdminPanelManagement = () => {
@@ -56,6 +59,14 @@ const AdminPanelManagement = () => {
     isOpen: false,
     message: "",
     existingCount: 0,
+  });
+
+  // Auto create panel popup state
+  const [autoCreatePopup, setAutoCreatePopup] = useState({
+    isOpen: false,
+    numPanels: "",
+    department: "",
+    error: "",
   });
 
   // Notification state for animated success/error messages
@@ -94,6 +105,91 @@ const AdminPanelManagement = () => {
   // Hide notification function
   const hideNotification = useCallback(() => {
     setNotification(prev => ({ ...prev, isVisible: false }));
+  }, []);
+
+  // Handle Excel file upload
+  const handleExcelUpload = useCallback(async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      showNotification("error", "Invalid File", "Please upload a valid Excel file (.xlsx or .xls)");
+      event.target.value = ""; // Reset input
+      return;
+    }
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        // Validate headers
+        const headers = jsonData[0].map(h => h.trim());
+        const requiredHeaders = ["Faculty Name", "Emp ID", "Email ID", "Department"];
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+        if (missingHeaders.length > 0) {
+          showNotification("error", "Invalid Format", `Missing required columns: ${missingHeaders.join(", ")}`);
+          event.target.value = "";
+          return;
+        }
+
+        // Process rows, skipping header
+        const validDepartments = ["BTech", "MTech (integrated)", "MCS"];
+        const facultyData = jsonData.slice(1).map(row => {
+          const rowObj = {};
+          headers.forEach((header, index) => {
+            rowObj[header] = row[index] || "";
+          });
+          return rowObj;
+        }).filter(row => row["Faculty Name"] && row["Emp ID"] && row["Email ID"] && validDepartments.includes(row["Department"]));
+
+        if (facultyData.length === 0) {
+          showNotification("error", "No Valid Data", "No valid faculty data found in the Excel file");
+          event.target.value = "";
+          return;
+        }
+
+        // Send to backend (assumes uploadFacultyExcel API exists)
+        try {
+          const response = await uploadFacultyExcel(facultyData); // API call to upload faculty data
+          if (response?.data?.success && response.data.data) {
+            setFacultyList(response.data.data);
+            await fetchData();
+            showNotification("success", "Upload Successful", "Faculty data uploaded and processed successfully");
+          } else {
+            showNotification("error", "Upload Failed", "Failed to process faculty data. Please try again.");
+          }
+        } catch (error) {
+          console.error("Excel upload error:", error);
+          showNotification("error", "Upload Failed", "Failed to upload faculty data. Please try again.");
+        }
+        event.target.value = ""; // Reset input
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      console.error("Excel processing error:", error);
+      showNotification("error", "Processing Error", "Failed to process Excel file. Please ensure it's valid.");
+      event.target.value = "";
+    }
+  }, [showNotification, fetchData]);
+
+  // Handle demo Excel download
+  const handleDemoExcelDownload = useCallback(() => {
+    const demoData = [
+      ["Faculty Name", "Emp ID", "Email ID", "Department"],
+      ["John Doe", "EMP001", "john.doe@university.edu", "BTech"],
+      ["Jane Smith", "EMP002", "jane.smith@university.edu", "MTech (integrated)"],
+      ["Alice Johnson", "EMP003", "alice.johnson@university.edu", "MCS"],
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet(demoData);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Faculty Template");
+    XLSX.writeFile(workbook, "Faculty_Demo.xlsx");
   }, []);
 
   // Check for admin context - handle both specific and skip modes
@@ -227,6 +323,7 @@ const AdminPanelManagement = () => {
             projectId: project._id,
             guideId: facultyId,
             guideName: facultyObj.faculty?.name,
+            department: project.department,
           });
         });
       });
@@ -344,10 +441,48 @@ const AdminPanelManagement = () => {
     await executeAutoAssign();
   }, [isAutoCreating, panels, showNotification]);
 
-  // Enhanced Auto Create with mutual exclusion
-  const handleAutoCreatePanel = useCallback(async () => {
+  // Enhanced Auto Create with popup
+  const handleAutoCreatePanel = useCallback(() => {
     if (isAutoAssigning) {
       showNotification("error", "Operation in Progress", "Cannot start auto panel creation while auto assignment is running. Please wait for it to complete.");
+      return;
+    }
+
+    setAutoCreatePopup({
+      isOpen: true,
+      numPanels: "",
+      department: "",
+      error: "",
+    });
+  }, [isAutoAssigning, showNotification]);
+
+  // Handle auto create popup confirmation
+  const handleAutoCreateConfirm = useCallback(async () => {
+    const numPanels = parseInt(autoCreatePopup.numPanels);
+    const selectedDept = autoCreatePopup.department;
+
+    // Filter faculty based on selected department
+    const filteredFaculty = selectedDept
+      ? facultyList.filter((faculty) =>
+          faculty.guidedProjects?.some((project) => project.department === selectedDept)
+        )
+      : facultyList;
+
+    const maxPanels = Math.floor(filteredFaculty.length / 2);
+
+    if (!numPanels || numPanels <= 0) {
+      setAutoCreatePopup(prev => ({
+        ...prev,
+        error: "Please enter a valid number of panels",
+      }));
+      return;
+    }
+
+    if (numPanels > maxPanels) {
+      setAutoCreatePopup(prev => ({
+        ...prev,
+        error: `Cannot create ${numPanels} panels. Only ${maxPanels} panels are possible with ${filteredFaculty.length} available faculty for ${selectedDept || 'all departments'}.`,
+      }));
       return;
     }
 
@@ -355,14 +490,21 @@ const AdminPanelManagement = () => {
       setAutoConfirmation({
         type: "create",
         isOpen: true,
-        message: `There are already ${panels.length} panels created. Auto-creation will create additional panels if needed. Do you want to continue?`,
+        message: `There are already ${panels.length} panels created. Auto-creation will create up to ${numPanels} additional panels for ${selectedDept || 'all departments'} if needed. Do you want to continue?`,
         existingCount: panels.length,
       });
+      setAutoCreatePopup({ isOpen: false, numPanels: "", department: "", error: "" });
       return;
     }
-    
-    await executeAutoCreate();
-  }, [isAutoAssigning, panels.length, showNotification]);
+
+    await executeAutoCreate(numPanels, selectedDept);
+    setAutoCreatePopup({ isOpen: false, numPanels: "", department: "", error: "" });
+  }, [autoCreatePopup.numPanels, autoCreatePopup.department, facultyList, panels.length]);
+
+  // Handle auto create popup cancellation
+  const handleAutoCreateCancel = useCallback(() => {
+    setAutoCreatePopup({ isOpen: false, numPanels: "", department: "", error: "" });
+  }, []);
 
   // Execute auto assign with notification instead of alert
   const executeAutoAssign = useCallback(async () => {
@@ -380,12 +522,12 @@ const AdminPanelManagement = () => {
   }, [fetchData, showNotification]);
 
   // Execute auto create with notification instead of alert
-  const executeAutoCreate = useCallback(async () => {
+  const executeAutoCreate = useCallback(async (numPanels, department) => {
     try {
       setIsAutoCreating(true);
-      await autoCreatePanelManual();
+      await autoCreatePanelManual({ numPanels, department });
       await fetchData();
-      showNotification("success", "Auto-Creation Complete!", "Panels have been automatically created");
+      showNotification("success", "Auto-Creation Complete!", `Up to ${numPanels} panels have been automatically created for ${department || 'all departments'}`);
     } catch (error) {
       console.error("Auto create panel error:", error);
       showNotification("error", "Creation Failed", "Auto panel creation failed. Please try again.");
@@ -397,6 +539,8 @@ const AdminPanelManagement = () => {
   // Handle auto operation confirmation
   const handleAutoConfirm = useCallback(async () => {
     const currentType = autoConfirmation.type;
+    const numPanels = parseInt(autoCreatePopup.numPanels) || 0;
+    const department = autoCreatePopup.department;
     setAutoConfirmation({
       type: "",
       isOpen: false,
@@ -407,9 +551,9 @@ const AdminPanelManagement = () => {
     if (currentType === "assign") {
       await executeAutoAssign();
     } else if (currentType === "create") {
-      await executeAutoCreate();
+      await executeAutoCreate(numPanels, department);
     }
-  }, [autoConfirmation.type, executeAutoAssign, executeAutoCreate]);
+  }, [autoConfirmation.type, autoCreatePopup.numPanels, autoCreatePopup.department, executeAutoAssign, executeAutoCreate]);
 
   // Handle auto operation cancellation
   const handleAutoCancel = useCallback(() => {
@@ -477,6 +621,18 @@ const AdminPanelManagement = () => {
     [searchQuery]
   );
 
+  // Calculate maximum possible panels based on filtered faculty
+  const filteredFaculty = useMemo(() => {
+    const selectedDept = autoCreatePopup.department;
+    return selectedDept
+      ? facultyList.filter((faculty) =>
+          faculty.guidedProjects?.some((project) => project.department === selectedDept)
+        )
+      : facultyList;
+  }, [autoCreatePopup.department, facultyList]);
+
+  const maxPanels = Math.floor(filteredFaculty.length / 2);
+
   if (loading) {
     return (
       <>
@@ -520,7 +676,7 @@ const AdminPanelManagement = () => {
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 w-full sm:w-auto">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                     <div className="text-left sm:text-right w-full sm:w-auto">
-                      <div className="text-white/90 text-xs sm:text-sm">Current Context</div>
+                      <div className="text-white/90 text-xs sm:text-sm">Current Programme</div>
                       <div className="text-white font-semibold text-sm sm:text-base">
                         {adminContext.skipped ? 'All Schools & Departments' : `${adminContext.school} - ${adminContext.department}`}
                       </div>
@@ -529,7 +685,7 @@ const AdminPanelManagement = () => {
                       onClick={handleChangeSchoolDepartment}
                       className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg transition-all duration-200 font-medium w-full sm:w-auto text-center"
                     >
-                      Change Context
+                      Change Programme
                     </button>
                   </div>
                 </div>
@@ -688,45 +844,40 @@ const AdminPanelManagement = () => {
                   <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                   Add Panel
                 </button>
-
-                {/* Auto Create Button */}
-              <button
-  onClick={handleAutoCreatePanel}
-  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
-  disabled={isAutoCreating || isAutoAssigning}
-  title={
-    isAutoAssigning 
-      ? "Cannot create panels while auto assignment is running"
-      : panels.length > 0 
-        ? `${panels.length} panels already exist` 
-        : "Create panels automatically"
-  }
->
-  {isAutoCreating ? (
-    <>
-      <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
-      Creating...
-    </>
-  ) : isAutoAssigning ? (
-    <>
-      <div className="animate-pulse h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-slate-300"></div>
-      Waiting...
-    </>
-  ) : (
-    <>
-      <Bot className="h-4 w-4 sm:h-5 sm:w-5" />
-      Auto Create
-      {panels.length > 0 && (
-        <span className="ml-1 bg-yellow-500 text-white text-xs rounded-full px-1.5 py-0.5 sm:px-2 sm:py-1">
-          {panels.length}
-        </span>
-      )}
-    </>
-  )}
-</button>
-
-
-                {/* Auto Assign Button */}
+                <button
+                  onClick={handleAutoCreatePanel}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
+                  disabled={isAutoCreating || isAutoAssigning}
+                  title={
+                    isAutoAssigning 
+                      ? "Cannot create panels while auto assignment is running"
+                      : panels.length > 0 
+                        ? `${panels.length} panels already exist` 
+                        : "Create panels automatically"
+                  }
+                >
+                  {isAutoCreating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
+                      Creating...
+                    </>
+                  ) : isAutoAssigning ? (
+                    <>
+                      <div className="animate-pulse h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-slate-300"></div>
+                      Waiting...
+                    </>
+                  ) : (
+                    <>
+                      <Bot className="h-4 w-4 sm:h-5 sm:w-5" />
+                      Auto Create
+                      {panels.length > 0 && (
+                        <span className="ml-1 bg-yellow-500 text-white text-xs rounded-full px-1.5 py-0.5 sm:px-2 sm:py-1">
+                          {panels.length}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </button>
                 <button
                   onClick={handleAutoAssign}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
@@ -761,10 +912,126 @@ const AdminPanelManagement = () => {
                     </>
                   )}
                 </button>
+                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                      Upload Faculty Excel
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={handleExcelUpload}
+                        className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleDemoExcelDownload}
+                    className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
+                    title="Download a demo Excel file with the correct format"
+                  >
+                    <Download className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Demo Excel
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Auto Create Panel Popup */}
+        {autoCreatePopup.isOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center gap-3 sm:gap-4 mb-4">
+                  <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                    <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+                      Auto Create Panels
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                      Specify the number of panels and department
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="mb-4 sm:mb-6 space-y-4">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                      Department
+                    </label>
+                    <select
+                      value={autoCreatePopup.department}
+                      onChange={(e) =>
+                        setAutoCreatePopup(prev => ({
+                          ...prev,
+                          department: e.target.value,
+                          error: "",
+                        }))
+                      }
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                    >
+                      <option value="">All Departments</option>
+                      <option value="BTech">BTech</option>
+                      <option value="MTech (integrated)">MTech (integrated)</option>
+                      <option value="MCS">MCS</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                      Number of Panels (Max: {maxPanels})
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={autoCreatePopup.numPanels}
+                      onChange={(e) =>
+                        setAutoCreatePopup(prev => ({
+                          ...prev,
+                          numPanels: e.target.value,
+                          error: "",
+                        }))
+                      }
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                      placeholder="Enter number of panels"
+                    />
+                  </div>
+                  {autoCreatePopup.error && (
+                    <div className="mt-2 p-2 sm:p-3 bg-red-50 rounded-lg border-l-4 border-red-300">
+                      <p className="text-xs sm:text-sm text-red-800">
+                        {autoCreatePopup.error}
+                      </p>
+                    </div>
+                  )}
+                  <div className="mt-2 p-2 sm:p-3 bg-blue-50 rounded-lg border-l-4 border-blue-300">
+                    <p className="text-xs sm:text-sm text-blue-800">
+                      <strong>Note:</strong> Each panel requires 2 faculty members. With {filteredFaculty.length} faculty {autoCreatePopup.department ? `in ${autoCreatePopup.department}` : 'across all departments'}, up to {maxPanels} panels can be created.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={handleAutoCreateCancel}
+                    className="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-all text-sm sm:text-base"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAutoCreateConfirm}
+                    className="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all text-sm sm:text-base"
+                  >
+                    Create Panels
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Panels Data Display */}
         <div className="mx-4 sm:mx-6 md:mx-8 mb-8">
@@ -1094,7 +1361,7 @@ const AdminPanelManagement = () => {
                   {autoConfirmation.type === "create" && (
                     <div className="mt-2 sm:mt-3 p-2 sm:p-3 bg-blue-50 rounded-lg border-l-4 border-blue-300">
                       <p className="text-xs sm:text-sm text-blue-800">
-                        <strong>Note:</strong> Additional panels will be created only if needed based on available faculty.
+                        <strong>Note:</strong> Up to {autoCreatePopup.numPanels || 0} additional panels will be created for {autoCreatePopup.department || 'all departments'} only if needed based on available faculty.
                       </p>
                     </div>
                   )}

@@ -572,7 +572,7 @@ const FacultyManagement = () => {
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 w-full sm:w-auto">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                   <div className="text-left sm:text-right">
-                    <div className="text-white/90 text-xs sm:text-sm">Current Context</div>
+                    <div className="text-white/90 text-xs sm:text-sm">Current Programme</div>
                     <div className="text-white font-semibold text-sm sm:text-base">
                       {hasContext ? `${schoolFromContext} - ${departmentFromContext}` : 'All Schools & Departments'}
                     </div>
@@ -581,7 +581,7 @@ const FacultyManagement = () => {
                     onClick={handleSelectContext}
                     className="bg-white/20 hover:bg-white/30 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-all duration-200 font-medium text-sm sm:text-base w-full sm:w-auto"
                   >
-                    {hasContext ? 'Change Context' : 'Select Context'}
+                    {hasContext ? 'Change Programme' : 'Select Programme'}
                   </button>
                 </div>
               </div>
