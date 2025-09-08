@@ -151,153 +151,17 @@ const ReviewTable = ({
 
   return (
     <div className="overflow-x-auto mt-4" key={forceRenderKey}>
-      <table className="min-w-full bg-white border border-gray-200">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="px-4 py-2 border font-semibold text-left sticky left-0 bg-gray-100 z-10 min-w-[150px]">
-              Student Name
-            </th>
-            {columns.map(col => (
-              <th key={col.key} className="px-4 py-2 border text-center min-w-[120px]">
-                <div className="flex flex-col items-center space-y-1">
-                  <span className="font-semibold break-words">{col.label}</span>
-                  <div className="text-xs text-gray-600 leading-tight">
-                    {col.components.length > 0 ? (
-                      <div className="space-y-1">
-                        <div className="font-medium">Components:</div>
-                        <div className="break-words">
-                          {col.components.map((comp, idx) => (
-                            <div key={idx} className="truncate" title={comp.name}>
-                              {comp.name} ({comp.weight || 10})
-                            </div>
-                          ))}
-                        </div>
-                        <div className="text-blue-600">+ Attendance</div>
-                      </div>
-                    ) : (
-                      'Marks | Attendance'
-                    )}
-                  </div>
-                  {col.requiresPPT && (
-                    <div className="text-xs text-yellow-600 bg-yellow-100 px-1 rounded">PPT Required</div>
-                  )}
-                </div>
-                {team.students.some(student => checkReviewLocked(student, col.key)) && (
-                  <div className="mt-1">
-                    <span className="px-2 py-0.5 text-xs bg-red-200 text-red-700 rounded">
-                      🔒 Locked
-                    </span>
-                  </div>
-                )}
-              </th>
-            ))}
-            <th className="px-4 py-2 border text-center min-w-[120px]">Comments</th>
-          </tr>
-        </thead>
-        <tbody>
-          {team.students.map((student, studentIndex) => (
-            <tr key={`${student._id}_${forceRenderKey}`} className={studentIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-              <td className="px-4 py-2 border font-semibold sticky left-0 bg-white z-10 min-w-[150px]">
-                <div className="break-words">
-                  <div>{student.name}</div>
-                  <div className="text-sm text-gray-600">{student.regNo}</div>
-                </div>
-              </td>
-              
-              {columns.map(col => {
-                // ✅ FIXED: Get review data with proper Map handling
-                let reviewData = null;
-                
-                if (student.reviews && typeof student.reviews.get === 'function') {
-                  reviewData = student.reviews.get(col.key);
-                } else if (student.reviews && student.reviews[col.key]) {
-                  reviewData = student.reviews[col.key];
-                }
-                
-                const isLocked = checkReviewLocked(student, col.key);
-                
-                return (
-                  <td key={`${student._id}_${col.key}`} className="px-4 py-2 border text-center align-top">
-                    <div className="space-y-3">
-                      <div>
-                        <div className="text-sm font-medium text-gray-700 mb-1">Marks:</div>
-                        <div className="font-semibold">
-                          {renderMarks(reviewData, col.components)}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <div className="text-sm font-medium text-gray-700 mb-1">Attendance:</div>
-                        <div>
-                          {renderAttendance(reviewData?.attendance)}
-                        </div>
-                      </div>
-                      
-                      {isLocked && (
-                        <div className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
-                          🔒 Locked
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                );
-              })}
-              
-              <td className="px-4 py-2 border align-top max-w-md">
-                <div className="space-y-2">
-                  {columns.map(col => {
-                    let reviewData = null;
-                    
-                    if (student.reviews && typeof student.reviews.get === 'function') {
-                      reviewData = student.reviews.get(col.key);
-                    } else if (student.reviews && student.reviews[col.key]) {
-                      reviewData = student.reviews[col.key];
-                    }
-                    
-                    const comments = reviewData?.comments;
-                    
-                    if (comments && comments.trim()) {
-                      return (
-                        <div key={`${student._id}_${col.key}_comment`} className="mb-3">
-                          <div className="text-sm font-medium text-gray-700 mb-1">
-                            {col.label}:
-                          </div>
-                          {renderComments(comments)}
-                        </div>
-                      );
-                    }
-                    return null;
-                  })}
-                  
-                  {!columns.some(col => {
-                    let reviewData = null;
-                    if (student.reviews && typeof student.reviews.get === 'function') {
-                      reviewData = student.reviews.get(col.key);
-                    } else if (student.reviews && student.reviews[col.key]) {
-                      reviewData = student.reviews[col.key];
-                    }
-                    return reviewData?.comments && reviewData.comments.trim();
-                  }) && (
-                    <span className="text-gray-400 text-sm">No comments</span>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+      <div className="mt-1 p-4 bg-gray-50 rounded-lg">
         <h3 className="font-semibold text-lg mb-3">Team Summary</h3>
         
-        <div className="mb-3">
+        {/* <div className="mb-3">
           <span className="font-medium">Overall PPT Approved: </span>
           <span className={team.students.every(s => s.pptApproved?.approved) ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
             {team.students.every(s => s.pptApproved?.approved) ? 'Yes' : 'No'}
           </span>
-        </div>
+        </div> */}
         
-        <div className="mb-3">
+        {/* <div className="mb-3">
           <div className="font-medium mb-2">Individual PPT Status:</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {team.students.map((student) => (
@@ -309,7 +173,7 @@ const ReviewTable = ({
               </div>
             ))}
           </div>
-        </div>
+        </div> */}
         
         {Object.keys(deadlines).length > 0 && (
           <div>
@@ -343,6 +207,143 @@ const ReviewTable = ({
           </div>
         )}
       </div>
+      <table className="min-w-full bg-white border border-gray-200">
+  <thead className="bg-gray-100">
+    <tr>
+      <th className="px-4 py-3 border font-semibold text-left sticky left-0 bg-gray-100 z-10 min-w-[150px]">
+        Student Name
+      </th>
+      {columns.map(col => (
+        <th key={col.key} className="px-4 py-3 border text-center min-w-[120px]">
+          <div className="flex flex-col items-center space-y-2">
+            <span className="font-semibold text-sm">{col.label}</span>
+            <div className="text-xs text-gray-600 leading-tight">
+              {col.components.length > 0 ? (
+                <div className="space-y-1">
+                  <div className="font-medium">Components:</div>
+                  <div>
+                    {col.components.map((comp, idx) => (
+                      <div key={idx} className="truncate max-w-[100px]" title={comp.name}>
+                        {comp.name} ({comp.weight || 10})
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-blue-600">+ Attendance</div>
+                </div>
+              ) : (
+                'Marks | Attendance'
+              )}
+            </div>
+            {col.requiresPPT && (
+              <div className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
+                PPT Required
+              </div>
+            )}
+          </div>
+          {team.students.some(student => checkReviewLocked(student, col.key)) && (
+            <div className="mt-2">
+              <span className="px-2 py-1 text-xs bg-red-200 text-red-700 rounded">
+                🔒 Locked
+              </span>
+            </div>
+          )}
+        </th>
+      ))}
+      <th className="px-4 py-3 border text-center min-w-[120px]">Comments</th>
+      <th className="px-4 py-3 border text-center min-w-[120px]">PPT Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {team.students.map((student, studentIndex) => (
+      <tr
+        key={`${student._id}_${forceRenderKey}`}
+        className={studentIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
+      >
+        <td className="px-4 py-3 border font-semibold sticky left-0 bg-inherit z-10 min-w-[150px]">
+          <div className="break-words">
+            <div>{student.name}</div>
+            <div className="text-sm text-gray-600">{student.regNo}</div>
+          </div>
+        </td>
+        {columns.map(col => {
+          let reviewData = null;
+          if (student.reviews && typeof student.reviews.get === 'function') {
+            reviewData = student.reviews.get(col.key);
+          } else if (student.reviews && student.reviews[col.key]) {
+            reviewData = student.reviews[col.key];
+          }
+          const isLocked = checkReviewLocked(student, col.key);
+          return (
+            <td
+              key={`${student._id}_${col.key}`}
+              className="px-4 py-3 border text-center align-middle"
+            >
+              <div className="space-y-3">
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-1">Marks:</div>
+                  <div className="font-semibold">{renderMarks(reviewData, col.components)}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-1">Attendance:</div>
+                  <div>{renderAttendance(reviewData?.attendance)}</div>
+                </div>
+                {isLocked && (
+                  <div className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
+                    🔒 Locked
+                  </div>
+                )}
+              </div>
+            </td>
+          );
+        })}
+        <td className="px-4 py-3 border align-middle max-w-md">
+          <div className="space-y-2">
+            {columns.map(col => {
+              let reviewData = null;
+              if (student.reviews && typeof student.reviews.get === 'function') {
+                reviewData = student.reviews.get(col.key);
+              } else if (student.reviews && student.reviews[col.key]) {
+                reviewData = student.reviews[col.key];
+              }
+              const comments = reviewData?.comments;
+              if (comments && comments.trim()) {
+                return (
+                  <div key={`${student._id}_${col.key}_comment`} className="mb-3">
+                    <div className="text-sm font-medium text-gray-700 mb-1">{col.label}:</div>
+                    <div className="text-sm">{renderComments(comments)}</div>
+                  </div>
+                );
+              }
+              return null;
+            })}
+            {!columns.some(col => {
+              let reviewData = null;
+              if (student.reviews && typeof student.reviews.get === 'function') {
+                reviewData = student.reviews.get(col.key);
+              } else if (student.reviews && student.reviews[col.key]) {
+                reviewData = student.reviews[col.key];
+              }
+              return reviewData?.comments && reviewData.comments.trim();
+            }) && <span className="text-gray-400 text-sm">No comments</span>}
+          </div>
+        </td>
+        <td className="px-4 py-3 border align-middle">
+          <div className="space-y-2">
+            <div className="text-sm  ">
+              <span
+                className={student.pptApproved?.approved ? 'text-green-600' : 'text-red-600'}
+              >
+                <b>{student.pptApproved?.approved ? 'PPT Approved' : 'PPT Not Approved'}</b>
+              </span>
+            </div>
+          </div>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+      
+      
     </div>
   );
 };
