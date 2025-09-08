@@ -1126,11 +1126,11 @@ export async function createPanelManually(req, res) {
 
 export async function autoCreatePanels(req, res) {
   try {
-    // Request structure:
+    // Request example (now with empid):
     // {
     //   "departments": {
-    //     "BTech": { "panelsNeeded": 5, "panelSize": 3, "faculties": [Array of faculty _id] },
-    //     "MCA": { "panelsNeeded": 2, "panelSize": 2, "faculties": [Array of faculty _id] }
+    //     "BTech": { "panelsNeeded": 5, "panelSize": 3, "faculties": [Array of empid as string or number] },
+    //     "MCA": { "panelsNeeded": 2, "panelSize": 2, "faculties": [Array of empid] }
     //   }
     // }
 
@@ -1138,57 +1138,78 @@ export async function autoCreatePanels(req, res) {
     const createdPanels = [];
     const invalidFaculties = {};
 
-    for (const [dept, { panelsNeeded, panelSize, faculties }] of Object.entries(departments)) {
-      // 1. Validate all faculties exist and belong to the right department
-      const foundFaculties = await Faculty.find({ _id: { $in: faculties }, department: dept });
-      const foundIds = foundFaculties.map(f => f._id.toString());
-      const missingIds = faculties.filter(fid => !foundIds.includes(fid.toString()));
+    for (const [dept, { panelsNeeded, panelSize, faculties }] of Object.entries(
+      departments
+    )) {
+      // 1. Validate: all faculties exist with correct empid and dept
+      const foundFaculties = await Faculty.find({
+        employeeId: { $in: faculties },
+        department: dept,
+      });
+      const foundEmpIds = foundFaculties.map((f) => f.employeeId.toString());
+      const missingEmpIds = faculties.filter(
+        (eid) => !foundEmpIds.includes(eid.toString())
+      );
 
       // Track any missing faculties
-      if (missingIds.length > 0) {
-        invalidFaculties[dept] = missingIds;
+      if (missingEmpIds.length > 0) {
+        invalidFaculties[dept] = missingEmpIds;
         continue; // Skip this department if any faculty is missing
       }
 
-      // 2. Sort faculties by experience (employeeId ascending)
-      foundFaculties.sort((a, b) => parseInt(a.employeeId) - parseInt(b.employeeId));
+      // 2. Sort by experience (employeeId ascending)
+      foundFaculties.sort(
+        (a, b) => parseInt(a.employeeId) - parseInt(b.employeeId)
+      );
 
-      // 3. Ensure enough faculties for panels
+      // 3. Check enough faculties
       const totalAvailable = foundFaculties.length;
       if (totalAvailable < panelsNeeded * panelSize) {
-        invalidFaculties[dept] = [`Not enough faculties, need ${panelsNeeded * panelSize}, found ${totalAvailable}`];
+        invalidFaculties[dept] = [
+          `Not enough faculties, need ${
+            panelsNeeded * panelSize
+          }, found ${totalAvailable}`,
+        ];
         continue;
       }
 
-      // 4. Build panels: always group most exp/least exp together in each panel
+      // 4. Group most/least experienced for each panel
       const used = new Set();
       let facultyPool = [...foundFaculties];
 
       for (let i = 0; i < panelsNeeded; i++) {
-        // Select faculty for panel: combine most and least experienced, no repeats
         let panelMembers = [];
-        let left = 0, right = facultyPool.length - 1;
+        let left = 0,
+          right = facultyPool.length - 1;
 
-        // Try to add most + least experienced, avoid repeats, until panelSize is met
         while (panelMembers.length < panelSize && left <= right) {
-          // Pick from extremes
-          if (!used.has(facultyPool[left]._id.toString()) && panelMembers.length < panelSize) {
+          if (
+            !used.has(facultyPool[left].employeeId.toString()) &&
+            panelMembers.length < panelSize
+          ) {
             panelMembers.push(facultyPool[left]);
-            used.add(facultyPool[left]._id.toString());
+            used.add(facultyPool[left].employeeId.toString());
           }
-          if (left !== right && !used.has(facultyPool[right]._id.toString()) && panelMembers.length < panelSize) {
+          if (
+            left !== right &&
+            !used.has(facultyPool[right].employeeId.toString()) &&
+            panelMembers.length < panelSize
+          ) {
             panelMembers.push(facultyPool[right]);
-            used.add(facultyPool[right]._id.toString());
+            used.add(facultyPool[right].employeeId.toString());
           }
-          left++; right--;
+          left++;
+          right--;
         }
-        if (panelMembers.length !== panelSize) break; // Should not happen if checks are correct
+        if (panelMembers.length !== panelSize) break;
 
         // Create and save panel
         const panel = new Panel({
-          members: panelMembers.map(f => f._id), // If your schema uses faculty1/faculty2, adjust accordingly
+          members: panelMembers.map((f) => f._id), // Or store empid if needed
           department: dept,
-          school: panelMembers.school,
+          school: Array.isArray(panelMembers[0].school)
+            ? panelMembers[0].school[0]
+            : panelMembers[0].school,
         });
         await panel.save();
         createdPanels.push(panel);
@@ -1197,19 +1218,25 @@ export async function autoCreatePanels(req, res) {
 
     res.status(200).json({
       success: Object.keys(invalidFaculties).length === 0,
-      message: Object.keys(invalidFaculties).length === 0
-        ? "Panels created successfully."
-        : `Panels created with errors. Invalid/missing faculties: ${JSON.stringify(invalidFaculties)}`,
+      message:
+        Object.keys(invalidFaculties).length === 0
+          ? "Panels created successfully."
+          : `Panels created with errors. Invalid/missing faculties: ${JSON.stringify(
+              invalidFaculties
+            )}`,
       panelsCreated: createdPanels.length,
-      details: createdPanels.map(p => ({
+      details: createdPanels.map((p) => ({
         department: p.department,
-        facultyIds: p.members // Or [p.faculty1, p.faculty2] per your schema
-      }))
+        facultyIds: p.members, // These will be faculty _ids, adjust if schema uses empid
+      })),
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Server error", error: error.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error", error: error.message });
   }
 }
+
 
 
 export async function deletePanel(req, res) {
