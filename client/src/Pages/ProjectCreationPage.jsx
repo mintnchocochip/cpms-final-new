@@ -1346,27 +1346,6 @@ if (contextLoading) {
                 </div>
 
                 <div className="max-w-xl sm:max-w-3xl mx-auto space-y-6">
-                  {/* Submit Button at Top */}
-                  <div className="mb-6 sm:mb-8">
-                    <button
-                      onClick={handleSingleSubmit}
-                      disabled={loading}
-                      className="w-full flex justify-center items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 sm:px-6 py-2 sm:py-4 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-                    >
-                      {loading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white mr-3"></div>
-                          Creating Project...
-                        </>
-                      ) : (
-                        <>
-                          <Save size={16} className="mr-2" />
-                          Create Project
-                        </>
-                      )}
-                    </button>
-                  </div>
-
                   {/* Project Name */}
                   <div>
                     <label htmlFor="name" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
