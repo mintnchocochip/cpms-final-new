@@ -1,16 +1,13 @@
 import mongoose from "mongoose";
 
 const panelSchema = new mongoose.Schema({
-  faculty1: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Faculty",
-    required: true,
-  },
-  faculty2: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Faculty",
-    required: true,
-  },
+  members: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Faculty",
+      required: true,
+    },
+  ],
   school: {
     type: String,
     required: true,

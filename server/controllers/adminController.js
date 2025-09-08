@@ -1126,43 +1126,33 @@ export async function createPanelManually(req, res) {
 
 export async function autoCreatePanels(req, res) {
   try {
-    // Request example (now with empid):
-    // {
-    //   "departments": {
-    //     "BTech": { "panelsNeeded": 5, "panelSize": 3, "faculties": [Array of empid as string or number] },
-    //     "MCA": { "panelsNeeded": 2, "panelSize": 2, "faculties": [Array of empid] }
-    //   }
-    // }
-
     const departments = req.body.departments;
     const createdPanels = [];
     const invalidFaculties = {};
+    const facultiesToUpdate = {}; // { empid: Set(depts) }
 
     for (const [dept, { panelsNeeded, panelSize, faculties }] of Object.entries(
       departments
     )) {
-      // 1. Validate: all faculties exist with correct empid and dept
+      // 1. Check all faculties exist
       const foundFaculties = await Faculty.find({
         employeeId: { $in: faculties },
-        department: dept,
       });
+
       const foundEmpIds = foundFaculties.map((f) => f.employeeId.toString());
       const missingEmpIds = faculties.filter(
         (eid) => !foundEmpIds.includes(eid.toString())
       );
 
-      // Track any missing faculties
       if (missingEmpIds.length > 0) {
         invalidFaculties[dept] = missingEmpIds;
-        continue; // Skip this department if any faculty is missing
+        continue;
       }
 
-      // 2. Sort by experience (employeeId ascending)
+      // 2. Sort by experience (empid ASC)
       foundFaculties.sort(
         (a, b) => parseInt(a.employeeId) - parseInt(b.employeeId)
       );
-
-      // 3. Check enough faculties
       const totalAvailable = foundFaculties.length;
       if (totalAvailable < panelsNeeded * panelSize) {
         invalidFaculties[dept] = [
@@ -1173,7 +1163,7 @@ export async function autoCreatePanels(req, res) {
         continue;
       }
 
-      // 4. Group most/least experienced for each panel
+      // 3. Make panels: most/least experienced pairing, never repeat
       const used = new Set();
       let facultyPool = [...foundFaculties];
 
@@ -1181,7 +1171,6 @@ export async function autoCreatePanels(req, res) {
         let panelMembers = [];
         let left = 0,
           right = facultyPool.length - 1;
-
         while (panelMembers.length < panelSize && left <= right) {
           if (
             !used.has(facultyPool[left].employeeId.toString()) &&
@@ -1201,11 +1190,25 @@ export async function autoCreatePanels(req, res) {
           left++;
           right--;
         }
-        if (panelMembers.length !== panelSize) break;
+
+        // Distinct check
+        if (
+          panelMembers.length !== panelSize ||
+          new Set(panelMembers.map((f) => f.employeeId)).size !== panelSize
+        ) {
+          continue;
+        }
+
+        // Track faculty to update dept later
+        for (const f of panelMembers) {
+          if (!facultiesToUpdate[f.employeeId])
+            facultiesToUpdate[f.employeeId] = new Set();
+          facultiesToUpdate[f.employeeId].add(dept);
+        }
 
         // Create and save panel
         const panel = new Panel({
-          members: panelMembers.map((f) => f._id), // Or store empid if needed
+          members: panelMembers.map((f) => f._id),
           department: dept,
           school: Array.isArray(panelMembers[0].school)
             ? panelMembers[0].school[0]
@@ -1216,18 +1219,31 @@ export async function autoCreatePanels(req, res) {
       }
     }
 
+    // 4. Update faculty department attribute (adds dept, no duplication)
+    for (const [empid, deptSet] of Object.entries(facultiesToUpdate)) {
+      const doc = await Faculty.findOne({ employeeId: empid });
+      const prevDepartments = Array.isArray(doc.department)
+        ? doc.department
+        : [];
+      const nextDepartments = Array.from(
+        new Set([...prevDepartments, ...deptSet])
+      );
+      doc.department = nextDepartments;
+      await doc.save();
+    }
+
     res.status(200).json({
       success: Object.keys(invalidFaculties).length === 0,
       message:
         Object.keys(invalidFaculties).length === 0
-          ? "Panels created successfully."
+          ? "Panels created and faculty department assigned successfully."
           : `Panels created with errors. Invalid/missing faculties: ${JSON.stringify(
               invalidFaculties
             )}`,
       panelsCreated: createdPanels.length,
       details: createdPanels.map((p) => ({
         department: p.department,
-        facultyIds: p.members, // These will be faculty _ids, adjust if schema uses empid
+        facultyIds: p.members,
       })),
     });
   } catch (error) {
@@ -1377,14 +1393,17 @@ export async function assignPanelToProject(req, res) {
   }
 }
 
+
 export async function autoAssignPanelsToProjects(req, res) {
   try {
     const buffer = Number(req.body.buffer) || 0;
 
+    // Get all unassigned projects (panel: null)
     const unassignedProjects = await Project.find({ panel: null }).populate(
       "guideFaculty"
     );
-    const panels = await Panel.find().populate(["faculty1", "faculty2"]);
+    // Fetch panels with members
+    const panels = await Panel.find().populate("members");
 
     if (!panels.length) {
       return res
@@ -1392,6 +1411,7 @@ export async function autoAssignPanelsToProjects(req, res) {
         .json({ success: false, message: "No panels available." });
     }
 
+    // Leave last N panels in buffer unassigned for future
     const panelsToAssign = panels.slice(0, panels.length - buffer);
 
     if (!panelsToAssign.length) {
@@ -1401,71 +1421,30 @@ export async function autoAssignPanelsToProjects(req, res) {
       });
     }
 
-    // Initialize assignment tracker
+    // Assignment tracker
     const panelAssignments = {};
     panelsToAssign.forEach((panel) => {
       panelAssignments[panel._id.toString()] = [];
     });
 
-    let assignments = 0;
-    let projectIndex = 0;
     const totalProjects = unassignedProjects.length;
     const totalPanels = panelsToAssign.length;
 
-    // Keep track of which projects are assigned
-    const assignedFlags = new Array(totalProjects).fill(false);
+    // Keep track of project assignments (fills all panels, then loops again)
+    let projectIndex = 0;
+    let panelIndex = 0;
 
-    // First pass: assign one project to each panel if possible
-    for (
-      let i = 0;
-      i < totalPanels && projectIndex < totalProjects;
-      i++, projectIndex++
-    ) {
+    // Distribute projects - first fill every panel with one, then round robin
+    while (projectIndex < totalProjects) {
+      const panel = panelsToAssign[panelIndex % totalPanels];
       const project = unassignedProjects[projectIndex];
-      // Specialization match logic as before
-      const projSpec = project.specialization?.trim();
-      let eligiblePanels = [panelsToAssign[i]];
-      const panel = eligiblePanels[0];
 
       project.panel = panel._id;
       await project.save();
       panelAssignments[panel._id.toString()].push(project._id);
-      assignedFlags[projectIndex] = true;
-      assignments++;
-    }
 
-    // Loop again for remaining projects (round-robin)
-    let loopIndex = 0;
-    for (let j = 0; j < totalProjects; j++) {
-      if (assignedFlags[j]) continue; // already assigned
-      const project = unassignedProjects[j];
-      const projSpec = project.specialization?.trim();
-
-      // Filter eligible panels by specialization for each round
-      let eligiblePanels = panelsToAssign.filter((panel) => {
-        const { faculty1, faculty2, specialization } = panel;
-        if (!faculty1 || !faculty2) return false;
-        if (!specialization || !projSpec || specialization.trim() !== projSpec)
-          return false;
-        const faculty1HasSpec = faculty1.specialization?.some(
-          (s) => s.trim() === projSpec
-        );
-        const faculty2HasSpec = faculty2.specialization?.some(
-          (s) => s.trim() === projSpec
-        );
-        return faculty1HasSpec || faculty2HasSpec;
-      });
-
-      // Fallback if no specialization matches
-      if (!eligiblePanels.length) eligiblePanels = panelsToAssign;
-
-      // Assign round-robin to eligible panels
-      const eligiblePanel = eligiblePanels[loopIndex % eligiblePanels.length];
-      project.panel = eligiblePanel._id;
-      await project.save();
-      panelAssignments[eligiblePanel._id.toString()].push(project._id);
-      assignments++;
-      loopIndex++;
+      projectIndex++;
+      panelIndex++;
     }
 
     return res.status(200).json({
@@ -1479,6 +1458,7 @@ export async function autoAssignPanelsToProjects(req, res) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 }
+
 
 
 
