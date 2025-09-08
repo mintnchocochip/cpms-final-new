@@ -256,6 +256,107 @@ export async function createProject(req, res, next) {
   }
 }
 
+export async function getAllProjects(req, res) {
+  try {
+    const { school, department } = req.query;
+
+    // Build filter object for optional filtering
+    const filter = {};
+    if (school) filter.school = school;
+    if (department) filter.department = department;
+
+    // Fetch all projects with populated references
+    const projects = await Project.find(filter)
+      .populate({
+        path: "students",
+        model: "Student",
+        select: "regNo name emailId reviews pptApproved deadline school department"
+      })
+      .populate({
+        path: "guideFaculty", 
+        model: "Faculty",
+        select: "name emailId employeeId school department specialization"
+      })
+      .populate({
+        path: "panel",
+        model: "Panel",
+        select: "school department",
+        populate: {
+          path: "members",
+          model: "Faculty",
+          select: "name emailId employeeId"
+        }
+      })
+      .lean();
+
+    console.log(`Found ${projects.length} projects`);
+
+    // Process projects to convert Maps to Objects (if using Maps in Student schema)
+    const processedProjects = projects.map(project => {
+      const processedStudents = project.students.map(student => {
+        // Convert MongoDB Map to plain object for reviews
+        let processedReviews = {};
+        if (student.reviews) {
+          if (student.reviews instanceof Map) {
+            processedReviews = Object.fromEntries(student.reviews);
+          } else if (typeof student.reviews === 'object') {
+            processedReviews = { ...student.reviews };
+          }
+        }
+        
+        // Convert deadline Map to plain object
+        let processedDeadlines = {};
+        if (student.deadline) {
+          if (student.deadline instanceof Map) {
+            processedDeadlines = Object.fromEntries(student.deadline);
+          } else if (typeof student.deadline === 'object') {
+            processedDeadlines = { ...student.deadline };
+          }
+        }
+
+        return {
+          _id: student._id,
+          regNo: student.regNo,
+          name: student.name,
+          emailId: student.emailId,
+          reviews: processedReviews,
+          pptApproved: student.pptApproved || { approved: false, locked: false },
+          deadline: processedDeadlines,
+          school: student.school,
+          department: student.department
+        };
+      });
+
+      return {
+        _id: project._id,
+        name: project.name,
+        school: project.school,
+        department: project.department,
+        specialization: project.specialization,
+        students: processedStudents,
+        guideFaculty: project.guideFaculty,
+        panel: project.panel
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: processedProjects,
+      message: "All projects retrieved successfully",
+      count: processedProjects.length
+    });
+
+  } catch (error) {
+    console.error("Error in getAllProjects:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error retrieving projects",
+      error: error.message,
+    });
+  }
+}
+
+
 export async function createProjectsBulk(req, res) {
   const session = await mongoose.startSession();
   try {
@@ -509,15 +610,18 @@ export async function getAllGuideProjects(req, res) {
       model: "Faculty",
       select: "name emailId employeeId school department specialization" // ✅ Include all faculty fields
     })
+    // ✅ REPLACE the panel populate sections with this fixed version:
     .populate({
       path: "panel",
-      model: "Panel", 
-      select: "school department", // ✅ FIXED: Remove 'members' field that doesn't exist
-      populate: [
-        { path: "faculty1", model: "Faculty", select: "name emailId employeeId" },
-        { path: "faculty2", model: "Faculty", select: "name emailId employeeId" }
-      ]
+      model: "Panel",
+      select: "school department", // ✅ FIXED: Removed non-existent fields
+      populate: {
+        path: "members", // ✅ FIXED: Use 'members' not 'faculty1/faculty2'
+        model: "Faculty",
+        select: "name emailId employeeId"
+      }
     })
+
     .lean(); // ✅ Use lean() for better performance since we're converting to object anyway
 
     console.log("Found guide projects:", projects.length);
@@ -832,23 +936,22 @@ export async function getAllPanelProjects(req, res) {
  */
 
 export const updateProjectDetails = async (req, res) => {
+  const session = await mongoose.startSession();
+  
   try {
+    session.startTransaction();
+
     const { projectId, projectUpdates, studentUpdates, pptApproved } = req.body;
 
     console.log("=== [BACKEND] UPDATE PROJECT STARTED ===");
     console.log("📋 [BACKEND] Project ID:", projectId);
-    console.log(
-      "📋 [BACKEND] Project Updates:",
-      JSON.stringify(projectUpdates, null, 2)
-    );
-    console.log(
-      "📋 [BACKEND] Student Updates:",
-      JSON.stringify(studentUpdates, null, 2)
-    );
+    console.log("📋 [BACKEND] Project Updates:", JSON.stringify(projectUpdates, null, 2));
+    console.log("📋 [BACKEND] Student Updates:", JSON.stringify(studentUpdates, null, 2));
 
-    // Find the project and populate students
-    const project = await Project.findById(projectId).populate("students");
+    // Find the project with session
+    const project = await Project.findById(projectId).session(session);
     if (!project) {
+      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: "Project not found",
@@ -857,39 +960,39 @@ export const updateProjectDetails = async (req, res) => {
 
     console.log("✅ [BACKEND] Project found:", project.name);
 
-    // Update project fields if provided
+    // Update project fields (excluding immutable ones)
     if (projectUpdates && typeof projectUpdates === "object") {
-      // Optional: exclude immutable fields like '_id'
-      const disallowedFields = ["_id", "students", "guideFaculty", "panel"];
+      const immutableFields = ["_id", "students", "guideFaculty", "panel"];
+      const updatableFields = ["name", "school", "department", "specialization"];
+      
       for (const key of Object.keys(projectUpdates)) {
-        if (!disallowedFields.includes(key)) {
+        if (!immutableFields.includes(key) && updatableFields.includes(key)) {
           project[key] = projectUpdates[key];
+          console.log(`📋 [BACKEND] Updated ${key}:`, projectUpdates[key]);
         }
       }
-      await project.save();
-      console.log("📋 [BACKEND] Project updated:", project);
+      await project.save({ session });
+      console.log("📋 [BACKEND] Project updated:", project.name);
     }
 
-    // Process each student update (merge reviews, update pptApproved)
-    const updatePromises = (studentUpdates || []).map(async (update) => {
+    // Process each student update sequentially (avoid parallel operations in transaction)
+    for (const update of studentUpdates || []) {
       const {
         studentId,
         reviews: reviewsToUpdate,
         pptApproved: studentPptApproved,
       } = update;
 
-      const student = await Student.findById(studentId);
+      const student = await Student.findById(studentId).session(session);
       if (!student) {
         console.error("❌ [BACKEND] Student not found:", studentId);
-        return null;
+        continue;
       }
 
       console.log("✅ [BACKEND] Processing student:", student.name);
 
       // Merge updates into existing reviews Map
-      for (const [reviewType, reviewData] of Object.entries(
-        reviewsToUpdate || {}
-      )) {
+      for (const [reviewType, reviewData] of Object.entries(reviewsToUpdate || {})) {
         if (!student.reviews) {
           student.reviews = new Map();
         }
@@ -906,39 +1009,38 @@ export const updateProjectDetails = async (req, res) => {
         student.pptApproved = studentPptApproved;
       }
 
-      await student.save();
+      await student.save({ session });
       console.log("✅ [BACKEND] Student saved:", student.name);
-      return student;
-    });
-
-    const results = await Promise.all(updatePromises);
-    const successfulUpdates = results.filter((r) => r !== null);
+    }
 
     // Update project-level PPT approval if provided
     if (pptApproved !== undefined) {
       project.pptApproved = pptApproved;
-      await project.save();
-      console.log(
-        "📋 [BACKEND] Updated project-level PPT approval:",
-        pptApproved
-      );
+      await project.save({ session });
+      console.log("📋 [BACKEND] Updated project-level PPT approval:", pptApproved);
     }
 
-    console.log("✅ [BACKEND] All updates completed");
+    await session.commitTransaction();
+    console.log("✅ [BACKEND] All updates completed successfully");
 
     res.status(200).json({
       success: true,
-      message: `Successfully updated project and ${successfulUpdates.length} students`,
+      message: `Successfully updated project "${project.name}" and ${(studentUpdates || []).length} students`,
       projectId: project._id,
-      updates: successfulUpdates.length,
+      updates: (studentUpdates || []).length,
     });
+
   } catch (error) {
+    await session.abortTransaction();
     console.error("❌ [BACKEND] Error updating project:", error);
+    
     res.status(500).json({
       success: false,
       message: "Server error during project update",
       error: error.message,
     });
+  } finally {
+    session.endSession();
   }
 };
 

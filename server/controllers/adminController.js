@@ -504,44 +504,103 @@ export async function getAllGuideWithProjects(req, res) {
   try {
     const { school, department } = req.query;
 
-    // Build dynamic query for faculties by role and optional school and department
-    const facultyQuery = { role: "faculty" };
-    if (school) facultyQuery.school = school;
-    if (department) facultyQuery.department = department;
+    console.log("getAllGuideWithProjects called with:", { school, department });
 
-    const faculties = await Faculty.find(facultyQuery);
+    // Build filter for projects directly
+    const projectFilter = {};
+    if (school) projectFilter.school = school;
+    if (department) projectFilter.department = department;
 
-    const result = await Promise.all(
-      faculties.map(async (faculty) => {
-        // Build dynamic query for projects by guideFaculty, and optional school and department
-        const projectQuery = { guideFaculty: faculty._id };
-        if (school) projectQuery.school = school;
-        if (department) projectQuery.department = department;
+    // Get all projects with full population
+    const projects = await Project.find(projectFilter)
+      .populate({
+        path: "students",
+        model: "Student",
+        select: "regNo name emailId reviews pptApproved deadline school department"
+      })
+      .populate({
+        path: "guideFaculty", 
+        model: "Faculty",
+        select: "name emailId employeeId school department specialization"
+      })
+      .populate({
+        path: "panel",
+        model: "Panel",
+        select: "school department",
+        populate: {
+          path: "members", // ✅ FIXED: Use 'members' from your schema
+          model: "Faculty",
+          select: "name emailId employeeId"
+        }
+      })
+      .lean();
 
-        const guidedProjects = await Project.find(projectQuery)
-          .populate("students", "regNo name")
-          .lean();
+    console.log(`Found ${projects.length} guide projects`);
+
+    // Process projects to convert Maps to Objects
+    const processedProjects = projects.map(project => {
+      const processedStudents = project.students.map(student => {
+        // Convert MongoDB Map to plain object for reviews
+        let processedReviews = {};
+        if (student.reviews) {
+          if (student.reviews instanceof Map) {
+            processedReviews = Object.fromEntries(student.reviews);
+          } else if (typeof student.reviews === 'object') {
+            processedReviews = { ...student.reviews };
+          }
+        }
+        
+        // Convert deadline Map to plain object
+        let processedDeadlines = {};
+        if (student.deadline) {
+          if (student.deadline instanceof Map) {
+            processedDeadlines = Object.fromEntries(student.deadline);
+          } else if (typeof student.deadline === 'object') {
+            processedDeadlines = { ...student.deadline };
+          }
+        }
 
         return {
-          faculty: {
-            _id: faculty._id,
-            employeeId: faculty.employeeId,
-            name: faculty.name,
-            emailId: faculty.emailId,
-            school: faculty.school,
-            department: faculty.department,
-          },
-          guidedProjects,
+          _id: student._id,
+          regNo: student.regNo,
+          name: student.name,
+          emailId: student.emailId,
+          reviews: processedReviews,
+          pptApproved: student.pptApproved || { approved: false, locked: false },
+          deadline: processedDeadlines,
+          school: student.school,
+          department: student.department
         };
-      })
-    );
+      });
 
-    res.status(200).json({ success: true, data: result });
+      return {
+        _id: project._id,
+        name: project.name,
+        school: project.school,
+        department: project.department,
+        specialization: project.specialization,
+        students: processedStudents,
+        guideFaculty: project.guideFaculty,
+        panel: project.panel
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: processedProjects, // ✅ Return projects directly, not grouped by faculty
+      message: "Guide projects retrieved successfully",
+    });
+
   } catch (error) {
     console.error("Error in getAllGuideWithProjects:", error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Error retrieving guide projects",
+      error: error.message,
+    });
   }
 }
+
 
 export async function getAllPanelsWithProjects(req, res) {
   try {
@@ -1203,9 +1262,9 @@ export async function getAllPanels(req, res) {
     if (school) filter.school = school;
     if (department) filter.department = department;
 
+    // ✅ FIXED: Use 'members' instead of 'faculty1' and 'faculty2'
     const panels = await Panel.find(filter)
-      .populate("faculty1", "employeeId name emailId school department")
-      .populate("faculty2", "employeeId name emailId school department")
+      .populate("members", "employeeId name emailId school department")
       .lean();
 
     return res.status(200).json({
@@ -1222,6 +1281,7 @@ export async function getAllPanels(req, res) {
     });
   }
 }
+
 
 export async function assignPanelToProject(req, res) {
   try {

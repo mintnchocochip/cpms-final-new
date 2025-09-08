@@ -3,7 +3,7 @@ import {
   createProject,
   getAllGuideProjects,
   getAllPanelProjects,
-  getProjectDetails,
+  getAllProjects,
   updateProjectDetails,
   deleteProject,createProjectsBulk
 } from "../controllers/projectController.js";
@@ -16,6 +16,9 @@ const projectRouter = express.Router();
 projectRouter.post("/create", jwtAuthMiddleware, createProject) 
 projectRouter.post("/createProjectsBulk", jwtAuthMiddleware, createProjectsBulk);
 
+// get project details
+projectRouter.get("/all", jwtAuthMiddleware, getAllProjects);
+
 // delete project
 projectRouter.delete("/:projectId", jwtAuthMiddleware, deleteProject);
 
@@ -26,7 +29,6 @@ projectRouter.get("/guide", jwtAuthMiddleware, getAllGuideProjects);
 projectRouter.get("/panel", jwtAuthMiddleware, getAllPanelProjects); 
 
 // seems redendant as all details will be fetched from the "/:facultyId/panel" endpoint, further decision needed
-// projectRouter.get("/:projectId", jwtAuthMiddleware, getProjectDetails);
 
 // update an existing project
 projectRouter.put("/update", jwtAuthMiddleware, updateProjectDetails); 

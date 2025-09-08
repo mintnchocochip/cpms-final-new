@@ -246,16 +246,75 @@ export const submitReview = (projectId, reviewType, reviewData) =>
   });
 
 // Project endpoints
+export const getAllProjects = (params = new URLSearchParams()) => {
+  const queryString = params.toString();
+  return API.get(`/project/all${queryString ? `?${queryString}` : ''}`);
+};
+
+// Update project (using existing project/update endpoint)
+export const updateProject = async (projectId, projectData) => {
+  try {
+    // Validate required parameters
+    if (!projectId) {
+      throw new Error('Project ID is required');
+    }
+
+    // Prepare the payload to match backend expectations exactly
+    const payload = {
+      projectId: projectId,
+      projectUpdates: projectData.projectUpdates || {},
+      studentUpdates: projectData.studentUpdates || [],
+    };
+
+    // Only include pptApproved if it's explicitly provided
+    if (projectData.hasOwnProperty('pptApproved')) {
+      payload.pptApproved = projectData.pptApproved;
+    }
+
+    console.log("📤 [FRONTEND] Sending update request:", JSON.stringify(payload, null, 2));
+
+    return API.put('/project/update', payload, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ [FRONTEND] Error in updateProject:", error);
+    throw error;
+  }
+};
+
+
+// Delete project (using existing project/:projectId endpoint)
+export const deleteProject = async (projectId) => {
+  return API.delete(`/project/${projectId}`);
+};
+
+// Get project by ID (using existing project endpoint)
+export const getProjectById = async (projectId) => {
+  return API.get(`/project/${projectId}`);
+};
+
+// Get all guide projects with optional filtering
+export const getAllGuideProjectsAdmin = (params = new URLSearchParams()) => {
+  const queryString = params.toString();
+  return API.get(`/project/guide/all${queryString ? `?${queryString}` : ''}`);
+};
+
+// Get all panel projects with optional filtering  
+export const getAllPanelProjectsAdmin = (params = new URLSearchParams()) => {
+  const queryString = params.toString();
+  return API.get(`/project/panel/all${queryString ? `?${queryString}` : ''}`);
+};
 export const createProjectsBulk = (payload) => {
   return API.post("/project/createProjectsBulk", payload);
 };
 
 export const createProject = (projectData) => API.post("/project/create", projectData);
 export const createProjects = (data) => API.post("/project/createProjects", data);
-export const deleteProject = (projectId) => API.delete(`/project/${projectId}`);
 export const getGuideProjects = () => API.get("/project/guide");
 export const getPanelProjects = () => API.get("/project/panel");
-export const updateProject = (updatePayload) => API.put("/project/update", updatePayload);
 export const getProjectDetails = (projectId) => API.get(`/project/${projectId}`);
 
 // OTP endpoints

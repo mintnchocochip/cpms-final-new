@@ -298,62 +298,57 @@ const ProjectCreationPage = () => {
     );
   };
 
-  const handleStudentChange = (index, field, value) => {
-    const fieldKey = `student_${index}_${field}`;
-    
-    // Enhanced validation for student fields
-    if (field === 'regNo' && value.trim()) {
-      // Registration number format validation (assuming format like 21BCE1001)
-      const regNoPattern = /^[0-9]{2}[A-Z]{3}[0-9]{4}$/;
-      if (!regNoPattern.test(value.trim().toUpperCase())) {
-        setFieldError(fieldKey, 'Registration number format should be like 21BCE1001');
-        return;
-      }
-      
-      // Check for duplicates
-      if (isDuplicateStudent(singleProject.students, index, field, value)) {
-        setFieldError(fieldKey, `Registration number "${value}" is already used by another student.`);
-        return;
-      }
-    }
+const handleStudentChange = (index, field, value) => {
+  const fieldKey = `student_${index}_${field}`;
+  let error = "";
 
-    if (field === 'emailId' && value.trim()) {
-      // Email format validation
-      const emailPattern = /^[a-zA-Z0-9._%+-]+@vitstudent\.ac\.in$/;
-      if (!emailPattern.test(value.trim())) {
-        setFieldError(fieldKey, 'Email must be in format: username@vitstudent.ac.in');
-        return;
-      }
-      
-      // Check for duplicates
-      if (isDuplicateStudent(singleProject.students, index, field, value)) {
-        setFieldError(fieldKey, `Email "${value}" is already used by another student.`);
-        return;
-      }
-    }
-
-    if (field === 'name' && value.trim()) {
-      // Name validation - only alphabets and spaces
-      const namePattern = /^[a-zA-Z\s]+$/;
-      if (!namePattern.test(value.trim())) {
-        setFieldError(fieldKey, 'Name should contain only alphabets and spaces');
-        return;
-      }
-    }
-
-    // Clear error if validation passes
-    clearFieldError(fieldKey);
-
-    const updatedStudents = [...singleProject.students];
-    updatedStudents[index] = {
-      ...updatedStudents[index],
-      [field]: value
-    };
-    setSingleProject(prev => ({
-      ...prev,
-      students: updatedStudents
-    }));
+  // ===== Update the value in state FIRST =====
+  const updatedStudents = [...singleProject.students];
+  updatedStudents[index] = {
+    ...updatedStudents[index],
+    [field]: value
   };
+  setSingleProject(prev => ({
+    ...prev,
+    students: updatedStudents
+  }));
+
+  // ===== Validation/Errors: Run only to set error, not to block typing =====
+  if (field === 'regNo' && value.trim()) {
+    // Registration number format validation (e.g., 21BCE1001)
+    const regNoPattern = /^[0-9]{2}[A-Z]{3}[0-9]{4}$/;
+    if (!regNoPattern.test(value.trim().toUpperCase())) {
+      error = 'Registration number format should be like 21BCE1001';
+    } else if (isDuplicateStudent(updatedStudents, index, field, value)) {
+      error = `Registration number "${value}" is already used by another student.`;
+    }
+  }
+
+  if (field === 'emailId' && value.trim()) {
+    // Email format validation
+    const emailPattern = /^[a-zA-Z0-9._%+-]+@vitstudent\.ac\.in$/;
+    if (!emailPattern.test(value.trim())) {
+      error = 'Email must be in format: username@vitstudent.ac.in';
+    } else if (isDuplicateStudent(updatedStudents, index, field, value)) {
+      error = `Email "${value}" is already used by another student.`;
+    }
+  }
+
+  if (field === 'name' && value.trim()) {
+    // Name validation
+    const namePattern = /^[a-zA-Z\s]+$/;
+    if (!namePattern.test(value.trim())) {
+      error = 'Name should contain only alphabets and spaces';
+    }
+  }
+
+  if (error) {
+    setFieldError(fieldKey, error);
+  } else {
+    clearFieldError(fieldKey);
+  }
+};
+
 
   const addStudent = () => {
     if (singleProject.students.length >= 3) {

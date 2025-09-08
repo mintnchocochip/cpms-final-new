@@ -1,6 +1,18 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { BellRing, Clock, ArrowLeft, Menu, UserRoundPlus, FileUp, FileText } from 'lucide-react';
+import { 
+  BellRing, 
+  Clock, 
+  ArrowLeft, 
+  Menu, 
+  UserRoundPlus, 
+  FileUp, 
+  FileText, 
+  Users, 
+  Settings, 
+  Calendar,
+  Database
+} from 'lucide-react';
 
 function Leftmenu() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -50,6 +62,7 @@ function Leftmenu() {
                   Request
                 </div>
               </button>
+              
               <button 
                 onClick={() => active('admin/createFaculty')}
                 className={`h-16 w-32 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
@@ -57,51 +70,75 @@ function Leftmenu() {
                 }`}
               >
                 <div className="flex justify-center items-center gap-2">
-                  Add Faculty Member
+                  Add Faculty
                 </div>
               </button>
+              
               <button 
                 onClick={() => active('admin/panel-management')}
                 className={`h-16 w-32 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/panel-management' ? "bg-[#22C55E] text-white" : " bg-gray-100 text-black"
+                  isactive === 'admin/panel-management' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
                 }`}
               >
-                Panel Management
+                <div className="flex justify-center items-center gap-2">
+                  Panel Management
+                </div>
               </button>
+
+              {/* NEW - Project Management Button */}
+              <button 
+                onClick={() => active('admin/project-management')}
+                className={`h-16 w-32 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
+                  isactive === 'admin/project-management' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                }`}
+              >
+                <div className="flex justify-center items-center gap-2">
+                  Project Database
+                </div>
+              </button>
+              
               <button 
                 onClick={() => active('admin/facultylistview-adminGuide')}
                 className={`h-16 w-32 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/facultylistview-adminGuide' ? "bg-[#22C55E] text-white" : " bg-gray-100 text-black"
+                  isactive === 'admin/facultylistview-adminGuide' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
                 }`}
               >
-                Faculty List
+                <div className="flex justify-center items-center gap-2">
+                  Faculty List
+                </div>
               </button>
+              
               <button 
                 onClick={() => active('admin/addProject')}
                 className={`h-16 w-32 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/addProject' ? "bg-[#22C55E] text-white" : " bg-gray-100 text-black"
+                  isactive === 'admin/addProject' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
                 }`}
               >
-                Add Projects
+                <div className="flex justify-center items-center gap-2">
+                  Add Projects
+                </div>
               </button>
+              
               <button 
                 onClick={() => active('admin/Schedule')}
                 className={`h-16 w-32 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/Schedule' ? "bg-[#22C55E] text-white" : " bg-gray-100 text-black"
+                  isactive === 'admin/Schedule' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
                 }`}
               >
                 <div className="flex justify-center items-center gap-2">
                   Schedule
                 </div>
               </button>
-              {/* NEW BUTTON - Student Management */}
+              
               <button 
                 onClick={() => active('admin/student-management')}
                 className={`h-16 w-32 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/student-management' ? "bg-[#22C55E] text-white" : " bg-gray-100 text-black"
+                  isactive === 'admin/student-management' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
                 }`}
               >
-                Student Management
+                <div className="flex justify-center items-center gap-2">
+                  Student Management
+                </div>
               </button>
             </div>
           </>
@@ -122,19 +159,21 @@ function Leftmenu() {
               <button 
                 onClick={() => active('admin/Request')}
                 className={`flex justify-center items-center h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/Request' ? "bg-[#22C55E] text-white" : " bg-gray-100 text-black"
+                  isactive === 'admin/Request' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
                 }`}
               >
                 <BellRing/>
               </button>
+              
               <button 
                 onClick={() => active('admin/createFaculty')}
                 className={`flex justify-center items-center h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/createFaculty' ? "bg-[#22C55E] text-white" : " bg-gray-100 text-black"
+                  isactive === 'admin/createFaculty' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
                 }`}
               >
                 <UserRoundPlus/>
               </button>
+              
               <button 
                 onClick={() => active('admin/panel-management')} 
                 className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
@@ -143,6 +182,17 @@ function Leftmenu() {
               >
                 P
               </button>
+
+              {/* NEW - Project Management Collapsed Icon */}
+              <button 
+                onClick={() => active('admin/project-management')} 
+                className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
+                  isactive === 'admin/project-management' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                } rounded-md focus:outline-none`}
+              >
+                <Database className="h-5 w-5"/>
+              </button>
+              
               <button 
                 onClick={() => active('admin/facultylistview-adminGuide')} 
                 className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
@@ -151,6 +201,7 @@ function Leftmenu() {
               >
                 F
               </button>
+              
               <button 
                 onClick={() => active('admin/addProject')} 
                 className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
@@ -159,22 +210,23 @@ function Leftmenu() {
               >
                 <FileUp/>
               </button>
+              
               <button 
                 onClick={() => active('admin/Schedule')}
                 className={`flex justify-center items-center h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/Schedule' ? "bg-[#22C55E] text-white" : " bg-gray-100 text-black"
+                  isactive === 'admin/Schedule' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
                 }`}
               >
                 <Clock/>
               </button>
-              {/* NEW BUTTON - Student Management Collapsed */}
+              
               <button 
                 onClick={() => active('admin/student-management')} 
                 className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
                   isactive === 'admin/student-management' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
                 } rounded-md focus:outline-none`}
               >
-                <FileText/>
+                <Users className="h-5 w-5"/>
               </button>
             </div>
           </>

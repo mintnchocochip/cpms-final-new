@@ -1,7 +1,7 @@
 import React, { useContext, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
-
+import AdminProjectManagement from './Pages/AdminProjectManagement';
 import Request from "./Pages/Request";
 import Schedule from "./Pages/Schedule";
 import FacultyListView from "./Pages/FacultyListView";
@@ -325,6 +325,7 @@ const App = () => {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/admin/project-management" element={<AdminProjectManagement />} />
           <Route path="/Home" element={<Home />} />
           <Route path="/" element={<Navigate to="/Home" replace />} />
 
