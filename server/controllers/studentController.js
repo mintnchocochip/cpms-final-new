@@ -162,3 +162,50 @@ export async function batchCheckRequestStatus(req, res) {
     return res.status(500).json({ message: error.stack });
   }
 }
+
+
+export const updateStudentDetails = async (req, res) => {
+  try {
+    const { regNo } = req.params; // or you can use _id, adapt as needed
+    const updateFields = req.body;
+
+    // Only allow updating certain fields for security (edit as required)
+    const allowedFields = [
+      "name",
+      "emailId",
+      "school",
+      "department",
+      "pptApproved",
+      "deadline",
+    ];
+    const updates = {};
+    for (const field of allowedFields) {
+      if (updateFields[field] !== undefined) {
+        updates[field] = updateFields[field];
+      }
+    }
+
+    const updatedStudent = await Student.findOneAndUpdate(
+      { regNo },
+      { $set: updates },
+      { new: true }
+    );
+
+    if (!updatedStudent) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Student details updated successfully.",
+      student: updatedStudent,
+    });
+  } catch (error) {
+    console.error("Error updating student details:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error", error: error.message });
+  }
+};

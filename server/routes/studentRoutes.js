@@ -4,6 +4,7 @@ import {
   requestAdmin,
   batchCheckRequestStatus,
   getFilteredStudents,
+  updateStudentDetails,
 } from "../controllers/studentController.js";
 
 import authMiddleware from "../middlewares/authMiddleware.js";
@@ -19,5 +20,7 @@ studentRouter.post("/:facultyType/requestAdmin", jwtAuthMiddleware, requestAdmin
 studentRouter.get("/:facultyType/checkRequestStatus", checkRequestStatus);
 studentRouter.post("/batchCheckRequestStatus", batchCheckRequestStatus);
 
+// update student details
+studentRouter.put("/:regNo", jwtAuthMiddleware, updateStudentDetails);
 
 export default studentRouter;
