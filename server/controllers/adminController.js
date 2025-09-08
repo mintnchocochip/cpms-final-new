@@ -1365,30 +1365,56 @@ export async function autoAssignPanelsToProjects(req, res) {
         .json({ success: false, message: "No panels available." });
     }
 
-    // Only use eligible panels (excluding buffer)
     const panelsToAssign = panels.slice(0, panels.length - buffer);
 
     if (!panelsToAssign.length) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "No panels left for assignment (buffer too large).",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "No panels left for assignment (buffer too large).",
+      });
     }
 
-    // Initialize a map to hold assignments
+    // Initialize assignment tracker
     const panelAssignments = {};
     panelsToAssign.forEach((panel) => {
       panelAssignments[panel._id.toString()] = [];
     });
 
-    let panelIndex = 0;
+    let assignments = 0;
+    let projectIndex = 0;
+    const totalProjects = unassignedProjects.length;
+    const totalPanels = panelsToAssign.length;
 
-    for (const project of unassignedProjects) {
+    // Keep track of which projects are assigned
+    const assignedFlags = new Array(totalProjects).fill(false);
+
+    // First pass: assign one project to each panel if possible
+    for (
+      let i = 0;
+      i < totalPanels && projectIndex < totalProjects;
+      i++, projectIndex++
+    ) {
+      const project = unassignedProjects[projectIndex];
+      // Specialization match logic as before
+      const projSpec = project.specialization?.trim();
+      let eligiblePanels = [panelsToAssign[i]];
+      const panel = eligiblePanels[0];
+
+      project.panel = panel._id;
+      await project.save();
+      panelAssignments[panel._id.toString()].push(project._id);
+      assignedFlags[projectIndex] = true;
+      assignments++;
+    }
+
+    // Loop again for remaining projects (round-robin)
+    let loopIndex = 0;
+    for (let j = 0; j < totalProjects; j++) {
+      if (assignedFlags[j]) continue; // already assigned
+      const project = unassignedProjects[j];
       const projSpec = project.specialization?.trim();
 
-      // Filter panels for specialization match (as before)
+      // Filter eligible panels by specialization for each round
       let eligiblePanels = panelsToAssign.filter((panel) => {
         const { faculty1, faculty2, specialization } = panel;
         if (!faculty1 || !faculty2) return false;
@@ -1403,24 +1429,21 @@ export async function autoAssignPanelsToProjects(req, res) {
         return faculty1HasSpec || faculty2HasSpec;
       });
 
-      // Fallback to any panel if none match by specialization
-      if (!eligiblePanels.length) {
-        eligiblePanels = panelsToAssign;
-      }
+      // Fallback if no specialization matches
+      if (!eligiblePanels.length) eligiblePanels = panelsToAssign;
 
-      // Assign project to next eligible panel round-robin
-      const eligiblePanel = eligiblePanels[panelIndex % eligiblePanels.length];
+      // Assign round-robin to eligible panels
+      const eligiblePanel = eligiblePanels[loopIndex % eligiblePanels.length];
       project.panel = eligiblePanel._id;
       await project.save();
-
       panelAssignments[eligiblePanel._id.toString()].push(project._id);
-
-      panelIndex++;
+      assignments++;
+      loopIndex++;
     }
 
     return res.status(200).json({
       success: true,
-      message: `Panels assigned to unassigned projects. Last ${buffer} panels left unassigned.`,
+      message: `Panels assigned to all unassigned projects (round-robin, buffer=${buffer}).`,
       assignments: panelAssignments,
       bufferUnassigned: panels.slice(panels.length - buffer).map((p) => p._id),
     });
@@ -1429,6 +1452,7 @@ export async function autoAssignPanelsToProjects(req, res) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 }
+
 
 
 // export async function assignPanelToProject(req, res) {
