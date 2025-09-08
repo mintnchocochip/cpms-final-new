@@ -11,7 +11,7 @@ import {
   getAllRequests,
   autoCreatePanels,
   createPanelManually,
-  assignExistingPanelToProject,
+  assignPanelToProject,
   autoAssignPanelsToProjects,
   deletePanel,
   getAllPanels,
@@ -36,54 +36,54 @@ adminRouter.post("/createFaculty", adminMiddleware, createFaculty);
 adminRouter.post("/createFacultyBulk", adminMiddleware, createFacultyBulk);
 
 // ✅ FIXED: Faculty management routes
-adminRouter.get("/getAllFaculty", adminMiddleware, async (req, res) => {
-  try {
-    console.log("=== getAllFaculty Route Called ===");
-    console.log("Query params:", req.query);
+// adminRouter.get("/getAllFaculty", adminMiddleware, async (req, res) => {
+//   try {
+//     console.log("=== getAllFaculty Route Called ===");
+//     console.log("Query params:", req.query);
     
-    const { school, department } = req.query;
+//     const { school, department } = req.query;
     
-    let query = { role: "faculty" };
+//     let query = { role: "faculty" };
     
-    // ✅ FIXED: Use $in operator for array fields
-    if (school) {
-      query.school = { $in: [school] };
-    }
+//     // ✅ FIXED: Use $in operator for array fields
+//     if (school) {
+//       query.school = { $in: [school] };
+//     }
     
-    if (department) {
-      query.department = { $in: [department] };
-    }
+//     if (department) {
+//       query.department = { $in: [department] };
+//     }
 
-    console.log("Mongoose query:", JSON.stringify(query, null, 2));
+//     console.log("Mongoose query:", JSON.stringify(query, null, 2));
 
-    const faculty = await Faculty.find(query).sort({ name: 1 });
+//     const faculty = await Faculty.find(query).sort({ name: 1 });
     
-    console.log("Faculty found:", faculty.length);
+//     console.log("Faculty found:", faculty.length);
 
-    res.status(200).json({
-      success: true,
-      data: faculty.map((f) => ({
-        _id: f._id,
-        imageUrl: f.imageUrl,
-        name: f.name,
-        employeeId: f.employeeId,
-        emailId: f.emailId,
-        role: f.role,
-        school: f.school,
-        department: f.department,
-        specialization: f.specialization,
-      })),
-    });
-  } catch (error) {
-    console.error("=== ERROR in getAllFaculty ===");
-    console.error("Error message:", error.message);
-    console.error("Error stack:", error.stack);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
-    });
-  }
-});
+//     res.status(200).json({
+//       success: true,
+//       data: faculty.map((f) => ({
+//         _id: f._id,
+//         imageUrl: f.imageUrl,
+//         name: f.name,
+//         employeeId: f.employeeId,
+//         emailId: f.emailId,
+//         role: f.role,
+//         school: f.school,
+//         department: f.department,
+//         specialization: f.specialization,
+//       })),
+//     });
+//   } catch (error) {
+//     console.error("=== ERROR in getAllFaculty ===");
+//     console.error("Error message:", error.message);
+//     console.error("Error stack:", error.stack);
+//     res.status(500).json({ 
+//       success: false, 
+//       message: error.message 
+//     });
+//   }
+// });
 
 // ✅ FIXED: Use adminRouter instead of router
 adminRouter.get('/getAllFaculty/:school', adminMiddleware, getAllFaculty); // Filter by school
@@ -116,7 +116,7 @@ adminRouter.delete("/:panelId/deletePanel", adminMiddleware, deletePanel);
 adminRouter.get("/getAllPanels", adminMiddleware, getAllPanels);
 
 // Panel assignment routes
-adminRouter.post("/assignPanel", adminMiddleware, assignExistingPanelToProject);
+adminRouter.post("/assignPanel", adminMiddleware, assignPanelToProject);
 adminRouter.post("/autoAssignPanel", adminMiddleware, autoAssignPanelsToProjects);
 
 export default adminRouter;
