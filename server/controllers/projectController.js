@@ -830,102 +830,118 @@ export async function getAllPanelProjects(req, res) {
 /**
  * Update project details with review data
  */
+
 export const updateProjectDetails = async (req, res) => {
   try {
-    const { projectId, studentUpdates, pptApproved } = req.body;
-    
-    console.log('=== [BACKEND] UPDATE PROJECT STARTED ===');
-    console.log('📋 [BACKEND] Project ID:', projectId);
-    console.log('📋 [BACKEND] Student Updates:', JSON.stringify(studentUpdates, null, 2));
+    const { projectId, projectUpdates, studentUpdates, pptApproved } = req.body;
+
+    console.log("=== [BACKEND] UPDATE PROJECT STARTED ===");
+    console.log("📋 [BACKEND] Project ID:", projectId);
+    console.log(
+      "📋 [BACKEND] Project Updates:",
+      JSON.stringify(projectUpdates, null, 2)
+    );
+    console.log(
+      "📋 [BACKEND] Student Updates:",
+      JSON.stringify(studentUpdates, null, 2)
+    );
 
     // Find the project and populate students
-    const project = await Project.findById(projectId).populate('students');
-    
+    const project = await Project.findById(projectId).populate("students");
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: 'Project not found'
+        message: "Project not found",
       });
     }
 
-    console.log('✅ [BACKEND] Project found:', project.name);
+    console.log("✅ [BACKEND] Project found:", project.name);
 
-    // ✅ CRITICAL FIX: Process each student update properly
-    const updatePromises = studentUpdates.map(async (update) => {
-      const { studentId, reviews: reviewsToUpdate, pptApproved: studentPptApproved } = update;
-      
+    // Update project fields if provided
+    if (projectUpdates && typeof projectUpdates === "object") {
+      // Optional: exclude immutable fields like '_id'
+      const disallowedFields = ["_id", "students", "guideFaculty", "panel"];
+      for (const key of Object.keys(projectUpdates)) {
+        if (!disallowedFields.includes(key)) {
+          project[key] = projectUpdates[key];
+        }
+      }
+      await project.save();
+      console.log("📋 [BACKEND] Project updated:", project);
+    }
+
+    // Process each student update (merge reviews, update pptApproved)
+    const updatePromises = (studentUpdates || []).map(async (update) => {
+      const {
+        studentId,
+        reviews: reviewsToUpdate,
+        pptApproved: studentPptApproved,
+      } = update;
+
       const student = await Student.findById(studentId);
       if (!student) {
-        console.error('❌ [BACKEND] Student not found:', studentId);
+        console.error("❌ [BACKEND] Student not found:", studentId);
         return null;
       }
 
-      console.log('✅ [BACKEND] Processing student:', student.name);
-      console.log('📋 [BACKEND] Reviews before update:', student.reviews);
+      console.log("✅ [BACKEND] Processing student:", student.name);
 
-      // ✅ KEY FIX: Merge updates into existing reviews Map instead of overwriting
-      for (const [reviewType, reviewData] of Object.entries(reviewsToUpdate)) {
-        console.log(`📋 [BACKEND] MERGING review '${reviewType}' for ${student.name}`);
-        console.log('📋 [BACKEND] New review data:', JSON.stringify(reviewData, null, 2));
-        
-        // ✅ Initialize reviews Map if it doesn't exist
+      // Merge updates into existing reviews Map
+      for (const [reviewType, reviewData] of Object.entries(
+        reviewsToUpdate || {}
+      )) {
         if (!student.reviews) {
           student.reviews = new Map();
         }
-        
-        // ✅ Use Map.set() to merge the specific review, not replace entire Map
         student.reviews.set(reviewType, {
           marks: new Map(Object.entries(reviewData.marks || {})),
-          comments: reviewData.comments || '',
+          comments: reviewData.comments || "",
           attendance: reviewData.attendance || { value: false, locked: false },
-          locked: reviewData.locked || false
+          locked: reviewData.locked || false,
         });
-        
-        console.log('✅ [BACKEND] Review merged successfully');
       }
 
       // Update PPT approval if provided
-      if (studentPptApproved) {
+      if (studentPptApproved !== undefined) {
         student.pptApproved = studentPptApproved;
-        console.log(`📋 [BACKEND] Updated PPT approval for ${student.name}:`, studentPptApproved);
       }
 
-      // ✅ Save the student with merged reviews
       await student.save();
-      console.log('✅ [BACKEND] Student saved:', student.name);
-      console.log('📋 [BACKEND] Final reviews after save:', student.reviews);
-      
+      console.log("✅ [BACKEND] Student saved:", student.name);
       return student;
     });
 
     const results = await Promise.all(updatePromises);
-    const successfulUpdates = results.filter(result => result !== null);
+    const successfulUpdates = results.filter((r) => r !== null);
 
     // Update project-level PPT approval if provided
-    if (pptApproved) {
+    if (pptApproved !== undefined) {
       project.pptApproved = pptApproved;
       await project.save();
-      console.log('📋 [BACKEND] Updated project-level PPT approval:', pptApproved);
+      console.log(
+        "📋 [BACKEND] Updated project-level PPT approval:",
+        pptApproved
+      );
     }
 
-    console.log('✅ [BACKEND] All updates completed');
+    console.log("✅ [BACKEND] All updates completed");
 
     res.status(200).json({
       success: true,
-      message: `Successfully updated ${successfulUpdates.length} students`,
+      message: `Successfully updated project and ${successfulUpdates.length} students`,
+      projectId: project._id,
       updates: successfulUpdates.length,
-      projectId: project._id
     });
-
   } catch (error) {
-    console.error('❌ [BACKEND] Error updating project:', error);
+    console.error("❌ [BACKEND] Error updating project:", error);
     res.status(500).json({
       success: false,
-      message: 'Server error during project update',
-      error: error.message
+      message: "Server error during project update",
+      error: error.message,
     });
   }
 };
+
 
 
 
