@@ -945,7 +945,6 @@ export async function getAllRequests(req, res) {
   }
 }
 
-
 export async function createPanelManually(req, res) {
   try {
     const { memberEmployeeIds, school, department } = req.body; // expecting array of employeeIds, optional school & department
@@ -1033,8 +1032,6 @@ export async function createPanelManually(req, res) {
     });
   }
 }
-
-
 
 export async function autoCreatePanels(req, res) {
   try {
