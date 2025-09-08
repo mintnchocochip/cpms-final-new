@@ -440,44 +440,28 @@ export async function updateFaculty(req, res) {
   }
 }
 
-// export async function getAllFaculty(req, res) {
-//   const allFaculty = await Faculty.find({});
 
-//   if (allFaculty.length === 0) {
-//     console.log("no faculty found");
-//     return res.status(404).json({
-//       success: false,
-//       message: "No Faculty found",
-//     });
-//   }
-
-//   return res.status(200).json({
-//     success: true,
-//     data: allFaculty,
-//   });
-// }
-
-
-// controller for getAllFaculty based on school, dept or specilization 
-
-// ✅ FIXED: Use query parameters instead of path parameters
 export async function getAllFaculty(req, res) {
-  const { school, department, specialization, sortBy, sortOrder } = req.query; // Changed from req.params to req.query
+  const { school, department, specialization, sortBy, sortOrder } = req.query;
 
   try {
-    // Build dynamic query based on provided params
+    // Build dynamic query based on provided filters
     let query = {};
-    
-    if (school && school !== 'all') query.schools = school;
-    if (department && department !== 'all') query.departments = department;
-    if (specialization && specialization !== 'all') query.specialization = specialization;
 
-    // If no filters provided, return all faculty
-    // Remove the restriction that required at least one filter
+    if (school && school !== "all") query.schools = school;
+    if (department && department !== "all") query.departments = department;
+    if (specialization && specialization !== "all")
+      query.specialization = specialization;
 
     // Allowed sorting fields
-    const validSortFields = ["schools", "departments", "specialization", "name", "employeeId"];
-    
+    const validSortFields = [
+      "schools",
+      "departments",
+      "specialization",
+      "name",
+      "employeeId",
+    ];
+
     let sortOption = {};
     if (sortBy && validSortFields.includes(sortBy)) {
       const order = sortOrder && sortOrder.toLowerCase() === "desc" ? -1 : 1;
@@ -487,7 +471,9 @@ export async function getAllFaculty(req, res) {
       sortOption.name = 1;
     }
 
-    const faculty = await Faculty.find(query).sort(sortOption).select('-password');
+    const faculty = await Faculty.find(query)
+      .sort(sortOption)
+      .select("-password");
 
     res.status(200).json({
       success: true,
@@ -498,72 +484,21 @@ export async function getAllFaculty(req, res) {
         employeeId: f.employeeId,
         emailId: f.emailId,
         role: f.role,
-        school: f.schools, // Note: using schools (array) from schema
-        department: f.departments, // Note: using departments (array) from schema
+        school: f.schools,
+        department: f.departments,
         specialization: f.specialization,
       })),
-      count: faculty.length
+      count: faculty.length,
     });
   } catch (error) {
-    console.error('Error in getAllFaculty:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    console.error("Error in getAllFaculty:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 }
 
-// without dept and school, can be used for getting all the details
-// export async function getAllGuideWithProjects(req, res) {
-//   const faculties = await Faculty.find({ role: "faculty" });
-
-//   const result = await Promise.all(
-//     faculties.map(async (faculty) => {
-//       const guidedProjects = await Project.find({ guideFaculty: faculty._id })
-//         .populate("students", "regNo name")
-//         .lean();
-//       return {
-//         faculty: {
-//           _id: faculty._id,
-//           employeeId: faculty.employeeId,
-//           name: faculty.name,
-//           emailId: faculty.emailId,
-//           school: faculty.school,
-//           department: faculty.department,
-//         },
-//         guidedProjects,
-//       };
-//     })
-//   );
-
-//   res.status(200).json({ success: true, data: result });
-// }
-
-// export async function getAllPanelsWithProjects(req, res) {
-//   const panels = await Panel.find()
-//     .populate("faculty1", "employeeId name emailId")
-//     .populate("faculty2", "employeeId name emailId")
-//     .lean();
-
-//   const result = await Promise.all(
-//     panels.map(async (panel) => {
-//       const projects = await Project.find({ panel: panel._id })
-//         .populate("students", "regNo name")
-//         .lean();
-
-//       return {
-//         panelId: panel._id,
-//         faculty1: panel.faculty1,
-//         faculty2: panel.faculty2,
-//         projects,
-//       };
-//     })
-//   );
-
-//   res.status(200).json({ success: true, data: result });
-// }
-
-// with dept and school specific
 
 export async function getAllGuideWithProjects(req, res) {
   try {
@@ -612,28 +547,34 @@ export async function getAllPanelsWithProjects(req, res) {
   try {
     const { school, department } = req.query;
 
-    // Find all panels with populated faculties
+    // Find all panels with populated members array
     const panels = await Panel.find()
-      .populate("faculty1", "employeeId name emailId school department")
-      .populate("faculty2", "employeeId name emailId school department")
+      .populate("members", "employeeId name emailId school department")
       .lean();
 
     // Filter panels based on school and department if provided
     const filteredPanels = panels.filter((panel) => {
-      if (!panel.faculty1 || !panel.faculty2) return false;
+      if (!panel.members || panel.members.length === 0) return false;
+
       let schoolMatch = true;
       let departmentMatch = true;
 
       if (school) {
-        schoolMatch =
-          panel.faculty1.school?.includes(school) &&
-          panel.faculty2.school?.includes(school);
+        // Each faculty's school is an array - ensure all panel members include the school
+        schoolMatch = panel.members.every(
+          (faculty) =>
+            Array.isArray(faculty.school) && faculty.school.includes(school)
+        );
       }
       if (department) {
-        departmentMatch =
-          panel.faculty1.department?.includes(department) &&
-          panel.faculty2.department?.includes(department);
+        // Each faculty's department is an array - ensure all panel members include the department
+        departmentMatch = panel.members.every(
+          (faculty) =>
+            Array.isArray(faculty.department) &&
+            faculty.department.includes(department)
+        );
       }
+
       return schoolMatch && departmentMatch;
     });
 
@@ -650,8 +591,7 @@ export async function getAllPanelsWithProjects(req, res) {
 
         return {
           panelId: panel._id,
-          faculty1: panel.faculty1,
-          faculty2: panel.faculty2,
+          members: panel.members,
           projects,
         };
       })
@@ -663,6 +603,7 @@ export async function getAllPanelsWithProjects(req, res) {
     res.status(500).json({ success: false, message: error.message });
   }
 }
+
 
 export async function deleteFacultyByEmployeeId(req, res) {
   const { employeeId } = req.params;
@@ -919,68 +860,6 @@ export async function updateRequestStatus(req, res) {
   }
 }
 
-// without dept and school
-// export async function getAllRequests(req, res) {
-//   const { facultyType } = req.params;
-
-//   if (!["panel", "guide"].includes(facultyType)) {
-//     return res.status(400).json({
-//       success: false,
-//       message: "facultyType should either be 'guide' or 'panel'",
-//     });
-//   }
-
-//   const requests = await Request.find({ facultyType })
-//     .populate("faculty", "name empId")
-//     .populate("student", "name regNo");
-
-//   if (!requests.length) {
-//     return res.status(404).json({
-//       success: false,
-//       message: `No requests found for the ${facultyType}`,
-//     });
-//   }
-
-//   // Grouping by faculty
-//   const grouped = {};
-
-//   requests.forEach((req) => {
-//     const faculty = req.faculty[0];
-//     const facultyId = faculty._id.toString();
-
-//     if (!grouped[facultyId]) {
-//       grouped[facultyId] = {
-//         _id: facultyId,
-//         name: faculty.name,
-//         empId: faculty.empId,
-//         students: [],
-//       };
-//     }
-
-//     grouped[facultyId].students.push({
-//       _id: req._id,
-//       name: req.student.name,
-//       regNo: req.student.regNo,
-//       projectType: req.reviewType,
-//       comments: req.reason,
-//       approved:
-//         req.status === "approved"
-//           ? true
-//           : req.status === "rejected"
-//           ? false
-//           : null,
-//     });
-//   });
-
-//   const result = Object.values(grouped);
-
-//   return res.status(200).json({
-//     success: true,
-//     message: "Operation successful",
-//     data: result,
-//   });
-// }
-
 export async function getAllRequests(req, res) {
   try {
     const { facultyType } = req.params;
@@ -1066,51 +945,83 @@ export async function getAllRequests(req, res) {
   }
 }
 
+
 export async function createPanelManually(req, res) {
   try {
-    const { faculty1Id, faculty2Id } = req.body;
+    const { memberEmployeeIds, school, department } = req.body; // expecting array of employeeIds, optional school & department
 
-    if (!faculty1Id || !faculty2Id || faculty1Id === faculty2Id) {
+    // Validate input
+    if (
+      !Array.isArray(memberEmployeeIds) ||
+      memberEmployeeIds.length < 2 ||
+      new Set(memberEmployeeIds).size !== memberEmployeeIds.length
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Two distinct faculty IDs are required.",
+        message:
+          "At least two distinct faculty employee IDs are required in members.",
       });
     }
 
-    const faculty1 = await Faculty.findById(faculty1Id);
-    const faculty2 = await Faculty.findById(faculty2Id);
+    // Fetch faculties by employeeId
+    const faculties = await Faculty.find({
+      employeeId: { $in: memberEmployeeIds },
+    });
 
-    if (!faculty1 || !faculty2) {
+    if (faculties.length !== memberEmployeeIds.length) {
+      const foundEmpIds = faculties.map((f) => f.employeeId.toString());
+      const missing = memberEmployeeIds.filter(
+        (id) => !foundEmpIds.includes(id)
+      );
       return res.status(404).json({
         success: false,
-        message: "One or both faculty not found.",
+        message: "Some faculty members not found.",
+        missing,
       });
     }
 
-    // ✅ FIXED: Handle array fields - check if they have common school and department
-    const commonschool = faculty1.school.filter(s => faculty2.school.includes(s));
-    const commondepartment = faculty1.department.filter(d => faculty2.department.includes(d));
+    // Use provided school and department if given, else compute intersection
+    let panelSchool = school;
+    let panelDepartment = department;
 
-    if (commonschool.length === 0 || commondepartment.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Faculty members must have at least one common school and department.",
-      });
+    if (!panelSchool) {
+      const commonSchool = faculties
+        .map((f) => f.school)
+        .reduce((acc, schools) => acc.filter((s) => schools.includes(s)));
+      if (commonSchool.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Faculty members must have at least one common school.",
+        });
+      }
+      panelSchool = commonSchool[0];
     }
 
-    // Use the first common school and department
+    if (!panelDepartment) {
+      const commonDepartment = faculties
+        .map((f) => f.department || [])
+        .reduce((acc, depts) => acc.filter((d) => depts.includes(d)));
+      if (commonDepartment.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Faculty members must have at least one common department.",
+        });
+      }
+      panelDepartment = commonDepartment[0];
+    }
+
+    // Create and save panel
     const panel = new Panel({
-      faculty1: faculty1Id,
-      faculty2: faculty2Id,
-      school: commonschool[0],
-      department: commondepartment[0],
+      members: faculties.map((f) => f._id), // ObjectId references to Faculty
+      school: panelSchool,
+      department: panelDepartment,
     });
 
     await panel.save();
 
     return res.status(201).json({
       success: true,
-      message: "Panel created successfully",
+      message: "Panel created successfully.",
       data: panel,
     });
   } catch (error) {
@@ -1122,6 +1033,7 @@ export async function createPanelManually(req, res) {
     });
   }
 }
+
 
 
 export async function autoCreatePanels(req, res) {
@@ -1253,8 +1165,6 @@ export async function autoCreatePanels(req, res) {
   }
 }
 
-
-
 export async function deletePanel(req, res) {
   try {
     const { panelId } = req.params;
@@ -1287,16 +1197,6 @@ export async function deletePanel(req, res) {
   }
 }
 
-// without dept and school
-// export async function getAllPanels(req, res) {
-//   const panel = await Panel.find().populate("faculty1").populate("faculty2");
-//   // FIX: Always return 200 with empty array if no panels
-//   return res.status(200).json({
-//     success: true,
-//     message: "Operation Successful",
-//     data: panel || [],
-//   });
-// }
 
 export async function getAllPanels(req, res) {
   try {
@@ -1393,241 +1293,188 @@ export async function assignPanelToProject(req, res) {
   }
 }
 
-
 export async function autoAssignPanelsToProjects(req, res) {
   try {
     const buffer = Number(req.body.buffer) || 0;
+    const department = req.body.department; // Optional department filter
 
-    // Get all unassigned projects (panel: null)
-    const unassignedProjects = await Project.find({ panel: null }).populate(
-      "guideFaculty"
-    );
-    // Fetch panels with members
-    const panels = await Panel.find().populate("members");
+    let projectFilter = { panel: null };
+    let panelFilter = {};
 
-    if (!panels.length) {
-      return res
-        .status(400)
-        .json({ success: false, message: "No panels available." });
+    // Apply department filter if specified
+    if (department) {
+      projectFilter.department = department;
+      panelFilter.department = department;
     }
 
-    // Leave last N panels in buffer unassigned for future
-    const panelsToAssign = panels.slice(0, panels.length - buffer);
+    const unassignedProjects = await Project.find(projectFilter).populate("guideFaculty");
+    
+    // ✅ FIXED: Populate members array (your schema uses members, not faculty1/faculty2)
+    const panels = await Panel.find(panelFilter).populate({
+      path: "members",
+      select: "employeeId name emailId school department"
+    });
+
+    if (!panels.length) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `No panels available${department ? ` for ${department} department` : ''}` 
+      });
+    }
+
+    let panelsToAssign;
+    let bufferPanels;
+    let assignmentStats = {};
+
+    if (department) {
+      // ✅ Single department mode - apply buffer normally
+      if (buffer >= panels.length) {
+        return res.status(400).json({
+          success: false,
+          message: `Buffer (${buffer}) cannot be >= total panels (${panels.length}) for ${department}.`,
+        });
+      }
+      
+      panelsToAssign = panels.slice(0, panels.length - buffer);
+      bufferPanels = panels.slice(panels.length - buffer);
+      
+    } else {
+      // ✅ FIXED: Global mode - distribute buffer per department
+      const panelsByDept = {};
+      
+      // Group panels by department
+      panels.forEach(panel => {
+        if (!panelsByDept[panel.department]) {
+          panelsByDept[panel.department] = [];
+        }
+        panelsByDept[panel.department].push(panel);
+      });
+
+      const departments = Object.keys(panelsByDept);
+      
+      if (departments.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No departments found with panels.",
+        });
+      }
+
+      // Calculate buffer per department
+      const bufferPerDept = Math.ceil(buffer / departments.length);
+      
+      panelsToAssign = [];
+      bufferPanels = [];
+
+      console.log(`=== BUFFER DISTRIBUTION ===`);
+      console.log(`Total buffer: ${buffer}, Departments: ${departments.length}, Buffer per dept: ${bufferPerDept}`);
+
+      // Apply distributed buffer per department
+      departments.forEach(dept => {
+        const deptPanels = panelsByDept[dept];
+        const actualBuffer = Math.min(bufferPerDept, Math.max(0, deptPanels.length - 1)); // At least 0 panels for assignment
+        
+        const deptPanelsToAssign = deptPanels.slice(0, deptPanels.length - actualBuffer);
+        const deptBufferPanels = deptPanels.slice(deptPanels.length - actualBuffer);
+        
+        console.log(`Dept: ${dept}, Total: ${deptPanels.length}, Buffer: ${actualBuffer}, Available: ${deptPanelsToAssign.length}`);
+        
+        panelsToAssign.push(...deptPanelsToAssign);
+        bufferPanels.push(...deptBufferPanels);
+        
+        // Initialize assignment stats per department
+        assignmentStats[dept] = 0;
+      });
+    }
 
     if (!panelsToAssign.length) {
       return res.status(400).json({
         success: false,
-        message: "No panels left for assignment (buffer too large).",
+        message: "No panels left for assignment after applying buffer.",
       });
     }
 
-    // Assignment tracker
     const panelAssignments = {};
     panelsToAssign.forEach((panel) => {
       panelAssignments[panel._id.toString()] = [];
     });
 
-    const totalProjects = unassignedProjects.length;
-    const totalPanels = panelsToAssign.length;
+    let assignedCount = 0;
+    let conflictCount = 0;
 
-    // Keep track of project assignments (fills all panels, then loops again)
-    let projectIndex = 0;
-    let panelIndex = 0;
+    // ✅ FIXED: Match projects to panels by department with conflict checking
+    for (const project of unassignedProjects) {
+      const matchingPanels = panelsToAssign.filter(panel => 
+        panel.department === project.department
+      );
 
-    // Distribute projects - first fill every panel with one, then round robin
-    while (projectIndex < totalProjects) {
-      const panel = panelsToAssign[panelIndex % totalPanels];
-      const project = unassignedProjects[projectIndex];
+      if (matchingPanels.length > 0) {
+        // ✅ FIXED: Filter out conflict panels (guide faculty cannot be panel member)
+        const nonConflictPanels = matchingPanels.filter(panel => {
+          const guideId = project.guideFaculty._id.toString();
+          
+          // Check if guide faculty is in panel members
+          const hasConflict = panel.members.some(member => 
+            member._id.toString() === guideId
+          );
+          
+          return !hasConflict;
+        });
 
-      project.panel = panel._id;
-      await project.save();
-      panelAssignments[panel._id.toString()].push(project._id);
+        if (nonConflictPanels.length > 0) {
+          // ✅ FIXED: Round-robin assignment within each department
+          if (!assignmentStats[project.department]) {
+            assignmentStats[project.department] = 0;
+          }
+          
+          const panelIndex = assignmentStats[project.department] % nonConflictPanels.length;
+          const selectedPanel = nonConflictPanels[panelIndex];
 
-      projectIndex++;
-      panelIndex++;
+          project.panel = selectedPanel._id;
+          await project.save();
+          
+          panelAssignments[selectedPanel._id.toString()].push(project._id);
+          assignedCount++;
+          assignmentStats[project.department]++;
+        } else {
+          conflictCount++;
+          console.log(`⚠️ Conflict: Project ${project.name} guide ${project.guideFaculty.name} is in available panels`);
+        }
+      } else {
+        console.log(`⚠️ No panels available for department: ${project.department}`);
+      }
     }
 
+    // ✅ Enhanced response with detailed statistics
     return res.status(200).json({
       success: true,
-      message: `Panels assigned to all unassigned projects (round-robin, buffer=${buffer}).`,
-      assignments: panelAssignments,
-      bufferUnassigned: panels.slice(panels.length - buffer).map((p) => p._id),
+      message: `Assigned ${assignedCount} projects with ${department ? 'department-specific' : 'distributed per-department'} buffer strategy.`,
+      data: {
+        assignments: panelAssignments,
+        bufferPanels: bufferPanels.map(p => ({
+          id: p._id,
+          department: p.department,
+          members: p.members.map(m => ({ name: m.name, employeeId: m.employeeId }))
+        })),
+        statistics: {
+          totalProjects: unassignedProjects.length,
+          assignedProjects: assignedCount,
+          conflictedProjects: conflictCount,
+          unassignableProjects: unassignedProjects.length - assignedCount,
+          totalPanelsAvailable: panels.length,
+          panelsUsedForAssignment: panelsToAssign.length,
+          panelsKeptAsBuffer: bufferPanels.length,
+          assignmentPerDepartment: assignmentStats
+        },
+        mode: department ? `Single Department (${department})` : "All Departments with Distributed Buffer"
+      }
     });
+    
   } catch (error) {
     console.error("Error in autoAssignPanelsToProjects:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error", 
+      error: error.message 
+    });
   }
 }
-
-
-
-
-// export async function assignPanelToProject(req, res) {
-//   try {
-//     const { panelFacultyIds, projectId } = req.body;
-
-//     if (!Array.isArray(panelFacultyIds) || panelFacultyIds.length !== 2) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Exactly 2 panel faculty IDs required.",
-//       });
-//     }
-
-//     // Check distinctness
-//     if (panelFacultyIds[0] === panelFacultyIds[1]) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Panel faculty members must be distinct.",
-//       });
-//     }
-
-//     const [faculty1, faculty2] = await Promise.all([
-//       Faculty.findById(panelFacultyIds[0]),
-//       Faculty.findById(panelFacultyIds[1]),
-//     ]);
-
-//     if (!faculty1 || !faculty2) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "One or both faculty not found.",
-//       });
-//     }
-
-//     const project = await Project.findById(projectId).populate("guideFaculty");
-//     if (!project) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Project not found.",
-//       });
-//     }
-
-//     if (!project.guideFaculty) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Project has no guide faculty to check.",
-//       });
-//     }
-
-//     // Check that panel faculty and guide faculty have same school and dept
-//     if (
-//       faculty1.school !== project.guideFaculty.school ||
-//       faculty2.school !== project.guideFaculty.school ||
-//       faculty1.department !== project.guideFaculty.department ||
-//       faculty2.department !== project.guideFaculty.department
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Panel faculty and guide faculty must belong to the same school and department.",
-//       });
-//     }
-
-//     // Prevent guide faculty from being panel member
-//     if (
-//       project.guideFaculty._id.toString() === panelFacultyIds[0] ||
-//       project.guideFaculty._id.toString() === panelFacultyIds[1]
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Guide faculty cannot be a panel member for their own project.",
-//       });
-//     }
-
-//     // Create panel
-//     const panel = new Panel({
-//       faculty1: panelFacultyIds[0],
-//       faculty2: panelFacultyIds[1],
-//       school: faculty1.school,
-//       department: faculty1.department,
-//     });
-//     await panel.save();
-
-//     // Assign panel to project
-//     project.panel = panel._id;
-//     await project.save();
-
-//     const populatedProject = await Project.findById(projectId).populate({
-//       path: "panel",
-//       populate: [{ path: "faculty1" }, { path: "faculty2" }],
-//     });
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Panel assigned successfully",
-//       data: populatedProject,
-//     });
-//   } catch (error) {
-//     console.error("Error in assignPanelToProject:", error);
-//     return res.status(500).json({ success: false, message: "Server error" });
-//   }
-// }
-
-// export async function getAllFacultyWithProjects(req, res) {
-//   try {
-//     const { school, department } = req.query;
-
-//     // Filter faculties optionally by school and department
-//     const facultyFilter = {};
-//     if (school) facultyFilter.school = school;
-//     if (department) facultyFilter.department = department;
-
-//     const allFaculty = await Faculty.find(facultyFilter);
-
-//     const facultyWithProjects = [];
-
-//     for (const faculty of allFaculty) {
-//       const facultyId = faculty._id;
-
-//       // Guided projects in same school and dept as faculty
-//       const guidedProjects = await Project.find({
-//         guideFaculty: facultyId,
-//         school: faculty.school,
-//         department: faculty.department,
-//       })
-//         .populate("students", "name regNo")
-//         .populate("panel");
-
-//       // Panels where faculty is either member and panel in same school/department
-//       const panelsWithFaculty = await Panel.find({
-//         $or: [{ faculty1: facultyId }, { faculty2: facultyId }],
-//         school: faculty.school,
-//         department: faculty.department,
-//       });
-
-//       const panelIds = panelsWithFaculty.map((panel) => panel._id);
-
-//       const panelProjects = await Project.find({
-//         panel: { $in: panelIds },
-//         school: faculty.school,
-//         department: faculty.department,
-//       })
-//         .populate("students", "name regNo")
-//         .populate("panel");
-
-//       facultyWithProjects.push({
-//         faculty: {
-//           name: faculty.name,
-//           employeeId: faculty.employeeId,
-//           emailId: faculty.emailId,
-//           school: faculty.school,
-//           department: faculty.department,
-//         },
-//         guide: guidedProjects,
-//         panel: panelProjects,
-//       });
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       data: facultyWithProjects,
-//     });
-//   } catch (error) {
-//     console.error("Error in getAllFacultyWithProjects:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Server error",
-//       error: error.message,
-//     });
-//   }
-// }
