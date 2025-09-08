@@ -5,6 +5,29 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 const API = axios.create({
   baseURL: `${API_BASE_URL}`,
 });
+
+
+// Add these to your existing api.js file
+
+// Update student (keep existing but ensure it only sends basic fields)
+export const updateStudent = async (regNo, studentData) => {
+  // Filter to only send editable fields that match your schema
+  const allowedData = {
+    name: studentData.name,
+    emailId: studentData.emailId,
+    school: studentData.school,
+    department: studentData.department
+    // Note: reviews, pptApproved, deadline typically managed by backend
+  };
+
+  return API.put(`/student/${regNo}`, allowedData);
+};
+
+// Delete student (using axios like other endpoints)
+export const deleteStudent = async (regNo) => {
+  return API.delete(`/student/${regNo}`);
+};
+
 // Get filtered students
 export const getFilteredStudents = (params = new URLSearchParams()) => {
   const queryString = params.toString();

@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import * as XLSX from "xlsx"; // Import xlsx library for Excel processing
+import * as XLSX from "xlsx";
 import {
-  getFacultyBySchoolAndDept,
   getAllPanels,
   getAllPanelProjects,
   getAllGuideProjects,
@@ -11,7 +10,7 @@ import {
   assignPanelToProject,
   autoAssignPanelsToProjects,
   autoCreatePanelManual,
-} from "../api"; // Note: uploadFacultyExcel API is assumed to be added
+} from "../api";
 import TeamPopup from "../Components/TeamPopup";
 import ConfirmPopup from "../Components/ConfirmDialog";
 import Navbar from "../Components/UniversalNavbar";
@@ -52,27 +51,31 @@ const AdminPanelManagement = () => {
     panelId: null,
     teamId: null,
   });
-  
-  // Auto operation confirmation states
-  const [autoConfirmation, setAutoConfirmation] = useState({
-    type: "", // "create" or "assign"
-    isOpen: false,
-    message: "",
-    existingCount: 0,
-  });
 
   // Auto create panel popup state
   const [autoCreatePopup, setAutoCreatePopup] = useState({
     isOpen: false,
     numPanels: "",
     department: "",
+    panelSize: "",
     error: "",
   });
 
-  // Notification state for animated success/error messages
+  // Auto assign popup state
+  const [autoAssignPopup, setAutoAssignPopup] = useState({
+    isOpen: false,
+    bufferPanels: "",
+    department: "",
+    error: "",
+  });
+
+  // Manual create department selection for "All Schools & Departments" mode
+  const [manualCreateDept, setManualCreateDept] = useState("");
+
+  // Notification state
   const [notification, setNotification] = useState({
     isVisible: false,
-    type: "", // "success" or "error"
+    type: "",
     title: "",
     message: "",
     icon: null,
@@ -107,116 +110,6 @@ const AdminPanelManagement = () => {
     setNotification(prev => ({ ...prev, isVisible: false }));
   }, []);
 
-  // Handle Excel file upload
-  const handleExcelUpload = useCallback(async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-      showNotification("error", "Invalid File", "Please upload a valid Excel file (.xlsx or .xls)");
-      event.target.value = ""; // Reset input
-      return;
-    }
-
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-        // Validate headers
-        const headers = jsonData[0].map(h => h.trim());
-        const requiredHeaders = ["Faculty Name", "Emp ID", "Email ID", "Department"];
-        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-        if (missingHeaders.length > 0) {
-          showNotification("error", "Invalid Format", `Missing required columns: ${missingHeaders.join(", ")}`);
-          event.target.value = "";
-          return;
-        }
-
-        // Process rows, skipping header
-        const validDepartments = ["BTech", "MTech (integrated)", "MCS"];
-        const facultyData = jsonData.slice(1).map(row => {
-          const rowObj = {};
-          headers.forEach((header, index) => {
-            rowObj[header] = row[index] || "";
-          });
-          return rowObj;
-        }).filter(row => row["Faculty Name"] && row["Emp ID"] && row["Email ID"] && validDepartments.includes(row["Department"]));
-
-        if (facultyData.length === 0) {
-          showNotification("error", "No Valid Data", "No valid faculty data found in the Excel file");
-          event.target.value = "";
-          return;
-        }
-
-        // Send to backend (assumes uploadFacultyExcel API exists)
-        try {
-          const response = await uploadFacultyExcel(facultyData); // API call to upload faculty data
-          if (response?.data?.success && response.data.data) {
-            setFacultyList(response.data.data);
-            await fetchData();
-            showNotification("success", "Upload Successful", "Faculty data uploaded and processed successfully");
-          } else {
-            showNotification("error", "Upload Failed", "Failed to process faculty data. Please try again.");
-          }
-        } catch (error) {
-          console.error("Excel upload error:", error);
-          showNotification("error", "Upload Failed", "Failed to upload faculty data. Please try again.");
-        }
-        event.target.value = ""; // Reset input
-      };
-      reader.readAsArrayBuffer(file);
-    } catch (error) {
-      console.error("Excel processing error:", error);
-      showNotification("error", "Processing Error", "Failed to process Excel file. Please ensure it's valid.");
-      event.target.value = "";
-    }
-  }, [showNotification, fetchData]);
-
-  // Handle demo Excel download
-  const handleDemoExcelDownload = useCallback(() => {
-    const demoData = [
-      ["Faculty Name", "Emp ID", "Email ID", "Department"],
-      ["John Doe", "EMP001", "john.doe@university.edu", "BTech"],
-      ["Jane Smith", "EMP002", "jane.smith@university.edu", "MTech (integrated)"],
-      ["Alice Johnson", "EMP003", "alice.johnson@university.edu", "MCS"],
-    ];
-
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.aoa_to_sheet(demoData);
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Faculty Template");
-    XLSX.writeFile(workbook, "Faculty_Demo.xlsx");
-  }, []);
-
-  // Check for admin context - handle both specific and skip modes
-  useEffect(() => {
-    const savedAdminContext = sessionStorage.getItem("adminContext");
-    if (!savedAdminContext) {
-      navigate("/admin/school-selection");
-      return;
-    }
-    
-    try {
-      const parsedContext = JSON.parse(savedAdminContext);
-      
-      if (parsedContext.skipped) {
-        setAdminContext({ school: null, department: null, skipped: true });
-      } else if (parsedContext.school && parsedContext.department) {
-        setAdminContext(parsedContext);
-      } else {
-        navigate("/admin/school-selection");
-      }
-    } catch (error) {
-      console.error("Failed to parse admin context:", error);
-      navigate("/admin/school-selection");
-    }
-  }, [navigate]);
-
-  // Fetch data function with proper backend API usage
   const fetchData = useCallback(async () => {
     if (!adminContext) return;
     
@@ -232,34 +125,19 @@ const AdminPanelManagement = () => {
 
       console.log("API Parameters:", { apiSchool, apiDepartment });
 
-      const [facultyRes, panelRes, panelProjectsRes, guideProjectsRes] = await Promise.all([
-        getFacultyBySchoolAndDept(apiSchool, apiDepartment),
+      // ✅ REMOVED getFacultyBySchoolAndDept since using Excel upload
+      const [panelRes, panelProjectsRes, guideProjectsRes] = await Promise.all([
         getAllPanels(apiSchool, apiDepartment),
         getAllPanelProjects(apiSchool, apiDepartment),
         getAllGuideProjects(apiSchool, apiDepartment),
       ]);
 
       console.log("=== RAW API RESPONSES ===");
-      console.log("Faculty Response:", facultyRes);
       console.log("Panels Response:", panelRes);
       console.log("Panel Projects Response:", panelProjectsRes);
       console.log("Guide Projects Response:", guideProjectsRes);
 
-      // Process Faculty
-      let facultyData = [];
-      if (facultyRes?.data?.success && facultyRes.data.data) {
-        facultyData = facultyRes.data.data;
-      } else if (facultyRes?.data?.faculties) {
-        facultyData = facultyRes.data.faculties;
-      } else if (facultyRes?.data && Array.isArray(facultyRes.data)) {
-        facultyData = facultyRes.data;
-      } else if (facultyRes?.success && facultyRes.data) {
-        facultyData = facultyRes.data;
-      }
-      console.log("Processed Faculty Data:", facultyData);
-      setFacultyList(facultyData);
-
-      // Process All Panels Data - SIMPLIFIED APPROACH
+      // Process All Panels Data - UPDATED FOR NEW SCHEMA
       let allPanelsData = [];
       if (panelRes?.data?.success && panelRes.data.data) {
         allPanelsData = panelRes.data.data;
@@ -294,11 +172,14 @@ const AdminPanelManagement = () => {
         panelTeamsMap.set(p.panelId, teams);
       });
 
-      // Format panels with their teams
+      // ✅ UPDATED: Format panels with NEW SCHEMA (members array)
       const formattedPanels = allPanelsData.map((panel) => ({
         panelId: panel._id,
-        facultyIds: [panel.faculty1?._id, panel.faculty2?._id].filter(Boolean),
-        facultyNames: [panel.faculty1?.name, panel.faculty2?.name].filter(Boolean),
+        // ✅ FIXED: Use members array instead of faculty1/faculty2
+        facultyIds: (panel.members || []).map(m => m._id).filter(Boolean),
+        facultyNames: (panel.members || []).map(m => m.name).filter(Boolean),
+        department: panel.department || "Unknown",
+        school: panel.school || "Unknown",
         teams: panelTeamsMap.get(panel._id) || [],
       }));
 
@@ -353,6 +234,129 @@ const AdminPanelManagement = () => {
       setLoading(false);
     }
   }, [adminContext, showNotification]);
+  
+  const handleExcelUpload = useCallback(async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      showNotification("error", "Invalid File", "Please upload a valid Excel file (.xlsx or .xls)");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        // Validate headers
+        const headers = jsonData[0].map(h => h.trim());
+        const requiredHeaders = ["Faculty Name", "Emp ID", "Email ID", "Department"];
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+        if (missingHeaders.length > 0) {
+          showNotification("error", "Invalid Format", `Missing required columns: ${missingHeaders.join(", ")}`);
+          event.target.value = "";
+          return;
+        }
+
+        // Process rows, skipping header
+        const validDepartments = ["BTech", "MTech (integrated)", "MCS"];
+        const processedFacultyData = jsonData.slice(1).map((row, index) => {
+          const rowObj = {};
+          headers.forEach((header, headerIndex) => {
+            rowObj[header] = row[headerIndex] || "";
+          });
+          
+          // ✅ UPDATED: Create faculty object matching your schema
+          return {
+            _id: `temp_${index}_${Date.now()}`, // Temporary ID for frontend use
+            name: rowObj["Faculty Name"],
+            employeeId: rowObj["Emp ID"],
+            emailId: rowObj["Email ID"], // Changed from 'email' to 'emailId'
+            department: [rowObj["Department"]], // Array format to match schema
+            school: ["SCOPE"], // Default school, adjust as needed
+            specialization: ["General"], // Default specialization
+          };
+        }).filter(faculty => 
+          faculty.name && 
+          faculty.employeeId && 
+          faculty.emailId && 
+          validDepartments.includes(faculty.department[0])
+        );
+
+        if (processedFacultyData.length === 0) {
+          showNotification("error", "No Valid Data", "No valid faculty data found in the Excel file");
+          event.target.value = "";
+          return;
+        }
+
+        // Merge with existing faculty list, avoiding duplicates based on employeeId
+        const existingEmployeeIds = facultyList.map(f => f.employeeId);
+        const newFaculty = processedFacultyData.filter(f => !existingEmployeeIds.includes(f.employeeId));
+        const duplicateCount = processedFacultyData.length - newFaculty.length;
+
+        // Update faculty list directly in state
+        setFacultyList(prev => [...prev, ...newFaculty]);
+
+        let message = `Successfully processed ${newFaculty.length} faculty records`;
+        if (duplicateCount > 0) {
+          message += ` (${duplicateCount} duplicates skipped)`;
+        }
+
+        showNotification("success", "Upload Successful", message);
+        event.target.value = "";
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      console.error("Excel processing error:", error);
+      showNotification("error", "Processing Error", "Failed to process Excel file. Please ensure it's valid.");
+      event.target.value = "";
+    }
+  }, [showNotification, facultyList]);
+
+  // Handle demo Excel download
+  const handleDemoExcelDownload = useCallback(() => {
+    const demoData = [
+      ["Faculty Name", "Emp ID", "Email ID", "Department"],
+      ["John Doe", "EMP001", "john.doe@vit.ac.in", "BTech"],
+      ["Jane Smith", "EMP002", "jane.smith@vit.ac.in", "MTech (integrated)"],
+      ["Alice Johnson", "EMP003", "alice.johnson@vit.ac.in", "MCS"],
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet(demoData);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Faculty Template");
+    XLSX.writeFile(workbook, "Faculty_Demo.xlsx");
+  }, []);
+
+  // Check for admin context - handle both specific and skip modes
+  useEffect(() => {
+    const savedAdminContext = sessionStorage.getItem("adminContext");
+    if (!savedAdminContext) {
+      navigate("/admin/school-selection");
+      return;
+    }
+    
+    try {
+      const parsedContext = JSON.parse(savedAdminContext);
+      
+      if (parsedContext.skipped) {
+        setAdminContext({ school: null, department: null, skipped: true });
+      } else if (parsedContext.school && parsedContext.department) {
+        setAdminContext(parsedContext);
+      } else {
+        navigate("/admin/school-selection");
+      }
+    } catch (error) {
+      console.error("Failed to parse admin context:", error);
+      navigate("/admin/school-selection");
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (adminContext) {
@@ -419,27 +423,20 @@ const AdminPanelManagement = () => {
     }
   }, [selectedPair, panels, fetchData, showNotification]);
 
-  // Enhanced Auto Assign with mutual exclusion
-  const handleAutoAssign = useCallback(async () => {
+  // Enhanced Auto Assign with popup
+  const handleAutoAssign = useCallback(() => {
     if (isAutoCreating) {
       showNotification("error", "Operation in Progress", "Cannot start auto assignment while auto panel creation is running. Please wait for it to complete.");
       return;
     }
 
-    const assignedTeamsCount = panels.reduce((sum, panel) => sum + panel.teams.length, 0);
-    
-    if (assignedTeamsCount > 0) {
-      setAutoConfirmation({
-        type: "assign",
-        isOpen: true,
-        message: `There are already ${assignedTeamsCount} teams assigned to panels. Auto-assignment may reassign existing teams. Do you want to continue?`,
-        existingCount: assignedTeamsCount,
-      });
-      return;
-    }
-    
-    await executeAutoAssign();
-  }, [isAutoCreating, panels, showNotification]);
+    setAutoAssignPopup({
+      isOpen: true,
+      bufferPanels: "",
+      department: "",
+      error: "",
+    });
+  }, [isAutoCreating, showNotification]);
 
   // Enhanced Auto Create with popup
   const handleAutoCreatePanel = useCallback(() => {
@@ -452,6 +449,7 @@ const AdminPanelManagement = () => {
       isOpen: true,
       numPanels: "",
       department: "",
+      panelSize: "",
       error: "",
     });
   }, [isAutoAssigning, showNotification]);
@@ -459,17 +457,10 @@ const AdminPanelManagement = () => {
   // Handle auto create popup confirmation
   const handleAutoCreateConfirm = useCallback(async () => {
     const numPanels = parseInt(autoCreatePopup.numPanels);
+    const panelSize = parseInt(autoCreatePopup.panelSize);
     const selectedDept = autoCreatePopup.department;
 
-    // Filter faculty based on selected department
-    const filteredFaculty = selectedDept
-      ? facultyList.filter((faculty) =>
-          faculty.guidedProjects?.some((project) => project.department === selectedDept)
-        )
-      : facultyList;
-
-    const maxPanels = Math.floor(filteredFaculty.length / 2);
-
+    // Validation
     if (!numPanels || numPanels <= 0) {
       setAutoCreatePopup(prev => ({
         ...prev,
@@ -478,91 +469,113 @@ const AdminPanelManagement = () => {
       return;
     }
 
-    if (numPanels > maxPanels) {
+    if (!panelSize || panelSize <= 0) {
       setAutoCreatePopup(prev => ({
         ...prev,
-        error: `Cannot create ${numPanels} panels. Only ${maxPanels} panels are possible with ${filteredFaculty.length} available faculty for ${selectedDept || 'all departments'}.`,
+        error: "Please enter a valid panel size",
       }));
       return;
     }
 
-    if (panels.length > 0) {
-      setAutoConfirmation({
-        type: "create",
-        isOpen: true,
-        message: `There are already ${panels.length} panels created. Auto-creation will create up to ${numPanels} additional panels for ${selectedDept || 'all departments'} if needed. Do you want to continue?`,
-        existingCount: panels.length,
-      });
-      setAutoCreatePopup({ isOpen: false, numPanels: "", department: "", error: "" });
+    if (!selectedDept) {
+      setAutoCreatePopup(prev => ({
+        ...prev,
+        error: "Please select a department",
+      }));
       return;
     }
 
-    await executeAutoCreate(numPanels, selectedDept);
-    setAutoCreatePopup({ isOpen: false, numPanels: "", department: "", error: "" });
-  }, [autoCreatePopup.numPanels, autoCreatePopup.department, facultyList, panels.length]);
+    // Filter faculty based on selected department
+    const filteredFaculty = facultyList.filter((faculty) => {
+      const deptField = Array.isArray(faculty.department) ? faculty.department : [faculty.department];
+      return deptField.includes(selectedDept);
+    });
 
-  // Handle auto create popup cancellation
-  const handleAutoCreateCancel = useCallback(() => {
-    setAutoCreatePopup({ isOpen: false, numPanels: "", department: "", error: "" });
-  }, []);
+    const maxPanels = Math.floor(filteredFaculty.length / panelSize);
 
-  // Execute auto assign with notification instead of alert
-  const executeAutoAssign = useCallback(async () => {
-    try {
-      setIsAutoAssigning(true);
-      await autoAssignPanelsToProjects();
-      await fetchData();
-      showNotification("success", "Auto-Assignment Complete!", "Teams have been automatically assigned to panels");
-    } catch (error) {
-      console.error("Auto assign error:", error);
-      showNotification("error", "Assignment Failed", "Auto-assignment failed. Please try again.");
-    } finally {
-      setIsAutoAssigning(false);
+    if (numPanels > maxPanels) {
+      setAutoCreatePopup(prev => ({
+        ...prev,
+        error: `Cannot create ${numPanels} panels with panel size ${panelSize}. Only ${maxPanels} panels are possible with ${filteredFaculty.length} available faculty for ${selectedDept}.`,
+      }));
+      return;
     }
-  }, [fetchData, showNotification]);
 
-  // Execute auto create with notification instead of alert
-  const executeAutoCreate = useCallback(async (numPanels, department) => {
+    // Prepare request payload in the format expected by backend
+    const requestPayload = {
+      departments: {
+        [selectedDept]: {
+          panelsNeeded: numPanels,
+          panelSize: panelSize,
+          faculties: filteredFaculty.map(f => f.employeeId)
+        }
+      }
+    };
+
     try {
       setIsAutoCreating(true);
-      await autoCreatePanelManual({ numPanels, department });
+      const response = await autoCreatePanelManual(requestPayload);
       await fetchData();
-      showNotification("success", "Auto-Creation Complete!", `Up to ${numPanels} panels have been automatically created for ${department || 'all departments'}`);
+      showNotification("success", "Auto-Creation Complete!", `Successfully created ${numPanels} panels for ${selectedDept} department`);
+      setAutoCreatePopup({ isOpen: false, numPanels: "", department: "", panelSize: "", error: "" });
     } catch (error) {
       console.error("Auto create panel error:", error);
       showNotification("error", "Creation Failed", "Auto panel creation failed. Please try again.");
     } finally {
       setIsAutoCreating(false);
     }
-  }, [fetchData, showNotification]);
+  }, [autoCreatePopup, facultyList, fetchData, showNotification]);
 
-  // Handle auto operation confirmation
-  const handleAutoConfirm = useCallback(async () => {
-    const currentType = autoConfirmation.type;
-    const numPanels = parseInt(autoCreatePopup.numPanels) || 0;
-    const department = autoCreatePopup.department;
-    setAutoConfirmation({
-      type: "",
-      isOpen: false,
-      message: "",
-      existingCount: 0,
-    });
+  // Handle auto assign popup confirmation
+  const handleAutoAssignConfirm = useCallback(async () => {
+    const bufferPanels = parseInt(autoAssignPopup.bufferPanels) || 0;
+    const selectedDept = autoAssignPopup.department;
 
-    if (currentType === "assign") {
-      await executeAutoAssign();
-    } else if (currentType === "create") {
-      await executeAutoCreate(numPanels, department);
+    // Validation
+    if (bufferPanels < 0) {
+      setAutoAssignPopup(prev => ({
+        ...prev,
+        error: "Buffer panels cannot be negative",
+      }));
+      return;
     }
-  }, [autoConfirmation.type, autoCreatePopup.numPanels, autoCreatePopup.department, executeAutoAssign, executeAutoCreate]);
 
-  // Handle auto operation cancellation
-  const handleAutoCancel = useCallback(() => {
-    setAutoConfirmation({
-      type: "",
-      isOpen: false,
-      message: "",
-      existingCount: 0,
-    });
+    if (bufferPanels >= panels.length) {
+      setAutoAssignPopup(prev => ({
+        ...prev,
+        error: `Buffer panels cannot be greater than or equal to total panels (${panels.length})`,
+      }));
+      return;
+    }
+
+    // Prepare request payload
+    const requestPayload = {
+      buffer: bufferPanels,
+      ...(selectedDept && { department: selectedDept })
+    };
+
+    try {
+      setIsAutoAssigning(true);
+      await autoAssignPanelsToProjects(requestPayload);
+      await fetchData();
+      showNotification("success", "Auto-Assignment Complete!", `Teams have been automatically assigned with ${bufferPanels} buffer panels`);
+      setAutoAssignPopup({ isOpen: false, bufferPanels: "", department: "", error: "" });
+    } catch (error) {
+      console.error("Auto assign error:", error);
+      showNotification("error", "Assignment Failed", "Auto-assignment failed. Please try again.");
+    } finally {
+      setIsAutoAssigning(false);
+    }
+  }, [autoAssignPopup, panels.length, fetchData, showNotification]);
+
+  // Handle auto create popup cancellation
+  const handleAutoCreateCancel = useCallback(() => {
+    setAutoCreatePopup({ isOpen: false, numPanels: "", department: "", panelSize: "", error: "" });
+  }, []);
+
+  // Handle auto assign popup cancellation
+  const handleAutoAssignCancel = useCallback(() => {
+    setAutoAssignPopup({ isOpen: false, bufferPanels: "", department: "", error: "" });
   }, []);
 
   const handleManualAssign = useCallback(async (panelIndex, projectId) => {
@@ -621,17 +634,49 @@ const AdminPanelManagement = () => {
     [searchQuery]
   );
 
-  // Calculate maximum possible panels based on filtered faculty
-  const filteredFaculty = useMemo(() => {
-    const selectedDept = autoCreatePopup.department;
-    return selectedDept
-      ? facultyList.filter((faculty) =>
-          faculty.guidedProjects?.some((project) => project.department === selectedDept)
-        )
-      : facultyList;
+  // Get available departments from faculty list
+  const availableDepartments = useMemo(() => {
+    const depts = new Set();
+    facultyList.forEach(faculty => {
+      if (Array.isArray(faculty.department)) {
+        faculty.department.forEach(dept => depts.add(dept));
+      } else if (faculty.department) {
+        depts.add(faculty.department);
+      }
+    });
+    return Array.from(depts);
+  }, [facultyList]);
+
+  // Calculate faculty count for selected department in auto create popup
+  const facultyCountForAutoCreate = useMemo(() => {
+    if (!autoCreatePopup.department) return 0;
+    return facultyList.filter((faculty) => {
+      const deptField = Array.isArray(faculty.department) ? faculty.department : [faculty.department];
+      return deptField.includes(autoCreatePopup.department);
+    }).length;
   }, [autoCreatePopup.department, facultyList]);
 
-  const maxPanels = Math.floor(filteredFaculty.length / 2);
+  // Calculate faculty count for manual create department selection
+  const facultyCountForManualCreate = useMemo(() => {
+    if (!manualCreateDept) return 0;
+    return facultyList.filter((faculty) => {
+      const deptField = Array.isArray(faculty.department) ? faculty.department : [faculty.department];
+      return deptField.includes(manualCreateDept);
+    }).length;
+  }, [manualCreateDept, facultyList]);
+
+  // Determine if manual create button should be disabled
+  const isManualCreateDisabled = useMemo(() => {
+    if (!adminContext) return true;
+    
+    // If not in "All Schools & Departments" mode, use normal validation
+    if (!adminContext.skipped) {
+      return !selectedPair.f1 || !selectedPair.f2;
+    }
+    
+    // If in "All Schools & Departments" mode, require department selection and faculty availability
+    return !manualCreateDept || facultyCountForManualCreate === 0 || !selectedPair.f1 || !selectedPair.f2;
+  }, [adminContext, manualCreateDept, facultyCountForManualCreate, selectedPair]);
 
   if (loading) {
     return (
@@ -657,7 +702,7 @@ const AdminPanelManagement = () => {
     <>
       <Navbar />
       <div className="pt-20 pl-4 sm:pl-6 md:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
-        <div className=" " >
+        <div className="">
         {/* Page Header with Context */}
         <div className="mb-8 bg-white rounded-2xl shadow-lg mx-4 sm:mx-6 md:mx-8 overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6">
@@ -797,7 +842,31 @@ const AdminPanelManagement = () => {
 
             {/* Panel Creation Controls */}
             <div className="border-t border-slate-200 pt-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 items-end">
+                {/* Department Selection for All Schools & Departments mode */}
+                {adminContext?.skipped && (
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                      Department *
+                    </label>
+                    <select
+                      value={manualCreateDept}
+                      onChange={(e) => setManualCreateDept(e.target.value)}
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                    >
+                      <option value="">Select Department</option>
+                      {availableDepartments.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                    {manualCreateDept && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        {facultyCountForManualCreate} faculty available
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                     Faculty 1
@@ -810,7 +879,9 @@ const AdminPanelManagement = () => {
                     className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
                   >
                     <option key="empty-f1" value="">Select Faculty 1</option>
-                    {availableFaculty.map((f) => (
+                    {availableFaculty
+                      .filter(f => adminContext?.skipped ? (manualCreateDept ? (Array.isArray(f.department) ? f.department.includes(manualCreateDept) : f.department === manualCreateDept) : false) : true)
+                      .map((f) => (
                       <option key={`f1-${f._id}`} value={f._id}>
                         {f.name} ({f.employeeId})
                       </option>
@@ -829,7 +900,9 @@ const AdminPanelManagement = () => {
                     className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
                   >
                     <option key="empty-f2" value="">Select Faculty 2</option>
-                    {availableFaculty.map((f) => (
+                    {availableFaculty
+                      .filter(f => adminContext?.skipped ? (manualCreateDept ? (Array.isArray(f.department) ? f.department.includes(manualCreateDept) : f.department === manualCreateDept) : false) : true)
+                      .map((f) => (
                       <option key={`f2-${f._id}`} value={f._id}>
                         {f.name} ({f.employeeId})
                       </option>
@@ -839,7 +912,14 @@ const AdminPanelManagement = () => {
                 <button
                   onClick={handleAddPanel}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
-                  disabled={!selectedPair.f1 || !selectedPair.f2}
+                  disabled={isManualCreateDisabled}
+                  title={
+                    adminContext?.skipped && !manualCreateDept
+                      ? "Please select a department first"
+                      : adminContext?.skipped && facultyCountForManualCreate === 0
+                        ? "No faculty available for selected department"
+                        : "Create a new panel manually"
+                  }
                 >
                   <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                   Add Panel
@@ -912,19 +992,17 @@ const AdminPanelManagement = () => {
                     </>
                   )}
                 </button>
-                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                <div className="flex flex-col gap-4">
                   <div>
                     <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
                       Upload Faculty Excel
                     </label>
-                    <div className="relative">
-                      <input
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={handleExcelUpload}
-                        className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                      />
-                    </div>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleExcelUpload}
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
                   </div>
                   <button
                     onClick={handleDemoExcelDownload}
@@ -954,7 +1032,7 @@ const AdminPanelManagement = () => {
                       Auto Create Panels
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                      Specify the number of panels and department
+                      Configure panel creation parameters
                     </p>
                   </div>
                 </div>
@@ -962,7 +1040,7 @@ const AdminPanelManagement = () => {
                 <div className="mb-4 sm:mb-6 space-y-4">
                   <div>
                     <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                      Department
+                      Department *
                     </label>
                     <select
                       value={autoCreatePopup.department}
@@ -975,15 +1053,25 @@ const AdminPanelManagement = () => {
                       }
                       className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
                     >
-                      <option value="">All Departments</option>
-                      <option value="BTech">BTech</option>
-                      <option value="MTech (integrated)">MTech (integrated)</option>
-                      <option value="MCS">MCS</option>
+                      <option value="">Select Department</option>
+                      {availableDepartments.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
                     </select>
+                    {autoCreatePopup.department && facultyCountForAutoCreate > 0 && (
+                      <p className="text-xs text-emerald-600 mt-2 font-medium">
+                        ✓ {facultyCountForAutoCreate} faculty members available in {autoCreatePopup.department}
+                      </p>
+                    )}
+                    {autoCreatePopup.department && facultyCountForAutoCreate === 0 && (
+                      <p className="text-xs text-red-600 mt-2 font-medium">
+                        ⚠️ No faculty members available in {autoCreatePopup.department}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                      Number of Panels (Max: {maxPanels})
+                      Number of Panels *
                     </label>
                     <input
                       type="number"
@@ -1000,6 +1088,25 @@ const AdminPanelManagement = () => {
                       placeholder="Enter number of panels"
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                      Panel Size (Faculty per Panel) *
+                    </label>
+                    <input
+                      type="number"
+                      min="2"
+                      value={autoCreatePopup.panelSize}
+                      onChange={(e) =>
+                        setAutoCreatePopup(prev => ({
+                          ...prev,
+                          panelSize: e.target.value,
+                          error: "",
+                        }))
+                      }
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                      placeholder="Enter panel size (e.g., 2, 3)"
+                    />
+                  </div>
                   {autoCreatePopup.error && (
                     <div className="mt-2 p-2 sm:p-3 bg-red-50 rounded-lg border-l-4 border-red-300">
                       <p className="text-xs sm:text-sm text-red-800">
@@ -1009,7 +1116,7 @@ const AdminPanelManagement = () => {
                   )}
                   <div className="mt-2 p-2 sm:p-3 bg-blue-50 rounded-lg border-l-4 border-blue-300">
                     <p className="text-xs sm:text-sm text-blue-800">
-                      <strong>Note:</strong> Each panel requires 2 faculty members. With {filteredFaculty.length} faculty {autoCreatePopup.department ? `in ${autoCreatePopup.department}` : 'across all departments'}, up to {maxPanels} panels can be created.
+                      <strong>Note:</strong> Faculty will be automatically selected from the chosen department based on experience (employee ID order).
                     </p>
                   </div>
                 </div>
@@ -1024,8 +1131,118 @@ const AdminPanelManagement = () => {
                   <button
                     onClick={handleAutoCreateConfirm}
                     className="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all text-sm sm:text-base"
+                    disabled={isAutoCreating}
                   >
-                    Create Panels
+                    {isAutoCreating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline-block mr-2"></div>
+                        Creating...
+                      </>
+                    ) : (
+                      'Create Panels'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Auto Assign Popup */}
+        {autoAssignPopup.isOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center gap-3 sm:gap-4 mb-4">
+                  <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                    <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+                      Auto Assign Teams
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                      Configure assignment parameters
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="mb-4 sm:mb-6 space-y-4">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                      Department (Optional)
+                    </label>
+                    <select
+                      value={autoAssignPopup.department}
+                      onChange={(e) =>
+                        setAutoAssignPopup(prev => ({
+                          ...prev,
+                          department: e.target.value,
+                          error: "",
+                        }))
+                      }
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm sm:text-base"
+                    >
+                      <option value="">All Departments</option>
+                      {availableDepartments.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                      Buffer Panels (Keep Unassigned)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={panels.length - 1}
+                      value={autoAssignPopup.bufferPanels}
+                      onChange={(e) =>
+                        setAutoAssignPopup(prev => ({
+                          ...prev,
+                          bufferPanels: e.target.value,
+                          error: "",
+                        }))
+                      }
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm sm:text-base"
+                      placeholder="Enter number of buffer panels (default: 0)"
+                    />
+                  </div>
+                  {autoAssignPopup.error && (
+                    <div className="mt-2 p-2 sm:p-3 bg-red-50 rounded-lg border-l-4 border-red-300">
+                      <p className="text-xs sm:text-sm text-red-800">
+                        {autoAssignPopup.error}
+                      </p>
+                    </div>
+                  )}
+                  <div className="mt-2 p-2 sm:p-3 bg-purple-50 rounded-lg border-l-4 border-purple-300">
+                    <p className="text-xs sm:text-sm text-purple-800">
+                      <strong>Note:</strong> Teams will be distributed across panels using round-robin assignment. Buffer panels will be kept empty for future assignments. Total panels: {panels.length}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={handleAutoAssignCancel}
+                    className="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-all text-sm sm:text-base"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAutoAssignConfirm}
+                    className="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-all text-sm sm:text-base"
+                    disabled={isAutoAssigning}
+                  >
+                    {isAutoAssigning ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline-block mr-2"></div>
+                        Assigning...
+                      </>
+                    ) : (
+                      'Assign Teams'
+                    )}
                   </button>
                 </div>
               </div>
@@ -1090,14 +1307,18 @@ const AdminPanelManagement = () => {
                                 <ChevronRight className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
                               )}
                             </div>
-                            <div>
+                            <div className="flex-1">
                               <h4 className="font-bold text-lg sm:text-xl text-slate-800 mb-1">
                                 Panel {idx + 1}: {panel.facultyNames.join(" & ")}
                               </h4>
-                              <div className="flex items-center space-x-4 sm:space-x-6 text-xs sm:text-sm text-slate-600">
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-xs sm:text-sm text-slate-600">
                                 <span className="flex items-center space-x-1">
                                   <Users className="h-3 w-3 sm:h-4 sm:w-4" />
                                   <span>{panel.teams.length} teams assigned</span>
+                                </span>
+                                <span className="flex items-center space-x-1">
+                                  <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span>{panel.department}</span>
                                 </span>
                                 {panel.teams.length > 0 && (
                                   <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs font-semibold">
@@ -1325,71 +1546,6 @@ const AdminPanelManagement = () => {
           onConfirm={handleConfirmRemove}
           type={confirmRemove.type}
         />
-
-        {/* Auto Operation Confirmation Dialog */}
-        {autoConfirmation.isOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">
-              <div className="p-4 sm:p-6">
-                <div className="flex items-center gap-3 sm:gap-4 mb-4">
-                  <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-yellow-100 flex items-center justify-center">
-                    <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base sm:text-lg font-semibold text-slate-900">
-                      {autoConfirmation.type === "create" ? "Confirm Auto Panel Creation" : "Confirm Auto Assignment"}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                      This action will modify existing data
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="mb-4 sm:mb-6">
-                  <p className="text-slate-700 leading-relaxed text-sm sm:text-base">
-                    {autoConfirmation.message}
-                  </p>
-                  
-                  {autoConfirmation.type === "assign" && (
-                    <div className="mt-2 sm:mt-3 p-2 sm:p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-300">
-                      <p className="text-xs sm:text-sm text-yellow-800">
-                        <strong>Note:</strong> This may reassign teams that are already assigned to panels.
-                      </p>
-                    </div>
-                  )}
-                  
-                  {autoConfirmation.type === "create" && (
-                    <div className="mt-2 sm:mt-3 p-2 sm:p-3 bg-blue-50 rounded-lg border-l-4 border-blue-300">
-                      <p className="text-xs sm:text-sm text-blue-800">
-                        <strong>Note:</strong> Up to {autoCreatePopup.numPanels || 0} additional panels will be created for {autoCreatePopup.department || 'all departments'} only if needed based on available faculty.
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={handleAutoCancel}
-                    className="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-all text-sm sm:text-base"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleAutoConfirm}
-                    className={`flex-1 px-3 py-1.5 sm:px-4 sm:py-2 text-white rounded-lg font-medium transition-all text-sm sm:text-base ${
-                      autoConfirmation.type === "create"
-                        ? "bg-blue-600 hover:bg-blue-700"
-                        : "bg-purple-600 hover:bg-purple-700"
-                    }`}
-                  >
-                    {autoConfirmation.type === "create" ? "Create Panels" : "Assign Teams"}
-                  </button>
-                </div>
-              </div>
-              
-            </div>
-          </div>
-        )}
         </div>
       </div>
     </>

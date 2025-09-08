@@ -1397,65 +1397,186 @@ export async function assignPanelToProject(req, res) {
 export async function autoAssignPanelsToProjects(req, res) {
   try {
     const buffer = Number(req.body.buffer) || 0;
+    const department = req.body.department; // Optional department filter
 
-    // Get all unassigned projects (panel: null)
-    const unassignedProjects = await Project.find({ panel: null }).populate(
-      "guideFaculty"
-    );
-    // Fetch panels with members
-    const panels = await Panel.find().populate("members");
+    let projectFilter = { panel: null };
+    let panelFilter = {};
 
-    if (!panels.length) {
-      return res
-        .status(400)
-        .json({ success: false, message: "No panels available." });
+    // Apply department filter if specified
+    if (department) {
+      projectFilter.department = department;
+      panelFilter.department = department;
     }
 
-    // Leave last N panels in buffer unassigned for future
-    const panelsToAssign = panels.slice(0, panels.length - buffer);
+    const unassignedProjects = await Project.find(projectFilter).populate("guideFaculty");
+    
+    // ✅ FIXED: Populate members array (your schema uses members, not faculty1/faculty2)
+    const panels = await Panel.find(panelFilter).populate({
+      path: "members",
+      select: "employeeId name emailId school department"
+    });
+
+    if (!panels.length) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `No panels available${department ? ` for ${department} department` : ''}` 
+      });
+    }
+
+    let panelsToAssign;
+    let bufferPanels;
+    let assignmentStats = {};
+
+    if (department) {
+      // ✅ Single department mode - apply buffer normally
+      if (buffer >= panels.length) {
+        return res.status(400).json({
+          success: false,
+          message: `Buffer (${buffer}) cannot be >= total panels (${panels.length}) for ${department}.`,
+        });
+      }
+      
+      panelsToAssign = panels.slice(0, panels.length - buffer);
+      bufferPanels = panels.slice(panels.length - buffer);
+      
+    } else {
+      // ✅ FIXED: Global mode - distribute buffer per department
+      const panelsByDept = {};
+      
+      // Group panels by department
+      panels.forEach(panel => {
+        if (!panelsByDept[panel.department]) {
+          panelsByDept[panel.department] = [];
+        }
+        panelsByDept[panel.department].push(panel);
+      });
+
+      const departments = Object.keys(panelsByDept);
+      
+      if (departments.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No departments found with panels.",
+        });
+      }
+
+      // Calculate buffer per department
+      const bufferPerDept = Math.ceil(buffer / departments.length);
+      
+      panelsToAssign = [];
+      bufferPanels = [];
+
+      console.log(`=== BUFFER DISTRIBUTION ===`);
+      console.log(`Total buffer: ${buffer}, Departments: ${departments.length}, Buffer per dept: ${bufferPerDept}`);
+
+      // Apply distributed buffer per department
+      departments.forEach(dept => {
+        const deptPanels = panelsByDept[dept];
+        const actualBuffer = Math.min(bufferPerDept, Math.max(0, deptPanels.length - 1)); // At least 0 panels for assignment
+        
+        const deptPanelsToAssign = deptPanels.slice(0, deptPanels.length - actualBuffer);
+        const deptBufferPanels = deptPanels.slice(deptPanels.length - actualBuffer);
+        
+        console.log(`Dept: ${dept}, Total: ${deptPanels.length}, Buffer: ${actualBuffer}, Available: ${deptPanelsToAssign.length}`);
+        
+        panelsToAssign.push(...deptPanelsToAssign);
+        bufferPanels.push(...deptBufferPanels);
+        
+        // Initialize assignment stats per department
+        assignmentStats[dept] = 0;
+      });
+    }
 
     if (!panelsToAssign.length) {
       return res.status(400).json({
         success: false,
-        message: "No panels left for assignment (buffer too large).",
+        message: "No panels left for assignment after applying buffer.",
       });
     }
 
-    // Assignment tracker
     const panelAssignments = {};
     panelsToAssign.forEach((panel) => {
       panelAssignments[panel._id.toString()] = [];
     });
 
-    const totalProjects = unassignedProjects.length;
-    const totalPanels = panelsToAssign.length;
+    let assignedCount = 0;
+    let conflictCount = 0;
 
-    // Keep track of project assignments (fills all panels, then loops again)
-    let projectIndex = 0;
-    let panelIndex = 0;
+    // ✅ FIXED: Match projects to panels by department with conflict checking
+    for (const project of unassignedProjects) {
+      const matchingPanels = panelsToAssign.filter(panel => 
+        panel.department === project.department
+      );
 
-    // Distribute projects - first fill every panel with one, then round robin
-    while (projectIndex < totalProjects) {
-      const panel = panelsToAssign[panelIndex % totalPanels];
-      const project = unassignedProjects[projectIndex];
+      if (matchingPanels.length > 0) {
+        // ✅ FIXED: Filter out conflict panels (guide faculty cannot be panel member)
+        const nonConflictPanels = matchingPanels.filter(panel => {
+          const guideId = project.guideFaculty._id.toString();
+          
+          // Check if guide faculty is in panel members
+          const hasConflict = panel.members.some(member => 
+            member._id.toString() === guideId
+          );
+          
+          return !hasConflict;
+        });
 
-      project.panel = panel._id;
-      await project.save();
-      panelAssignments[panel._id.toString()].push(project._id);
+        if (nonConflictPanels.length > 0) {
+          // ✅ FIXED: Round-robin assignment within each department
+          if (!assignmentStats[project.department]) {
+            assignmentStats[project.department] = 0;
+          }
+          
+          const panelIndex = assignmentStats[project.department] % nonConflictPanels.length;
+          const selectedPanel = nonConflictPanels[panelIndex];
 
-      projectIndex++;
-      panelIndex++;
+          project.panel = selectedPanel._id;
+          await project.save();
+          
+          panelAssignments[selectedPanel._id.toString()].push(project._id);
+          assignedCount++;
+          assignmentStats[project.department]++;
+        } else {
+          conflictCount++;
+          console.log(`⚠️ Conflict: Project ${project.name} guide ${project.guideFaculty.name} is in available panels`);
+        }
+      } else {
+        console.log(`⚠️ No panels available for department: ${project.department}`);
+      }
     }
 
+    // ✅ Enhanced response with detailed statistics
     return res.status(200).json({
       success: true,
-      message: `Panels assigned to all unassigned projects (round-robin, buffer=${buffer}).`,
-      assignments: panelAssignments,
-      bufferUnassigned: panels.slice(panels.length - buffer).map((p) => p._id),
+      message: `Assigned ${assignedCount} projects with ${department ? 'department-specific' : 'distributed per-department'} buffer strategy.`,
+      data: {
+        assignments: panelAssignments,
+        bufferPanels: bufferPanels.map(p => ({
+          id: p._id,
+          department: p.department,
+          members: p.members.map(m => ({ name: m.name, employeeId: m.employeeId }))
+        })),
+        statistics: {
+          totalProjects: unassignedProjects.length,
+          assignedProjects: assignedCount,
+          conflictedProjects: conflictCount,
+          unassignableProjects: unassignedProjects.length - assignedCount,
+          totalPanelsAvailable: panels.length,
+          panelsUsedForAssignment: panelsToAssign.length,
+          panelsKeptAsBuffer: bufferPanels.length,
+          assignmentPerDepartment: assignmentStats
+        },
+        mode: department ? `Single Department (${department})` : "All Departments with Distributed Buffer"
+      }
     });
+    
   } catch (error) {
     console.error("Error in autoAssignPanelsToProjects:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error", 
+      error: error.message 
+    });
   }
 }
 

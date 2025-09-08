@@ -209,3 +209,33 @@ export const updateStudentDetails = async (req, res) => {
       .json({ success: false, message: "Server error", error: error.message });
   }
 };
+export const deleteStudent = async (req, res) => {
+  try {
+    const { regNo } = req.params;
+    
+    const deletedStudent = await Student.findOneAndDelete({ regNo });
+    
+    if (!deletedStudent) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Student not found." 
+      });
+    }
+    
+    // Also cleanup related requests
+    await Request.deleteMany({ student: deletedStudent._id });
+    
+    return res.status(200).json({
+      success: true,
+      message: "Student deleted successfully.",
+      student: deletedStudent,
+    });
+  } catch (error) {
+    console.error("Error deleting student:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error", 
+      error: error.message 
+    });
+  }
+};

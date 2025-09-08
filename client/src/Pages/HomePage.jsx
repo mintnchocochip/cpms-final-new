@@ -54,19 +54,7 @@ const VITHomepage = () => {
                     </div>
                 </div>
 
-                {/* Footer Info */}
-                <div className="mt-12 sm:mt-16 text-center">
-                    <p className="text-sm sm:text-base text-gray-500 mb-2">
-                        Secure access to capstone project management
-                    </p>
-                    <div className="flex items-center justify-center space-x-4 text-xs sm:text-sm text-gray-400">
-                        <span>🔒 Secure Login</span>
-                        <span>•</span>
-                        <span>📊 Project Tracking</span>
-                        <span>•</span>
-                        <span>⭐ Quality Reviews</span>
-                    </div>
-                </div>
+            
             </div>
         </>
     );
