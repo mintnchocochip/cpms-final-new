@@ -161,12 +161,12 @@ export async function createFaculty(req, res) {
       });
     }
 
-    if (!department || !Array.isArray(department) || department.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Department must be a non-empty array",
-      });
-    }
+    // if (!department || !Array.isArray(department) || department.length === 0) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Department must be a non-empty array",
+    //   });
+    // }
 
     if (!specialization || !Array.isArray(specialization) || specialization.length === 0) {
       return res.status(400).json({
@@ -504,103 +504,44 @@ export async function getAllGuideWithProjects(req, res) {
   try {
     const { school, department } = req.query;
 
-    console.log("getAllGuideWithProjects called with:", { school, department });
+    // Build dynamic query for faculties by role and optional school and department
+    const facultyQuery = { role: "faculty" };
+    if (school) facultyQuery.school = school;
+    if (department) facultyQuery.department = department;
 
-    // Build filter for projects directly
-    const projectFilter = {};
-    if (school) projectFilter.school = school;
-    if (department) projectFilter.department = department;
+    const faculties = await Faculty.find(facultyQuery);
 
-    // Get all projects with full population
-    const projects = await Project.find(projectFilter)
-      .populate({
-        path: "students",
-        model: "Student",
-        select: "regNo name emailId reviews pptApproved deadline school department"
-      })
-      .populate({
-        path: "guideFaculty", 
-        model: "Faculty",
-        select: "name emailId employeeId school department specialization"
-      })
-      .populate({
-        path: "panel",
-        model: "Panel",
-        select: "school department",
-        populate: {
-          path: "members", // ✅ FIXED: Use 'members' from your schema
-          model: "Faculty",
-          select: "name emailId employeeId"
-        }
-      })
-      .lean();
+    const result = await Promise.all(
+      faculties.map(async (faculty) => {
+        // Build dynamic query for projects by guideFaculty, and optional school and department
+        const projectQuery = { guideFaculty: faculty._id };
+        if (school) projectQuery.school = school;
+        if (department) projectQuery.department = department;
 
-    console.log(`Found ${projects.length} guide projects`);
-
-    // Process projects to convert Maps to Objects
-    const processedProjects = projects.map(project => {
-      const processedStudents = project.students.map(student => {
-        // Convert MongoDB Map to plain object for reviews
-        let processedReviews = {};
-        if (student.reviews) {
-          if (student.reviews instanceof Map) {
-            processedReviews = Object.fromEntries(student.reviews);
-          } else if (typeof student.reviews === 'object') {
-            processedReviews = { ...student.reviews };
-          }
-        }
-        
-        // Convert deadline Map to plain object
-        let processedDeadlines = {};
-        if (student.deadline) {
-          if (student.deadline instanceof Map) {
-            processedDeadlines = Object.fromEntries(student.deadline);
-          } else if (typeof student.deadline === 'object') {
-            processedDeadlines = { ...student.deadline };
-          }
-        }
+        const guidedProjects = await Project.find(projectQuery)
+          .populate("students", "regNo name")
+          .lean();
 
         return {
-          _id: student._id,
-          regNo: student.regNo,
-          name: student.name,
-          emailId: student.emailId,
-          reviews: processedReviews,
-          pptApproved: student.pptApproved || { approved: false, locked: false },
-          deadline: processedDeadlines,
-          school: student.school,
-          department: student.department
+          faculty: {
+            _id: faculty._id,
+            employeeId: faculty.employeeId,
+            name: faculty.name,
+            emailId: faculty.emailId,
+            school: faculty.school,
+            department: faculty.department,
+          },
+          guidedProjects,
         };
-      });
+      })
+    );
 
-      return {
-        _id: project._id,
-        name: project.name,
-        school: project.school,
-        department: project.department,
-        specialization: project.specialization,
-        students: processedStudents,
-        guideFaculty: project.guideFaculty,
-        panel: project.panel
-      };
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: processedProjects, // ✅ Return projects directly, not grouped by faculty
-      message: "Guide projects retrieved successfully",
-    });
-
+    res.status(200).json({ success: true, data: result });
   } catch (error) {
     console.error("Error in getAllGuideWithProjects:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Error retrieving guide projects",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 }
-
 
 export async function getAllPanelsWithProjects(req, res) {
   try {
@@ -1094,24 +1035,57 @@ export async function createPanelManually(req, res) {
 
 export async function autoCreatePanels(req, res) {
   try {
-    const departments = req.body.departments;
+    const { departments, school } = req.body; 
+    
+    if (!school) {
+      return res.status(400).json({
+        success: false,
+        message: "School must be provided in the request body.",
+      });
+    }
+
+    // ✅ FIX 1: Get all already assigned faculty IDs from existing panels
+    const existingPanels = await Panel.find({}).populate('members', 'employeeId');
+    const alreadyAssignedFacultyIds = new Set();
+    
+    existingPanels.forEach(panel => {
+      panel.members.forEach(faculty => {
+        if (faculty && faculty.employeeId) {
+          alreadyAssignedFacultyIds.add(faculty.employeeId.toString());
+        }
+      });
+    });
+
+    console.log('Already assigned faculty IDs:', Array.from(alreadyAssignedFacultyIds));
+
     const createdPanels = [];
     const invalidFaculties = {};
     const facultiesToUpdate = {}; // { empid: Set(depts) }
-
-    for (const [dept, { panelsNeeded, panelSize, faculties }] of Object.entries(
-      departments
-    )) {
-      // 1. Check all faculties exist
-      const foundFaculties = await Faculty.find({
-        employeeId: { $in: faculties },
-      });
-
-      const foundEmpIds = foundFaculties.map((f) => f.employeeId.toString());
-      const missingEmpIds = faculties.filter(
-        (eid) => !foundEmpIds.includes(eid.toString())
+    
+    for (const [dept, { panelsNeeded, panelSize, faculties }] of Object.entries(departments)) {
+      
+      // ✅ FIX 2: Filter out already assigned faculties BEFORE processing
+      const availableFaculties = faculties.filter(empId => 
+        !alreadyAssignedFacultyIds.has(empId.toString())
       );
 
+      console.log(`Department ${dept}: Original ${faculties.length}, Available ${availableFaculties.length}`);
+
+      if (availableFaculties.length === 0) {
+        invalidFaculties[dept] = ['All faculties already assigned to other panels'];
+        continue;
+      }
+
+      // 1. Check available faculties exist
+      const foundFaculties = await Faculty.find({
+        employeeId: { $in: availableFaculties },
+      });
+      
+      const foundEmpIds = foundFaculties.map((f) => f.employeeId.toString());
+      const missingEmpIds = availableFaculties.filter(
+        (eid) => !foundEmpIds.includes(eid.toString())
+      );
+      
       if (missingEmpIds.length > 0) {
         invalidFaculties[dept] = missingEmpIds;
         continue;
@@ -1121,56 +1095,73 @@ export async function autoCreatePanels(req, res) {
       foundFaculties.sort(
         (a, b) => parseInt(a.employeeId) - parseInt(b.employeeId)
       );
+
       const totalAvailable = foundFaculties.length;
-      if (totalAvailable < panelsNeeded * panelSize) {
-        invalidFaculties[dept] = [
-          `Not enough faculties, need ${
-            panelsNeeded * panelSize
-          }, found ${totalAvailable}`,
-        ];
-        continue;
+      const requiredFaculty = panelsNeeded * panelSize;
+      
+      // ✅ FIX 3: Adjust panel count if not enough faculty available
+      let actualPanelsNeeded = panelsNeeded;
+      if (totalAvailable < requiredFaculty) {
+        actualPanelsNeeded = Math.floor(totalAvailable / panelSize);
+        
+        if (actualPanelsNeeded === 0) {
+          invalidFaculties[dept] = [
+            `Not enough available faculties for even 1 panel. Need ${panelSize}, found ${totalAvailable} (excluding already assigned)`
+          ];
+          continue;
+        }
+        
+        console.log(`Adjusted panels for ${dept}: ${panelsNeeded} → ${actualPanelsNeeded}`);
       }
 
       // 3. Make panels: most/least experienced pairing, never repeat
       const used = new Set();
       let facultyPool = [...foundFaculties];
-
-      for (let i = 0; i < panelsNeeded; i++) {
+      
+      for (let i = 0; i < actualPanelsNeeded; i++) {
         let panelMembers = [];
-        let left = 0,
-          right = facultyPool.length - 1;
+        let left = 0, right = facultyPool.length - 1;
+        
         while (panelMembers.length < panelSize && left <= right) {
-          if (
-            !used.has(facultyPool[left].employeeId.toString()) &&
-            panelMembers.length < panelSize
-          ) {
-            panelMembers.push(facultyPool[left]);
-            used.add(facultyPool[left].employeeId.toString());
+          const leftFaculty = facultyPool[left];
+          const rightFaculty = facultyPool[right];
+          
+          // Add most experienced (left)
+          if (!used.has(leftFaculty.employeeId.toString()) && 
+              panelMembers.length < panelSize) {
+            panelMembers.push(leftFaculty);
+            used.add(leftFaculty.employeeId.toString());
+            // ✅ FIX 4: Also add to global assigned set to prevent future use
+            alreadyAssignedFacultyIds.add(leftFaculty.employeeId.toString());
           }
-          if (
-            left !== right &&
-            !used.has(facultyPool[right].employeeId.toString()) &&
-            panelMembers.length < panelSize
-          ) {
-            panelMembers.push(facultyPool[right]);
-            used.add(facultyPool[right].employeeId.toString());
+          
+          // Add least experienced (right) if different from left
+          if (left !== right && 
+              !used.has(rightFaculty.employeeId.toString()) && 
+              panelMembers.length < panelSize) {
+            panelMembers.push(rightFaculty);
+            used.add(rightFaculty.employeeId.toString());
+            // ✅ FIX 4: Also add to global assigned set
+            alreadyAssignedFacultyIds.add(rightFaculty.employeeId.toString());
           }
+          
           left++;
           right--;
         }
 
-        // Distinct check
-        if (
-          panelMembers.length !== panelSize ||
-          new Set(panelMembers.map((f) => f.employeeId)).size !== panelSize
-        ) {
+        // ✅ FIX 5: Enhanced validation - ensure distinct members
+        const uniqueEmployeeIds = new Set(panelMembers.map(f => f.employeeId.toString()));
+        
+        if (panelMembers.length !== panelSize || uniqueEmployeeIds.size !== panelSize) {
+          console.log(`Skipping incomplete panel for ${dept}: got ${panelMembers.length}/${panelSize} members`);
           continue;
         }
 
         // Track faculty to update dept later
         for (const f of panelMembers) {
-          if (!facultiesToUpdate[f.employeeId])
+          if (!facultiesToUpdate[f.employeeId]) {
             facultiesToUpdate[f.employeeId] = new Set();
+          }
           facultiesToUpdate[f.employeeId].add(dept);
         }
 
@@ -1178,48 +1169,51 @@ export async function autoCreatePanels(req, res) {
         const panel = new Panel({
           members: panelMembers.map((f) => f._id),
           department: dept,
-          school: Array.isArray(panelMembers[0].school)
-            ? panelMembers[0].school[0]
-            : panelMembers[0].school,
+          school: school,
         });
+        
         await panel.save();
         createdPanels.push(panel);
+        
+        console.log(`Created panel for ${dept} with faculty:`, panelMembers.map(f => f.employeeId));
       }
     }
 
     // 4. Update faculty department attribute (adds dept, no duplication)
     for (const [empid, deptSet] of Object.entries(facultiesToUpdate)) {
       const doc = await Faculty.findOne({ employeeId: empid });
-      const prevDepartments = Array.isArray(doc.department)
-        ? doc.department
-        : [];
-      const nextDepartments = Array.from(
-        new Set([...prevDepartments, ...deptSet])
-      );
-      doc.department = nextDepartments;
-      await doc.save();
+      if (doc) {
+        const prevDepartments = Array.isArray(doc.department) ? doc.department : [];
+        const nextDepartments = Array.from(new Set([...prevDepartments, ...deptSet]));
+        doc.department = nextDepartments;
+        await doc.save();
+      }
     }
 
     res.status(200).json({
       success: Object.keys(invalidFaculties).length === 0,
-      message:
-        Object.keys(invalidFaculties).length === 0
-          ? "Panels created and faculty department assigned successfully."
-          : `Panels created with errors. Invalid/missing faculties: ${JSON.stringify(
-              invalidFaculties
-            )}`,
+      message: Object.keys(invalidFaculties).length === 0
+        ? `Successfully created ${createdPanels.length} panels and updated faculty departments.`
+        : `Created ${createdPanels.length} panels with some errors. Invalid/missing faculties: ${JSON.stringify(invalidFaculties)}`,
       panelsCreated: createdPanels.length,
+      invalidFaculties: Object.keys(invalidFaculties).length > 0 ? invalidFaculties : undefined,
       details: createdPanels.map((p) => ({
         department: p.department,
-        facultyIds: p.members,
+        facultyCount: p.members.length,
+        school: p.school,
       })),
     });
+    
   } catch (error) {
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: error.message });
+    console.error('Auto create panels error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error", 
+      error: error.message 
+    });
   }
 }
+
 
 export async function deletePanel(req, res) {
   try {
@@ -1262,9 +1256,12 @@ export async function getAllPanels(req, res) {
     if (school) filter.school = school;
     if (department) filter.department = department;
 
-    // ✅ FIXED: Use 'members' instead of 'faculty1' and 'faculty2'
+    // ✅ FIXED: Populate 'members' array instead of 'faculty1' and 'faculty2'
     const panels = await Panel.find(filter)
-      .populate("members", "employeeId name emailId school department")
+      .populate({
+        path: 'members',
+        select: 'employeeId name emailId school department'
+      })
       .lean();
 
     return res.status(200).json({

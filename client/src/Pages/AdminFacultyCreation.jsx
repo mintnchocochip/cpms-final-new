@@ -187,7 +187,7 @@ const FacultyManagement = () => {
     if (!/[0-9]/.test(formData.password)) throw new Error('Password must contain at least one number');
     if (!/[^A-Za-z0-9]/.test(formData.password)) throw new Error('Password must contain at least one special character');
     if (!formData.school) throw new Error('School selection is required');
-    if (!formData.department) throw new Error('Department selection is required');
+    // if (!formData.department) throw new Error('Department selection is required');
     if (!formData.specializations || formData.specializations.length === 0) throw new Error('At least one specialization must be selected');
   };
 

@@ -117,7 +117,8 @@ export const getAllPanels = (school = null, department = null) => {
 };
 
 export const createPanelManual = (data) => API.post("/admin/createPanel", data);
-export const autoCreatePanelManual = () => API.post("/admin/autoCreatePanels", { force: true });
+export const autoCreatePanelManual = (payload) => API.post("/admin/autoCreatePanels", payload);
+
 export const deletePanel = (panelId) => API.delete(`/admin/${panelId}/deletePanel`);
 export const assignPanelToProject = (data) => API.post("/admin/assignPanel", data);
 export const autoAssignPanelsToProjects = () => API.post("/admin/autoAssignPanel");

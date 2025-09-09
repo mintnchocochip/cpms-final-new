@@ -11,32 +11,30 @@ import {
   autoAssignPanelsToProjects,
   autoCreatePanelManual,
 } from "../api";
+
+// ✅ Import extracted components
 import TeamPopup from "../Components/TeamPopup";
 import ConfirmPopup from "../Components/ConfirmDialog";
 import Navbar from "../Components/UniversalNavbar";
+import ManualPanelCreation from "../Components/ManualPanelCreation";
+import AutoCreatePanel from "../Components/AutoCreatePanel";
+import AutoAssignPanel from "../Components/AutoAssignPanel";
+import PanelStatsCard from "../Components/PanelStatsCard";
+import PanelCard from "../Components/PanelCard";
+
 import {
-  ChevronRight,
-  ChevronDown,
   Users,
-  Eye,
-  Trash2,
   Plus,
   Zap,
   Bot,
-  Building2,
-  GraduationCap,
   AlertTriangle,
   CheckCircle,
   XCircle,
   X,
   Database,
   Search,
-  Grid3X3,
   BarChart3,
   RefreshCw,
-  Filter,
-  Settings,
-  Upload,
   Download,
 } from "lucide-react";
 
@@ -44,7 +42,6 @@ const AdminPanelManagement = () => {
   const navigate = useNavigate();
   const [facultyList, setFacultyList] = useState([]);
   const [panels, setPanels] = useState([]);
-  const [selectedPair, setSelectedPair] = useState({ f1: "", f2: "" });
   const [modalTeam, setModalTeam] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState({
     type: "",
@@ -52,25 +49,10 @@ const AdminPanelManagement = () => {
     teamId: null,
   });
 
-  // Auto create panel popup state
-  const [autoCreatePopup, setAutoCreatePopup] = useState({
-    isOpen: false,
-    numPanels: "",
-    department: "",
-    panelSize: "",
-    error: "",
-  });
-
-  // Auto assign popup state
-  const [autoAssignPopup, setAutoAssignPopup] = useState({
-    isOpen: false,
-    bufferPanels: "",
-    department: "",
-    error: "",
-  });
-
-  // Manual create department selection for "All Schools & Departments" mode
-  const [manualCreateDept, setManualCreateDept] = useState("");
+  // ✅ SIMPLIFIED: Modal states (removed complex popup objects)
+  const [showManualCreateModal, setShowManualCreateModal] = useState(false);
+  const [showAutoCreateModal, setShowAutoCreateModal] = useState(false);
+  const [showAutoAssignModal, setShowAutoAssignModal] = useState(false);
 
   // Notification state
   const [notification, setNotification] = useState({
@@ -110,6 +92,7 @@ const AdminPanelManagement = () => {
     setNotification(prev => ({ ...prev, isVisible: false }));
   }, []);
 
+  // ✅ ENHANCED: Fetch data function with proper employee ID extraction
   const fetchData = useCallback(async () => {
     if (!adminContext) return;
     
@@ -117,27 +100,16 @@ const AdminPanelManagement = () => {
       setLoading(true);
       const { school, department, skipped } = adminContext;
 
-      console.log("=== FETCHING PANEL DATA ===");
-      console.log("Admin Context:", { school, department, skipped });
-
       const apiSchool = skipped ? null : school;
       const apiDepartment = skipped ? null : department;
 
-      console.log("API Parameters:", { apiSchool, apiDepartment });
-
-      // ✅ REMOVED getFacultyBySchoolAndDept since using Excel upload
       const [panelRes, panelProjectsRes, guideProjectsRes] = await Promise.all([
         getAllPanels(apiSchool, apiDepartment),
         getAllPanelProjects(apiSchool, apiDepartment),
         getAllGuideProjects(apiSchool, apiDepartment),
       ]);
 
-      console.log("=== RAW API RESPONSES ===");
-      console.log("Panels Response:", panelRes);
-      console.log("Panel Projects Response:", panelProjectsRes);
-      console.log("Guide Projects Response:", guideProjectsRes);
-
-      // Process All Panels Data - UPDATED FOR NEW SCHEMA
+      // Process panels data
       let allPanelsData = [];
       if (panelRes?.data?.success && panelRes.data.data) {
         allPanelsData = panelRes.data.data;
@@ -146,9 +118,8 @@ const AdminPanelManagement = () => {
       } else if (panelRes?.success && panelRes.data) {
         allPanelsData = panelRes.data;
       }
-      console.log("All Panels Data:", allPanelsData);
 
-      // Process Panel Projects Data to get team assignments
+      // Process panel projects data
       let panelProjectData = [];
       if (panelProjectsRes?.data?.success && panelProjectsRes.data.data) {
         panelProjectData = panelProjectsRes.data.data;
@@ -157,9 +128,8 @@ const AdminPanelManagement = () => {
       } else if (panelProjectsRes?.success && panelProjectsRes.data) {
         panelProjectData = panelProjectsRes.data;
       }
-      console.log("Panel Projects Data:", panelProjectData);
 
-      // Create a map of panelId to teams for quick lookup
+      // Create panel teams map
       const panelTeamsMap = new Map();
       panelProjectData.forEach((p) => {
         const teams = (p.projects || []).map((project) => ({
@@ -172,21 +142,21 @@ const AdminPanelManagement = () => {
         panelTeamsMap.set(p.panelId, teams);
       });
 
-      // ✅ UPDATED: Format panels with NEW SCHEMA (members array)
+      // ✅ ENHANCED: Format panels with faculty employee IDs directly from API response
       const formattedPanels = allPanelsData.map((panel) => ({
         panelId: panel._id,
-        // ✅ FIXED: Use members array instead of faculty1/faculty2
         facultyIds: (panel.members || []).map(m => m._id).filter(Boolean),
         facultyNames: (panel.members || []).map(m => m.name).filter(Boolean),
+        facultyEmployeeIds: (panel.members || []).map(m => m.employeeId).filter(Boolean), // ✅ NEW: Direct from API
         department: panel.department || "Unknown",
         school: panel.school || "Unknown",
         teams: panelTeamsMap.get(panel._id) || [],
       }));
 
-      console.log("Final formatted panels:", formattedPanels);
+      console.log('✅ Formatted panels with employee IDs:', formattedPanels);
       setPanels(formattedPanels);
 
-      // Process Guide Projects for conflict detection
+      // Process guide projects
       let guideProjectData = [];
       if (guideProjectsRes?.data?.success && guideProjectsRes.data.data) {
         guideProjectData = guideProjectsRes.data.data;
@@ -210,17 +180,14 @@ const AdminPanelManagement = () => {
       });
       setAllGuideProjects(guideProjectRelationships);
 
-      // Process Unassigned Teams
+      // Process unassigned teams
       const allProjectsFromGuides = (guideProjectData || []).flatMap(
         (facultyObj) => facultyObj.guidedProjects || []
       );
-
       const uniqueProjects = allProjectsFromGuides.filter(
         (project, index, self) => index === self.findIndex((p) => p._id === project._id)
       );
-
       const unassigned = uniqueProjects.filter((project) => project.panel === null);
-      console.log("Unassigned teams:", unassigned);
       setUnassignedTeams(unassigned);
 
     } catch (err) {
@@ -234,7 +201,73 @@ const AdminPanelManagement = () => {
       setLoading(false);
     }
   }, [adminContext, showNotification]);
-  
+
+  // ✅ FIXED: Get employee IDs directly from panel data (no complex mapping needed)
+  const usedFacultyIds = useMemo(() => {
+    const assignedEmployeeIds = new Set();
+    
+    console.log('=== CALCULATING USED FACULTY EMPLOYEE IDS ===');
+    console.log('Panels:', panels.length);
+    
+    panels.forEach((panel, index) => {
+      console.log(`Panel ${index + 1}:`, {
+        panelId: panel.panelId,
+        facultyNames: panel.facultyNames,
+        facultyEmployeeIds: panel.facultyEmployeeIds
+      });
+      
+      // ✅ DIRECT: Use employee IDs from panel data (no mapping required)
+      if (panel.facultyEmployeeIds && Array.isArray(panel.facultyEmployeeIds)) {
+        panel.facultyEmployeeIds.forEach(empId => {
+          if (empId) {
+            assignedEmployeeIds.add(empId.toString());
+            console.log(`✅ Added employee ID: ${empId}`);
+          }
+        });
+      }
+    });
+    
+    const result = Array.from(assignedEmployeeIds);
+    console.log('Final used employee IDs:', result);
+    console.log('=== END USED EMPLOYEE ID CALCULATION ===');
+    
+    return result;
+  }, [panels]);
+
+  // ✅ SIMPLIFIED: Filter available faculty by employee ID
+  const availableFaculty = useMemo(() => {
+    console.log('=== CALCULATING AVAILABLE FACULTY ===');
+    console.log('Total faculty list:', facultyList.length);
+    console.log('Used employee IDs:', usedFacultyIds);
+    
+    const filtered = facultyList.filter(f => {
+      if (!f || !f.employeeId) {
+        console.log(`❌ Faculty without employee ID: ${f?.name || 'Unknown'}`);
+        return false;
+      }
+      
+      const isAssigned = usedFacultyIds.includes(f.employeeId.toString());
+      if (isAssigned) {
+        console.log(`❌ Excluding assigned faculty: ${f.name} (${f.employeeId})`);
+      } else {
+        console.log(`✅ Including available faculty: ${f.name} (${f.employeeId})`);
+      }
+      return !isAssigned;
+    });
+    
+    console.log('Available faculty count:', filtered.length);
+    console.log('Available faculty names:', filtered.map(f => `${f.name} (${f.employeeId})`));
+    console.log('=== END AVAILABLE FACULTY CALCULATION ===');
+    
+    return filtered;
+  }, [facultyList, usedFacultyIds]);
+
+  // ✅ SIMPLIFIED: Direct employee ID set for Excel filtering
+  const assignedEmployeeIds = useMemo(() => {
+    return new Set(usedFacultyIds);
+  }, [usedFacultyIds]);
+
+  // ✅ COMPLETE FIXED Excel upload handler
   const handleExcelUpload = useCallback(async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -264,7 +297,7 @@ const AdminPanelManagement = () => {
           return;
         }
 
-        // Process rows, skipping header
+        // Process rows
         const validDepartments = ["BTech", "MTech (integrated)", "MCS"];
         const processedFacultyData = jsonData.slice(1).map((row, index) => {
           const rowObj = {};
@@ -272,15 +305,14 @@ const AdminPanelManagement = () => {
             rowObj[header] = row[headerIndex] || "";
           });
           
-          // ✅ UPDATED: Create faculty object matching your schema
           return {
-            _id: `temp_${index}_${Date.now()}`, // Temporary ID for frontend use
+            _id: `temp_${index}_${Date.now()}`,
             name: rowObj["Faculty Name"],
-            employeeId: rowObj["Emp ID"],
-            emailId: rowObj["Email ID"], // Changed from 'email' to 'emailId'
-            department: [rowObj["Department"]], // Array format to match schema
-            school: ["SCOPE"], // Default school, adjust as needed
-            specialization: ["General"], // Default specialization
+            employeeId: rowObj["Emp ID"].toString(),
+            emailId: rowObj["Email ID"],
+            department: [rowObj["Department"]],
+            school: ["SCOPE"],
+            specialization: ["General"],
           };
         }).filter(faculty => 
           faculty.name && 
@@ -295,17 +327,43 @@ const AdminPanelManagement = () => {
           return;
         }
 
-        // Merge with existing faculty list, avoiding duplicates based on employeeId
-        const existingEmployeeIds = facultyList.map(f => f.employeeId);
-        const newFaculty = processedFacultyData.filter(f => !existingEmployeeIds.includes(f.employeeId));
-        const duplicateCount = processedFacultyData.length - newFaculty.length;
+        // ✅ ENHANCED: Better exclusion logic using direct employee ID comparison
+        const existingEmployeeIds = facultyList.map(f => f.employeeId?.toString()).filter(Boolean);
+        
+        console.log('Processing Excel upload:');
+        console.log('- Processed faculties:', processedFacultyData.length);
+        console.log('- Existing employee IDs:', existingEmployeeIds.length);
+        console.log('- Assigned employee IDs:', assignedEmployeeIds.size);
 
-        // Update faculty list directly in state
+        // Filter out existing AND assigned faculty
+        const newFaculty = processedFacultyData.filter(f => {
+          const empId = f.employeeId.toString();
+          const isExisting = existingEmployeeIds.includes(empId);
+          const isAssigned = assignedEmployeeIds.has(empId);
+          
+          if (isExisting || isAssigned) {
+            console.log(`Excluding: ${f.name} (${empId}) - Existing: ${isExisting}, Assigned: ${isAssigned}`);
+          }
+          
+          return !isExisting && !isAssigned;
+        });
+        
+        const duplicateCount = processedFacultyData.filter(f => 
+          existingEmployeeIds.includes(f.employeeId.toString())
+        ).length;
+        
+        const assignedCount = processedFacultyData.filter(f => 
+          assignedEmployeeIds.has(f.employeeId.toString())
+        ).length;
+
         setFacultyList(prev => [...prev, ...newFaculty]);
 
         let message = `Successfully processed ${newFaculty.length} faculty records`;
         if (duplicateCount > 0) {
           message += ` (${duplicateCount} duplicates skipped)`;
+        }
+        if (assignedCount > 0) {
+          message += ` (${assignedCount} already in panels skipped)`;
         }
 
         showNotification("success", "Upload Successful", message);
@@ -317,15 +375,15 @@ const AdminPanelManagement = () => {
       showNotification("error", "Processing Error", "Failed to process Excel file. Please ensure it's valid.");
       event.target.value = "";
     }
-  }, [showNotification, facultyList]);
+  }, [showNotification, facultyList, assignedEmployeeIds]);
 
-  // Handle demo Excel download
+  // Demo Excel download
   const handleDemoExcelDownload = useCallback(() => {
     const demoData = [
       ["Faculty Name", "Emp ID", "Email ID", "Department"],
-      ["John Doe", "EMP001", "john.doe@vit.ac.in", "BTech"],
-      ["Jane Smith", "EMP002", "jane.smith@vit.ac.in", "MTech (integrated)"],
-      ["Alice Johnson", "EMP003", "alice.johnson@vit.ac.in", "MCS"],
+      ["John Doe", "50001", "john.doe@vit.ac.in", "BTech"],
+      ["Jane Smith", "50002", "jane.smith@vit.ac.in", "MTech (integrated)"],
+      ["Alice Johnson", "500003", "alice.johnson@vit.ac.in", "MCS"],
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -334,7 +392,7 @@ const AdminPanelManagement = () => {
     XLSX.writeFile(workbook, "Faculty_Demo.xlsx");
   }, []);
 
-  // Check for admin context - handle both specific and skip modes
+  // Admin context effect
   useEffect(() => {
     const savedAdminContext = sessionStorage.getItem("adminContext");
     if (!savedAdminContext) {
@@ -364,7 +422,7 @@ const AdminPanelManagement = () => {
     }
   }, [adminContext, fetchData]);
 
-  // Clear context before navigating
+  // Navigation handler
   const handleChangeSchoolDepartment = useCallback(() => {
     sessionStorage.removeItem("adminContext");
     sessionStorage.setItem('adminReturnPath', '/admin/panel-management');
@@ -373,9 +431,7 @@ const AdminPanelManagement = () => {
 
   // Conflict checking functions
   const canAssignProjectToPanel = useCallback((projectId, panelFacultyIds) => {
-    const projectGuide = allGuideProjects.find(
-      (rel) => rel.projectId === projectId
-    );
+    const projectGuide = allGuideProjects.find((rel) => rel.projectId === projectId);
     if (!projectGuide) return { canAssign: true, reason: "" };
 
     const hasConflict = panelFacultyIds.includes(projectGuide.guideId);
@@ -396,187 +452,48 @@ const AdminPanelManagement = () => {
     });
   }, [unassignedTeams, canAssignProjectToPanel]);
 
-  // Panel management functions
-  const handleAddPanel = useCallback(async () => {
-    const { f1, f2 } = selectedPair;
-    if (!f1 || !f2 || f1 === f2) {
-      showNotification("error", "Invalid Selection", "Please select two different faculty members");
-      return;
-    }
-    
-    const exists = panels.find(
-      (p) => p.facultyIds.includes(f1) && p.facultyIds.includes(f2)
-    );
-    if (exists) {
-      showNotification("error", "Panel Exists", "This panel combination already exists");
-      return;
-    }
-    
+  // ✅ SIMPLIFIED: Panel management handlers
+  const handleManualCreatePanel = useCallback(async (payload) => {
     try {
-      await createPanelManual({ faculty1Id: f1, faculty2Id: f2 });
-      setSelectedPair({ f1: "", f2: "" });
+      setLoading(true);
+      await createPanelManual(payload);
+      setShowManualCreateModal(false);
       await fetchData();
-      showNotification("success", "Panel Created!", "New panel has been created successfully");
+      showNotification("success", "Panel Created!", `New panel created successfully with ${payload.memberEmployeeIds.length} members`);
     } catch (error) {
       console.error("Panel creation error:", error);
-      showNotification("error", "Creation Failed", "Failed to create panel. Please try again.");
+      showNotification("error", "Creation Failed", error.response?.data?.message || "Failed to create panel. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  }, [selectedPair, panels, fetchData, showNotification]);
+  }, [fetchData, showNotification]);
 
-  // Enhanced Auto Assign with popup
-  const handleAutoAssign = useCallback(() => {
-    if (isAutoCreating) {
-      showNotification("error", "Operation in Progress", "Cannot start auto assignment while auto panel creation is running. Please wait for it to complete.");
-      return;
-    }
+  // ✅ SIMPLIFIED: Success/Error handlers for modals
+  const handleSuccess = useCallback((message) => {
+    fetchData(); // Refresh data
+    showNotification("success", "Success!", message);
+  }, [fetchData, showNotification]);
 
-    setAutoAssignPopup({
-      isOpen: true,
-      bufferPanels: "",
-      department: "",
-      error: "",
-    });
-  }, [isAutoCreating, showNotification]);
+  const handleError = useCallback((message) => {
+    showNotification("error", "Error", message);
+  }, [showNotification]);
 
-  // Enhanced Auto Create with popup
+  // ✅ SIMPLIFIED: Modal show handlers
   const handleAutoCreatePanel = useCallback(() => {
     if (isAutoAssigning) {
-      showNotification("error", "Operation in Progress", "Cannot start auto panel creation while auto assignment is running. Please wait for it to complete.");
+      showNotification("error", "Operation in Progress", "Cannot start auto panel creation while auto assignment is running.");
       return;
     }
-
-    setAutoCreatePopup({
-      isOpen: true,
-      numPanels: "",
-      department: "",
-      panelSize: "",
-      error: "",
-    });
+    setShowAutoCreateModal(true);
   }, [isAutoAssigning, showNotification]);
 
-  // Handle auto create popup confirmation
-  const handleAutoCreateConfirm = useCallback(async () => {
-    const numPanels = parseInt(autoCreatePopup.numPanels);
-    const panelSize = parseInt(autoCreatePopup.panelSize);
-    const selectedDept = autoCreatePopup.department;
-
-    // Validation
-    if (!numPanels || numPanels <= 0) {
-      setAutoCreatePopup(prev => ({
-        ...prev,
-        error: "Please enter a valid number of panels",
-      }));
+  const handleAutoAssign = useCallback(() => {
+    if (isAutoCreating) {
+      showNotification("error", "Operation in Progress", "Cannot start auto assignment while auto panel creation is running.");
       return;
     }
-
-    if (!panelSize || panelSize <= 0) {
-      setAutoCreatePopup(prev => ({
-        ...prev,
-        error: "Please enter a valid panel size",
-      }));
-      return;
-    }
-
-    if (!selectedDept) {
-      setAutoCreatePopup(prev => ({
-        ...prev,
-        error: "Please select a department",
-      }));
-      return;
-    }
-
-    // Filter faculty based on selected department
-    const filteredFaculty = facultyList.filter((faculty) => {
-      const deptField = Array.isArray(faculty.department) ? faculty.department : [faculty.department];
-      return deptField.includes(selectedDept);
-    });
-
-    const maxPanels = Math.floor(filteredFaculty.length / panelSize);
-
-    if (numPanels > maxPanels) {
-      setAutoCreatePopup(prev => ({
-        ...prev,
-        error: `Cannot create ${numPanels} panels with panel size ${panelSize}. Only ${maxPanels} panels are possible with ${filteredFaculty.length} available faculty for ${selectedDept}.`,
-      }));
-      return;
-    }
-
-    // Prepare request payload in the format expected by backend
-    const requestPayload = {
-      departments: {
-        [selectedDept]: {
-          panelsNeeded: numPanels,
-          panelSize: panelSize,
-          faculties: filteredFaculty.map(f => f.employeeId)
-        }
-      }
-    };
-
-    try {
-      setIsAutoCreating(true);
-      const response = await autoCreatePanelManual(requestPayload);
-      await fetchData();
-      showNotification("success", "Auto-Creation Complete!", `Successfully created ${numPanels} panels for ${selectedDept} department`);
-      setAutoCreatePopup({ isOpen: false, numPanels: "", department: "", panelSize: "", error: "" });
-    } catch (error) {
-      console.error("Auto create panel error:", error);
-      showNotification("error", "Creation Failed", "Auto panel creation failed. Please try again.");
-    } finally {
-      setIsAutoCreating(false);
-    }
-  }, [autoCreatePopup, facultyList, fetchData, showNotification]);
-
-  // Handle auto assign popup confirmation
-  const handleAutoAssignConfirm = useCallback(async () => {
-    const bufferPanels = parseInt(autoAssignPopup.bufferPanels) || 0;
-    const selectedDept = autoAssignPopup.department;
-
-    // Validation
-    if (bufferPanels < 0) {
-      setAutoAssignPopup(prev => ({
-        ...prev,
-        error: "Buffer panels cannot be negative",
-      }));
-      return;
-    }
-
-    if (bufferPanels >= panels.length) {
-      setAutoAssignPopup(prev => ({
-        ...prev,
-        error: `Buffer panels cannot be greater than or equal to total panels (${panels.length})`,
-      }));
-      return;
-    }
-
-    // Prepare request payload
-    const requestPayload = {
-      buffer: bufferPanels,
-      ...(selectedDept && { department: selectedDept })
-    };
-
-    try {
-      setIsAutoAssigning(true);
-      await autoAssignPanelsToProjects(requestPayload);
-      await fetchData();
-      showNotification("success", "Auto-Assignment Complete!", `Teams have been automatically assigned with ${bufferPanels} buffer panels`);
-      setAutoAssignPopup({ isOpen: false, bufferPanels: "", department: "", error: "" });
-    } catch (error) {
-      console.error("Auto assign error:", error);
-      showNotification("error", "Assignment Failed", "Auto-assignment failed. Please try again.");
-    } finally {
-      setIsAutoAssigning(false);
-    }
-  }, [autoAssignPopup, panels.length, fetchData, showNotification]);
-
-  // Handle auto create popup cancellation
-  const handleAutoCreateCancel = useCallback(() => {
-    setAutoCreatePopup({ isOpen: false, numPanels: "", department: "", panelSize: "", error: "" });
-  }, []);
-
-  // Handle auto assign popup cancellation
-  const handleAutoAssignCancel = useCallback(() => {
-    setAutoAssignPopup({ isOpen: false, bufferPanels: "", department: "", error: "" });
-  }, []);
+    setShowAutoAssignModal(true);
+  }, [isAutoCreating, showNotification]);
 
   const handleManualAssign = useCallback(async (panelIndex, projectId) => {
     try {
@@ -616,67 +533,12 @@ const AdminPanelManagement = () => {
     setConfirmRemove({ type: "", panelId: null, teamId: null });
   }, [confirmRemove, fetchData, showNotification]);
 
-  // Calculate used faculty IDs from actual panels
-  const usedFacultyIds = useMemo(
-    () => panels.flatMap((p) => p.facultyIds || []),
-    [panels]
-  );
-
-  const availableFaculty = useMemo(
-    () => facultyList.filter((f) => !usedFacultyIds.includes(f._id)),
-    [facultyList, usedFacultyIds]
-  );
-
   const filterMatches = useCallback((str) =>
     str &&
     typeof str === "string" &&
     str.toLowerCase().includes(searchQuery.toLowerCase()),
     [searchQuery]
   );
-
-  // Get available departments from faculty list
-  const availableDepartments = useMemo(() => {
-    const depts = new Set();
-    facultyList.forEach(faculty => {
-      if (Array.isArray(faculty.department)) {
-        faculty.department.forEach(dept => depts.add(dept));
-      } else if (faculty.department) {
-        depts.add(faculty.department);
-      }
-    });
-    return Array.from(depts);
-  }, [facultyList]);
-
-  // Calculate faculty count for selected department in auto create popup
-  const facultyCountForAutoCreate = useMemo(() => {
-    if (!autoCreatePopup.department) return 0;
-    return facultyList.filter((faculty) => {
-      const deptField = Array.isArray(faculty.department) ? faculty.department : [faculty.department];
-      return deptField.includes(autoCreatePopup.department);
-    }).length;
-  }, [autoCreatePopup.department, facultyList]);
-
-  // Calculate faculty count for manual create department selection
-  const facultyCountForManualCreate = useMemo(() => {
-    if (!manualCreateDept) return 0;
-    return facultyList.filter((faculty) => {
-      const deptField = Array.isArray(faculty.department) ? faculty.department : [faculty.department];
-      return deptField.includes(manualCreateDept);
-    }).length;
-  }, [manualCreateDept, facultyList]);
-
-  // Determine if manual create button should be disabled
-  const isManualCreateDisabled = useMemo(() => {
-    if (!adminContext) return true;
-    
-    // If not in "All Schools & Departments" mode, use normal validation
-    if (!adminContext.skipped) {
-      return !selectedPair.f1 || !selectedPair.f2;
-    }
-    
-    // If in "All Schools & Departments" mode, require department selection and faculty availability
-    return !manualCreateDept || facultyCountForManualCreate === 0 || !selectedPair.f1 || !selectedPair.f2;
-  }, [adminContext, manualCreateDept, facultyCountForManualCreate, selectedPair]);
 
   if (loading) {
     return (
@@ -702,8 +564,7 @@ const AdminPanelManagement = () => {
     <>
       <Navbar />
       <div className="pt-20 pl-4 sm:pl-6 md:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
-        <div className="">
-        {/* Page Header with Context */}
+        {/* Page Header */}
         <div className="mb-8 bg-white rounded-2xl shadow-lg mx-4 sm:mx-6 md:mx-8 overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
@@ -739,64 +600,41 @@ const AdminPanelManagement = () => {
           </div>
         </div>
 
-        {/* Statistics Dashboard */}
+        {/* ✅ Statistics using extracted component */}
         <div className="mx-4 sm:mx-6 md:mx-8 mb-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-xs sm:text-sm font-medium">Total Faculty</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-1">{facultyList.length}</p>
-                </div>
-                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
-                  <Users className="h-6 w-6 sm:h-8 sm:w-8" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-emerald-100 text-xs sm:text-sm font-medium">Total Panels</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-1">{panels.length}</p>
-                </div>
-                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
-                  <div className="h-6 w-6 sm:h-8 sm:w-8 bg-white/30 rounded-lg flex items-center justify-center text-white font-bold text-xs sm:text-sm">
-                    P
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100 text-xs sm:text-sm font-medium">Assigned Teams</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-1">
-                    {panels.reduce((sum, panel) => sum + panel.teams.length, 0)}
-                  </p>
-                </div>
-                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
-                  <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-orange-100 text-xs sm:text-sm font-medium">Unassigned Teams</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-1">{unassignedTeams.length}</p>
-                </div>
-                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
-                  <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8" />
-                </div>
-              </div>
-            </div>
+            <PanelStatsCard
+              icon={Users}
+              title="Total Faculty"
+              value={facultyList.length}
+              bgColor="bg-gradient-to-br from-blue-500 to-blue-600"
+              iconBg="bg-white/20"
+            />
+            <PanelStatsCard
+              icon={() => <div className="h-6 w-6 sm:h-8 sm:w-8 bg-white/30 rounded-lg flex items-center justify-center text-white font-bold text-xs sm:text-sm">P</div>}
+              title="Total Panels"
+              value={panels.length}
+              bgColor="bg-gradient-to-br from-emerald-500 to-emerald-600"
+              iconBg="bg-white/20"
+            />
+            <PanelStatsCard
+              icon={CheckCircle}
+              title="Assigned Teams"
+              value={panels.reduce((sum, panel) => sum + panel.teams.length, 0)}
+              bgColor="bg-gradient-to-br from-purple-500 to-purple-600"
+              iconBg="bg-white/20"
+            />
+            <PanelStatsCard
+              icon={AlertTriangle}
+              title="Unassigned Teams"
+              value={unassignedTeams.length}
+              bgColor="bg-gradient-to-br from-orange-500 to-orange-600"
+              iconBg="bg-white/20"
+            />
           </div>
         </div>
 
-        {/* Search and Controls Panel */}
+        {/* Controls Panel */}
         <div className="mx-4 sm:mx-6 md:mx-8 mb-8">
           <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 md:p-8">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-4 sm:gap-0">
@@ -842,415 +680,84 @@ const AdminPanelManagement = () => {
 
             {/* Panel Creation Controls */}
             <div className="border-t border-slate-200 pt-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 items-end">
-                {/* Department Selection for All Schools & Departments mode */}
-                {adminContext?.skipped && (
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                      Department *
-                    </label>
-                    <select
-                      value={manualCreateDept}
-                      onChange={(e) => setManualCreateDept(e.target.value)}
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                    >
-                      <option value="">Select Department</option>
-                      {availableDepartments.map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
-                    </select>
-                    {manualCreateDept && (
-                      <p className="text-xs text-slate-500 mt-1">
-                        {facultyCountForManualCreate} faculty available
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                    Faculty 1
-                  </label>
-                  <select
-                    value={selectedPair.f1}
-                    onChange={(e) =>
-                      setSelectedPair({ ...selectedPair, f1: e.target.value })
-                    }
-                    className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                  >
-                    <option key="empty-f1" value="">Select Faculty 1</option>
-                    {availableFaculty
-                      .filter(f => adminContext?.skipped ? (manualCreateDept ? (Array.isArray(f.department) ? f.department.includes(manualCreateDept) : f.department === manualCreateDept) : false) : true)
-                      .map((f) => (
-                      <option key={`f1-${f._id}`} value={f._id}>
-                        {f.name} ({f.employeeId})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                    Faculty 2
-                  </label>
-                  <select
-                    value={selectedPair.f2}
-                    onChange={(e) =>
-                      setSelectedPair({ ...selectedPair, f2: e.target.value })
-                    }
-                    className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                  >
-                    <option key="empty-f2" value="">Select Faculty 2</option>
-                    {availableFaculty
-                      .filter(f => adminContext?.skipped ? (manualCreateDept ? (Array.isArray(f.department) ? f.department.includes(manualCreateDept) : f.department === manualCreateDept) : false) : true)
-                      .map((f) => (
-                      <option key={`f2-${f._id}`} value={f._id}>
-                        {f.name} ({f.employeeId})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                {/* Manual Create Panel Button */}
                 <button
-                  onClick={handleAddPanel}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
-                  disabled={isManualCreateDisabled}
-                  title={
-                    adminContext?.skipped && !manualCreateDept
-                      ? "Please select a department first"
-                      : adminContext?.skipped && facultyCountForManualCreate === 0
-                        ? "No faculty available for selected department"
-                        : "Create a new panel manually"
-                  }
+                  onClick={() => setShowManualCreateModal(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
+                  disabled={availableFaculty.length < 2}
+                  title={availableFaculty.length < 2 ? "Need at least 2 available faculty members" : "Create a panel manually by selecting faculty members"}
                 >
                   <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-                  Add Panel
+                  Manual Create
                 </button>
+
+                {/* Auto Create Panel Button */}
                 <button
                   onClick={handleAutoCreatePanel}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
                   disabled={isAutoCreating || isAutoAssigning}
-                  title={
-                    isAutoAssigning 
-                      ? "Cannot create panels while auto assignment is running"
-                      : panels.length > 0 
-                        ? `${panels.length} panels already exist` 
-                        : "Create panels automatically"
-                  }
                 >
                   {isAutoCreating ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
                       Creating...
                     </>
-                  ) : isAutoAssigning ? (
-                    <>
-                      <div className="animate-pulse h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-slate-300"></div>
-                      Waiting...
-                    </>
                   ) : (
                     <>
                       <Bot className="h-4 w-4 sm:h-5 sm:w-5" />
                       Auto Create
-                      {panels.length > 0 && (
-                        <span className="ml-1 bg-yellow-500 text-white text-xs rounded-full px-1.5 py-0.5 sm:px-2 sm:py-1">
-                          {panels.length}
-                        </span>
-                      )}
                     </>
                   )}
                 </button>
+
+                {/* Auto Assign Button */}
                 <button
                   onClick={handleAutoAssign}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
                   disabled={isAutoAssigning || isAutoCreating}
-                  title={
-                    isAutoCreating
-                      ? "Cannot assign teams while auto panel creation is running"
-                      : panels.reduce((sum, panel) => sum + panel.teams.length, 0) > 0 
-                        ? `${panels.reduce((sum, panel) => sum + panel.teams.length, 0)} teams already assigned` 
-                        : "Assign teams automatically"
-                  }
                 >
                   {isAutoAssigning ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
                       Assigning...
                     </>
-                  ) : isAutoCreating ? (
-                    <>
-                      <div className="animate-pulse h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-slate-300"></div>
-                      Waiting...
-                    </>
                   ) : (
                     <>
                       <Zap className="h-4 w-4 sm:h-5 sm:w-5" />
                       Auto Assign
-                      {panels.reduce((sum, panel) => sum + panel.teams.length, 0) > 0 && (
-                        <span className="ml-1 bg-yellow-500 text-white text-xs rounded-full px-1.5 py-0.5 sm:px-2 sm:py-1">
-                          {panels.reduce((sum, panel) => sum + panel.teams.length, 0)}
-                        </span>
-                      )}
                     </>
                   )}
                 </button>
-                <div className="flex flex-col gap-4">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                      Upload Faculty Excel
-                    </label>
-                    <input
-                      type="file"
-                      accept=".xlsx,.xls"
-                      onChange={handleExcelUpload}
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                    />
-                  </div>
-                  <button
-                    onClick={handleDemoExcelDownload}
-                    className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
-                    title="Download a demo Excel file with the correct format"
-                  >
-                    <Download className="h-4 w-4 sm:h-5 sm:w-5" />
-                    Demo Excel
-                  </button>
+
+                {/* Faculty Excel Upload */}
+                <div className="flex flex-col gap-2">
+                  <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">
+                    Upload Faculty Excel
+                  </label>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleExcelUpload}
+                    className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
                 </div>
+
+                {/* Demo Excel Download */}
+                <button
+                  onClick={handleDemoExcelDownload}
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
+                  title="Download a demo Excel file with the correct format"
+                >
+                  <Download className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Demo Excel
+                </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Auto Create Panel Popup */}
-        {autoCreatePopup.isOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">
-              <div className="p-4 sm:p-6">
-                <div className="flex items-center gap-3 sm:gap-4 mb-4">
-                  <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                    <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base sm:text-lg font-semibold text-slate-900">
-                      Auto Create Panels
-                    </h3>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                      Configure panel creation parameters
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="mb-4 sm:mb-6 space-y-4">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                      Department *
-                    </label>
-                    <select
-                      value={autoCreatePopup.department}
-                      onChange={(e) =>
-                        setAutoCreatePopup(prev => ({
-                          ...prev,
-                          department: e.target.value,
-                          error: "",
-                        }))
-                      }
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                    >
-                      <option value="">Select Department</option>
-                      {availableDepartments.map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
-                    </select>
-                    {autoCreatePopup.department && facultyCountForAutoCreate > 0 && (
-                      <p className="text-xs text-emerald-600 mt-2 font-medium">
-                        ✓ {facultyCountForAutoCreate} faculty members available in {autoCreatePopup.department}
-                      </p>
-                    )}
-                    {autoCreatePopup.department && facultyCountForAutoCreate === 0 && (
-                      <p className="text-xs text-red-600 mt-2 font-medium">
-                        ⚠️ No faculty members available in {autoCreatePopup.department}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                      Number of Panels *
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={autoCreatePopup.numPanels}
-                      onChange={(e) =>
-                        setAutoCreatePopup(prev => ({
-                          ...prev,
-                          numPanels: e.target.value,
-                          error: "",
-                        }))
-                      }
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                      placeholder="Enter number of panels"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                      Panel Size (Faculty per Panel) *
-                    </label>
-                    <input
-                      type="number"
-                      min="2"
-                      value={autoCreatePopup.panelSize}
-                      onChange={(e) =>
-                        setAutoCreatePopup(prev => ({
-                          ...prev,
-                          panelSize: e.target.value,
-                          error: "",
-                        }))
-                      }
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                      placeholder="Enter panel size (e.g., 2, 3)"
-                    />
-                  </div>
-                  {autoCreatePopup.error && (
-                    <div className="mt-2 p-2 sm:p-3 bg-red-50 rounded-lg border-l-4 border-red-300">
-                      <p className="text-xs sm:text-sm text-red-800">
-                        {autoCreatePopup.error}
-                      </p>
-                    </div>
-                  )}
-                  <div className="mt-2 p-2 sm:p-3 bg-blue-50 rounded-lg border-l-4 border-blue-300">
-                    <p className="text-xs sm:text-sm text-blue-800">
-                      <strong>Note:</strong> Faculty will be automatically selected from the chosen department based on experience (employee ID order).
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={handleAutoCreateCancel}
-                    className="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-all text-sm sm:text-base"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleAutoCreateConfirm}
-                    className="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all text-sm sm:text-base"
-                    disabled={isAutoCreating}
-                  >
-                    {isAutoCreating ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline-block mr-2"></div>
-                        Creating...
-                      </>
-                    ) : (
-                      'Create Panels'
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Auto Assign Popup */}
-        {autoAssignPopup.isOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">
-              <div className="p-4 sm:p-6">
-                <div className="flex items-center gap-3 sm:gap-4 mb-4">
-                  <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                    <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base sm:text-lg font-semibold text-slate-900">
-                      Auto Assign Teams
-                    </h3>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                      Configure assignment parameters
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="mb-4 sm:mb-6 space-y-4">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                      Department (Optional)
-                    </label>
-                    <select
-                      value={autoAssignPopup.department}
-                      onChange={(e) =>
-                        setAutoAssignPopup(prev => ({
-                          ...prev,
-                          department: e.target.value,
-                          error: "",
-                        }))
-                      }
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm sm:text-base"
-                    >
-                      <option value="">All Departments</option>
-                      {availableDepartments.map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                      Buffer Panels (Keep Unassigned)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max={panels.length - 1}
-                      value={autoAssignPopup.bufferPanels}
-                      onChange={(e) =>
-                        setAutoAssignPopup(prev => ({
-                          ...prev,
-                          bufferPanels: e.target.value,
-                          error: "",
-                        }))
-                      }
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm sm:text-base"
-                      placeholder="Enter number of buffer panels (default: 0)"
-                    />
-                  </div>
-                  {autoAssignPopup.error && (
-                    <div className="mt-2 p-2 sm:p-3 bg-red-50 rounded-lg border-l-4 border-red-300">
-                      <p className="text-xs sm:text-sm text-red-800">
-                        {autoAssignPopup.error}
-                      </p>
-                    </div>
-                  )}
-                  <div className="mt-2 p-2 sm:p-3 bg-purple-50 rounded-lg border-l-4 border-purple-300">
-                    <p className="text-xs sm:text-sm text-purple-800">
-                      <strong>Note:</strong> Teams will be distributed across panels using round-robin assignment. Buffer panels will be kept empty for future assignments. Total panels: {panels.length}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={handleAutoAssignCancel}
-                    className="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition-all text-sm sm:text-base"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleAutoAssignConfirm}
-                    className="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-all text-sm sm:text-base"
-                    disabled={isAutoAssigning}
-                  >
-                    {isAutoAssigning ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline-block mr-2"></div>
-                        Assigning...
-                      </>
-                    ) : (
-                      'Assign Teams'
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Panels Data Display */}
+        {/* ✅ Panels using extracted component */}
         <div className="mx-4 sm:mx-6 md:mx-8 mb-8">
           <div className="bg-white rounded-2xl shadow-lg">
             {panels.length === 0 ? (
@@ -1260,20 +767,20 @@ const AdminPanelManagement = () => {
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold text-slate-600 mb-3">No Panels Found</h3>
                 <p className="text-slate-500 max-w-md mx-auto text-sm sm:text-base">
-                  Create panels to get started with team assignments
+                  {availableFaculty.length < 2 
+                    ? "Upload faculty data first, then create panels to get started with team assignments"
+                    : "Create panels to get started with team assignments"}
                 </p>
               </div>
             ) : (
               <div className="p-4 sm:p-6 md:p-8">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4 sm:gap-0">
-                  <div className="flex items-center space-x-3">
-                    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
-                      <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                    </div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
-                      Panel Records ({panels.length.toLocaleString()})
-                    </h2>
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg">
+                    <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
+                    Panel Records ({panels.length.toLocaleString()})
+                  </h2>
                 </div>
 
                 <div className="space-y-4">
@@ -1291,193 +798,19 @@ const AdminPanelManagement = () => {
                     const isExpanded = expandedPanel === idx;
 
                     return (
-                      <div
+                      <PanelCard
                         key={panel.panelId}
-                        className="border border-slate-200 rounded-xl bg-gradient-to-r from-white to-slate-50 hover:shadow-lg transition-all duration-300"
-                      >
-                        <div
-                          className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 cursor-pointer hover:bg-slate-50 transition-colors gap-4 sm:gap-0"
-                          onClick={() => setExpandedPanel(expandedPanel === idx ? null : idx)}
-                        >
-                          <div className="flex items-center space-x-4 w-full sm:w-auto">
-                            <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl">
-                              {isExpanded ? (
-                                <ChevronDown className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
-                              ) : (
-                                <ChevronRight className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-bold text-lg sm:text-xl text-slate-800 mb-1">
-                                Panel {idx + 1}: {panel.facultyNames.join(" & ")}
-                              </h4>
-                              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-xs sm:text-sm text-slate-600">
-                                <span className="flex items-center space-x-1">
-                                  <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>{panel.teams.length} teams assigned</span>
-                                </span>
-                                <span className="flex items-center space-x-1">
-                                  <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>{panel.department}</span>
-                                </span>
-                                {panel.teams.length > 0 && (
-                                  <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs font-semibold">
-                                    Active
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center space-x-3 w-full sm:w-auto justify-end">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setConfirmRemove({
-                                  type: "panel",
-                                  panelId: panel.panelId,
-                                });
-                              }}
-                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-1 sm:gap-2 text-sm"
-                            >
-                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                              Remove Panel
-                            </button>
-                          </div>
-                        </div>
-
-                        {isExpanded && (
-                          <div className="border-t border-slate-200 p-4 sm:p-6 bg-slate-50">
-                            {/* Assigned Teams */}
-                            <div className="mb-8">
-                              <h5 className="font-bold text-lg sm:text-xl mb-4 sm:mb-6 text-slate-800 flex items-center space-x-2">
-                                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                                <span>Assigned Teams</span>
-                              </h5>
-                              {panel.teams.length === 0 ? (
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-6">
-                                  <div className="flex items-center space-x-3 text-amber-800">
-                                    <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
-                                    <div>
-                                      <span className="font-bold block text-sm sm:text-base">No Teams Assigned</span>
-                                      <span className="text-xs sm:text-sm text-amber-700">Use the dropdown below to assign teams to this panel</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
-                                  {panel.teams.map((team) => (
-                                    <div
-                                      key={team.id}
-                                      className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 shadow-sm"
-                                    >
-                                      <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-4 sm:gap-0">
-                                        <h6 className="font-bold text-base sm:text-lg text-slate-800">{team.name}</h6>
-                                        <button
-                                          onClick={() =>
-                                            setConfirmRemove({
-                                              type: "team",
-                                              panelId: null,
-                                              teamId: team.id,
-                                            })
-                                          }
-                                          className="text-red-600 hover:text-red-800 p-1.5 sm:p-2 rounded-lg hover:bg-red-50 transition-all duration-200 flex items-center gap-1 text-xs sm:text-sm font-medium"
-                                        >
-                                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                                          Remove
-                                        </button>
-                                      </div>
-                                      
-                                      {team.members && team.members.length > 0 && (
-                                        <div className="space-y-3">
-                                          <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 space-x-0 sm:space-x-3 p-2 sm:p-3 bg-slate-50 rounded-lg">
-                                            <span className="font-semibold text-slate-700 text-sm sm:text-base">Team Members:</span>
-                                            <div className="flex flex-wrap gap-1 sm:gap-2">
-                                              {team.members.map((member, memberIdx) => (
-                                                <span
-                                                  key={`${team.id}-member-${memberIdx}`}
-                                                  className="bg-blue-100 text-blue-800 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs sm:text-sm font-semibold"
-                                                >
-                                                  {member}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Manual Assignment */}
-                            <div className="border-t border-slate-200 pt-6">
-                              <h5 className="font-bold text-lg sm:text-xl mb-4 text-slate-800 flex items-center space-x-2">
-                                <Plus className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
-                                <span>Manual Assignment</span>
-                                <span className="text-xs sm:text-sm font-normal text-slate-500">
-                                  ({availableTeamsForPanel.length} available)
-                                </span>
-                              </h5>
-                              {availableTeamsForPanel.length === 0 ? (
-                                <div className="bg-slate-100 p-3 sm:p-4 rounded-xl text-center">
-                                  <span className="text-slate-600 font-medium text-sm sm:text-base">
-                                    {unassignedTeams.length === 0
-                                      ? "✅ All teams have been assigned"
-                                      : "⚠️ No teams available (guide conflicts)"}
-                                  </span>
-                                </div>
-                              ) : (
-                                <select
-                                  onChange={(e) => {
-                                    if (e.target.value) {
-                                      handleManualAssign(idx, e.target.value);
-                                      e.target.value = "";
-                                    }
-                                  }}
-                                  className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                                  defaultValue=""
-                                >
-                                  <option key={`panel-${panel.panelId}-empty`} value="" disabled>
-                                    Select team to assign to this panel
-                                  </option>
-                                  {availableTeamsForPanel.map((team) => (
-                                    <option key={`panel-${panel.panelId}-team-${team._id}`} value={team._id}>
-                                      {team.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              )}
-                              {availableTeamsForPanel.length < unassignedTeams.length && (
-                                <details className="mt-4 cursor-pointer">
-                                  <summary className="text-xs sm:text-sm text-red-600 hover:text-red-800 font-medium">
-                                    ⚠️ {unassignedTeams.length - availableTeamsForPanel.length} teams excluded due to guide conflicts
-                                  </summary>
-                                  <div className="mt-2 ml-4 text-xs sm:text-sm text-gray-600 bg-red-50 p-2 sm:p-3 rounded border-l-4 border-red-200">
-                                    {unassignedTeams
-                                      .filter(
-                                        (team) =>
-                                          !availableTeamsForPanel.find((apt) => apt._id === team._id)
-                                      )
-                                      .map((team) => {
-                                        const guideInfo = allGuideProjects.find(
-                                          (rel) => rel.projectId === team._id
-                                        );
-                                        return (
-                                          <div key={`conflict-${team._id}`} className="text-red-700">
-                                            <strong>{team.name}</strong> - Guide:{" "}
-                                            {guideInfo?.guideName || "Unknown"}
-                                          </div>
-                                        );
-                                      })}
-                                  </div>
-                                </details>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                        panel={panel}
+                        index={idx}
+                        isExpanded={isExpanded}
+                        onToggleExpand={() => setExpandedPanel(expandedPanel === idx ? null : idx)}
+                        onRemovePanel={(panelId) => setConfirmRemove({ type: "panel", panelId })}
+                        availableTeams={availableTeamsForPanel}
+                        onManualAssign={handleManualAssign}
+                        unassignedTeams={unassignedTeams}
+                        allGuideProjects={allGuideProjects}
+                        onRemoveTeam={(teamId) => setConfirmRemove({ type: "team", teamId })}
+                      />
                     );
                   })}
                 </div>
@@ -1486,7 +819,41 @@ const AdminPanelManagement = () => {
           </div>
         </div>
 
-        {/* Enhanced Notification */}
+        {/* ✅ FIXED: Pass availableFaculty instead of full facultyList */}
+        <ManualPanelCreation
+          isOpen={showManualCreateModal}
+          onClose={() => setShowManualCreateModal(false)}
+          onSubmit={handleManualCreatePanel}
+          facultyList={availableFaculty} // ✅ Only unassigned faculty
+          loading={loading}
+          adminContext={adminContext}
+          usedFacultyIds={usedFacultyIds}
+        />
+
+        <AutoCreatePanel
+          isOpen={showAutoCreateModal}
+          onClose={() => setShowAutoCreateModal(false)}
+          facultyList={availableFaculty} // ✅ Only unassigned faculty
+          adminContext={adminContext}
+          onSuccess={handleSuccess}
+          onError={handleError}
+          autoCreatePanelManual={autoCreatePanelManual}
+          setIsCreating={setIsAutoCreating}
+          usedFacultyIds={usedFacultyIds}
+        />
+
+        <AutoAssignPanel
+          isOpen={showAutoAssignModal}
+          onClose={() => setShowAutoAssignModal(false)}
+          facultyList={facultyList}
+          panelsLength={panels.length}
+          onSuccess={handleSuccess}
+          onError={handleError}
+          autoAssignPanelsToProjects={autoAssignPanelsToProjects}
+          setIsAssigning={setIsAutoAssigning}
+        />
+
+        {/* Notification */}
         {notification.isVisible && (
           <div className="fixed top-20 sm:top-24 right-4 sm:right-8 z-50 max-w-md w-full px-4 sm:px-0">
             <div className={`transform transition-all duration-500 ease-out ${
@@ -1502,10 +869,7 @@ const AdminPanelManagement = () => {
                     notification.type === "success" ? "text-emerald-500" : "text-red-500"
                   }`}>
                     {notification.type === "success" ? (
-                      <div className="relative">
-                        <div className="animate-ping absolute inline-flex h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-emerald-400 opacity-75"></div>
-                        <CheckCircle className="relative inline-flex h-5 w-5 sm:h-6 sm:w-6" />
-                      </div>
+                      <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6" />
                     ) : (
                       <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
                     )}
@@ -1538,7 +902,7 @@ const AdminPanelManagement = () => {
           </div>
         )}
 
-        {/* Modals */}
+        {/* Other modals */}
         <TeamPopup team={modalTeam} onClose={() => setModalTeam(null)} />
         <ConfirmPopup
           isOpen={!!confirmRemove.type}
@@ -1546,7 +910,6 @@ const AdminPanelManagement = () => {
           onConfirm={handleConfirmRemove}
           type={confirmRemove.type}
         />
-        </div>
       </div>
     </>
   );
