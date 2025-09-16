@@ -249,12 +249,13 @@ export async function createFacultyBulk(req, res) {
     for (let i = 0; i < facultyList.length; i++) {
       const faculty = facultyList[i];
       try {
-        // Validate required fields including arrays for schools, departments and specialization
+        // Validate required fields including arrays and phoneNumber
         if (
           !faculty.name ||
           !faculty.emailId ||
           !faculty.password ||
           !faculty.employeeId ||
+          !faculty.phoneNumber || // phoneNumber required
           !faculty.schools ||
           !faculty.departments ||
           !faculty.specialization
@@ -263,7 +264,7 @@ export async function createFacultyBulk(req, res) {
           results.details.push({
             row: i + 1,
             error:
-              "Missing required fields including schools, departments, or specialization",
+              "Missing required fields including phoneNumber, schools, departments, or specialization",
           });
           continue;
         }
@@ -294,11 +295,23 @@ export async function createFacultyBulk(req, res) {
           continue;
         }
 
-        // Check existing faculty by email or employeeId (case normalized)
+        // Phone number regex validation using schema regex pattern
+        const phoneRegex = /^(\+91[- ]?)?[6-9]\d{9}$/;
+        if (!phoneRegex.test(faculty.phoneNumber.trim())) {
+          results.errors++;
+          results.details.push({
+            row: i + 1,
+            error: "Invalid Indian phone number format",
+          });
+          continue;
+        }
+
+        // Check existing faculty by email, employeeId, or phoneNumber (case normalized)
         const existingFaculty = await Faculty.findOne({
           $or: [
             { emailId: faculty.emailId.trim().toLowerCase() },
             { employeeId: faculty.employeeId.trim().toUpperCase() },
+            { phoneNumber: faculty.phoneNumber.trim() },
           ],
         });
 
@@ -306,7 +319,8 @@ export async function createFacultyBulk(req, res) {
           results.errors++;
           results.details.push({
             row: i + 1,
-            error: "Faculty with this email or employee ID already exists",
+            error:
+              "Faculty with this email, employee ID, or phone number already exists",
           });
           continue;
         }
@@ -315,16 +329,17 @@ export async function createFacultyBulk(req, res) {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(faculty.password, salt);
 
-        // Create new faculty record with array fields and other details
+        // Create new faculty record with array fields and phone number
         const newFaculty = new Faculty({
           imageUrl: faculty.imageUrl || "",
           name: faculty.name.trim(),
           emailId: faculty.emailId.trim().toLowerCase(),
           password: hashedPassword,
           employeeId: faculty.employeeId.trim().toUpperCase(),
+          phoneNumber: faculty.phoneNumber.trim(),
           role: faculty.role || "faculty",
-          school: faculty.schools.map((s) => s.trim()), // Note: frontend sends 'schools' but schema expects 'school'
-          department: faculty.departments.map((d) => d.trim()), // Note: frontend sends 'departments' but schema expects 'department'
+          school: faculty.schools.map((s) => s.trim()),
+          department: faculty.departments.map((d) => d.trim()),
           specialization: faculty.specialization.map((sp) => sp.trim()),
         });
 
@@ -480,21 +495,22 @@ export async function getAllFaculty(req, res) {
       .sort(sortOption)
       .select("-password");
 
-    res.status(200).json({
-      success: true,
-      data: faculty.map((f) => ({
-        _id: f._id,
-        imageUrl: f.imageUrl,
-        name: f.name,
-        employeeId: f.employeeId,
-        emailId: f.emailId,
-        role: f.role,
-        school: f.schools,
-        department: f.departments,
-        specialization: f.specialization,
-      })),
-      count: faculty.length,
-    });
+res.status(200).json({
+  success: true,
+  data: faculty.map((f) => ({
+    _id: f._id,
+    imageUrl: f.imageUrl,
+    name: f.name,
+    employeeId: f.employeeId,
+    emailId: f.emailId,
+    phoneNumber: f.phoneNumber, 
+    role: f.role,
+    school: f.school, 
+    department: f.department,
+    specialization: f.specialization,
+  })),
+  count: faculty.length,
+});
   } catch (error) {
     console.error("Error in getAllFaculty:", error);
     res.status(500).json({
@@ -1391,20 +1407,20 @@ export async function autoAssignPanelsToProjects(req, res) {
     let projectFilter = { panel: null };
     let panelFilter = {};
 
-    // Apply department filter if specified
     if (department) {
       projectFilter.department = department;
       panelFilter.department = department;
     }
 
+    // Populate unassigned projects with guideFaculty
     const unassignedProjects = await Project.find(projectFilter).populate(
       "guideFaculty"
     );
 
-    // ✅ FIXED: Populate members array (your schema uses members, not faculty1/faculty2)
+    // Populate panels with faculty members fully loaded
     const panels = await Panel.find(panelFilter).populate({
       path: "members",
-      select: "employeeId name emailId school department",
+      select: "employeeId name emailId school department specialization",
     });
 
     if (!panels.length) {
@@ -1421,21 +1437,16 @@ export async function autoAssignPanelsToProjects(req, res) {
     let assignmentStats = {};
 
     if (department) {
-      // ✅ Single department mode - apply buffer normally
       if (buffer >= panels.length) {
         return res.status(400).json({
           success: false,
           message: `Buffer (${buffer}) cannot be >= total panels (${panels.length}) for ${department}.`,
         });
       }
-
       panelsToAssign = panels.slice(0, panels.length - buffer);
       bufferPanels = panels.slice(panels.length - buffer);
     } else {
-      // ✅ FIXED: Global mode - distribute buffer per department
       const panelsByDept = {};
-
-      // Group panels by department
       panels.forEach((panel) => {
         if (!panelsByDept[panel.department]) {
           panelsByDept[panel.department] = [];
@@ -1444,7 +1455,6 @@ export async function autoAssignPanelsToProjects(req, res) {
       });
 
       const departments = Object.keys(panelsByDept);
-
       if (departments.length === 0) {
         return res.status(400).json({
           success: false,
@@ -1452,24 +1462,16 @@ export async function autoAssignPanelsToProjects(req, res) {
         });
       }
 
-      // Calculate buffer per department
       const bufferPerDept = Math.ceil(buffer / departments.length);
-
       panelsToAssign = [];
       bufferPanels = [];
 
-      console.log(`=== BUFFER DISTRIBUTION ===`);
-      console.log(
-        `Total buffer: ${buffer}, Departments: ${departments.length}, Buffer per dept: ${bufferPerDept}`
-      );
-
-      // Apply distributed buffer per department
       departments.forEach((dept) => {
         const deptPanels = panelsByDept[dept];
         const actualBuffer = Math.min(
           bufferPerDept,
           Math.max(0, deptPanels.length - 1)
-        ); // At least 0 panels for assignment
+        );
 
         const deptPanelsToAssign = deptPanels.slice(
           0,
@@ -1479,14 +1481,9 @@ export async function autoAssignPanelsToProjects(req, res) {
           deptPanels.length - actualBuffer
         );
 
-        console.log(
-          `Dept: ${dept}, Total: ${deptPanels.length}, Buffer: ${actualBuffer}, Available: ${deptPanelsToAssign.length}`
-        );
-
         panelsToAssign.push(...deptPanelsToAssign);
         bufferPanels.push(...deptBufferPanels);
 
-        // Initialize assignment stats per department
         assignmentStats[dept] = 0;
       });
     }
@@ -1498,6 +1495,37 @@ export async function autoAssignPanelsToProjects(req, res) {
       });
     }
 
+    // Helper to extract numeric part sum from employeeId string
+    const sumEmployeeIdNumbers = (employeeId) => {
+      const digits = employeeId.match(/\d+/g);
+      if (!digits) return 0;
+      return digits.reduce((acc, val) => acc + parseInt(val, 10), 0);
+    };
+
+    // Calculate total employeeId sum for a panel (sum of all member employeeId sums)
+    const calculatePanelScore = (panel) => {
+      return panel.members.reduce(
+        (acc, member) => acc + sumEmployeeIdNumbers(member.employeeId),
+        0
+      );
+    };
+
+    // Filter panels by department (pre-filter once)
+    const panelsByDeptFiltered = {};
+    panelsToAssign.forEach((panel) => {
+      if (!panelsByDeptFiltered[panel.department]) {
+        panelsByDeptFiltered[panel.department] = [];
+      }
+      panelsByDeptFiltered[panel.department].push(panel);
+    });
+
+    // Sort panels within each department by sum of employee Ids (ascending order = older faculties first)
+    for (const dept in panelsByDeptFiltered) {
+      panelsByDeptFiltered[dept].sort(
+        (a, b) => calculatePanelScore(a) - calculatePanelScore(b)
+      );
+    }
+
     const panelAssignments = {};
     panelsToAssign.forEach((panel) => {
       panelAssignments[panel._id.toString()] = [];
@@ -1506,55 +1534,86 @@ export async function autoAssignPanelsToProjects(req, res) {
     let assignedCount = 0;
     let conflictCount = 0;
 
-    // ✅ FIXED: Match projects to panels by department with conflict checking
+    // Keep track of round robin index per department
+    const roundRobinIndex = {};
+
     for (const project of unassignedProjects) {
-      const matchingPanels = panelsToAssign.filter(
-        (panel) => panel.department === project.department
+      const deptPanels = panelsByDeptFiltered[project.department] || [];
+
+      // Filter panels that contain at least one member with matching specialization with the project
+      const specializedPanels = deptPanels.filter((panel) =>
+        panel.members.some(
+          (member) =>
+            member.specialization &&
+            member.specialization.includes(project.specialization)
+        )
       );
 
-      if (matchingPanels.length > 0) {
-        // ✅ FIXED: Filter out conflict panels (guide faculty cannot be panel member)
-        const nonConflictPanels = matchingPanels.filter((panel) => {
-          const guideId = project.guideFaculty._id.toString();
+      // Further filter panels that do NOT have the guideFaculty as a member (conflict check)
+      const eligibleSpecializedPanels = specializedPanels.filter((panel) => {
+        const guideId = project.guideFaculty._id.toString();
+        return !panel.members.some(
+          (member) => member._id.toString() === guideId
+        );
+      });
 
-          // Check if guide faculty is in panel members
-          const hasConflict = panel.members.some(
+      let selectedPanel = null;
+
+      if (eligibleSpecializedPanels.length > 0) {
+        // Initialize round robin index for this department if not done
+        if (!(project.department in roundRobinIndex)) {
+          roundRobinIndex[project.department] = 0;
+        }
+
+        // Select panel using round robin among eligible panels with matching specialization
+        const panelIdx =
+          roundRobinIndex[project.department] %
+          eligibleSpecializedPanels.length;
+        selectedPanel = eligibleSpecializedPanels[panelIdx];
+
+        roundRobinIndex[project.department]++;
+      } else {
+        // If no specialized panel is suitable, assign to panel (with members but no guide conflict) in round robin by experience
+        const eligibleFallbackPanels = deptPanels.filter((panel) => {
+          const guideId = project.guideFaculty._id.toString();
+          // Exclude panels having the guide as member
+          return !panel.members.some(
             (member) => member._id.toString() === guideId
           );
-
-          return !hasConflict;
         });
 
-        if (nonConflictPanels.length > 0) {
-          // ✅ FIXED: Round-robin assignment within each department
-          if (!assignmentStats[project.department]) {
-            assignmentStats[project.department] = 0;
+        if (eligibleFallbackPanels.length > 0) {
+          if (!(project.department in roundRobinIndex)) {
+            roundRobinIndex[project.department] = 0;
           }
 
-          const panelIndex =
-            assignmentStats[project.department] % nonConflictPanels.length;
-          const selectedPanel = nonConflictPanels[panelIndex];
+          // Round robin among fallback panels
+          const fallbackPanelIdx =
+            roundRobinIndex[project.department] % eligibleFallbackPanels.length;
+          selectedPanel = eligibleFallbackPanels[fallbackPanelIdx];
 
-          project.panel = selectedPanel._id;
-          await project.save();
-
-          panelAssignments[selectedPanel._id.toString()].push(project._id);
-          assignedCount++;
-          assignmentStats[project.department]++;
-        } else {
-          conflictCount++;
-          console.log(
-            `⚠️ Conflict: Project ${project.name} guide ${project.guideFaculty.name} is in available panels`
-          );
+          roundRobinIndex[project.department]++;
         }
+      }
+
+      if (selectedPanel) {
+        // Assign project to selected panel
+        project.panel = selectedPanel._id;
+        await project.save();
+
+        panelAssignments[selectedPanel._id.toString()].push(project._id);
+        assignedCount++;
+        if (!assignmentStats[project.department])
+          assignmentStats[project.department] = 0;
+        assignmentStats[project.department]++;
       } else {
+        conflictCount++;
         console.log(
-          `⚠️ No panels available for department: ${project.department}`
+          `⚠️ No eligible panels for project ${project.name} with guide ${project.guideFaculty.name} in department ${project.department}`
         );
       }
     }
 
-    // ✅ Enhanced response with detailed statistics
     return res.status(200).json({
       success: true,
       message: `Assigned ${assignedCount} projects with ${
@@ -1594,3 +1653,4 @@ export async function autoAssignPanelsToProjects(req, res) {
     });
   }
 }
+

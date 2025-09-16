@@ -39,9 +39,11 @@ const createAdmin = async () => {
       password: hashedPassword,
       employeeId: ADMIN_EMPLOYEE_ID,
       role: "admin",
-      school: ADMIN_SCHOOL,
-      department: ADMIN_DEPARTMENT,
+      school: [ADMIN_SCHOOL], // must be array as per schema
+      department: [ADMIN_DEPARTMENT], // must be array as per schema
+      phoneNumber: "9940573903", // change this to a valid indian phone number to work
       imageUrl: "",
+      specialization: [], // empty array for admin allowed
     });
 
     await adminUser.save();
