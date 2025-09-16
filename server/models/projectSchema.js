@@ -26,6 +26,11 @@ const projectSchema = new mongoose.Schema({
   school: { type: String, required: true },
   department: { type: String, required: true },
   specialization: { type: String, required: true },
+  type: {
+    type: String,
+    required: true,
+    enum: ["hardware", "software"],
+  },
 });
 
 const Project = mongoose.model("Project", projectSchema);
