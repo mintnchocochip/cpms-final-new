@@ -21,6 +21,15 @@ const facultySchema = new mongoose.Schema({
     required: true,
     match: [/.+@vit\.ac\.in$/, "Please enter a valid VIT email address"],
   },
+  phoneNumber: {
+    type: String,
+    required: true,
+    unique: true,
+    match: [
+      /^(\+91[- ]?)?[6-9]\d{9}$/,
+      "Please enter a valid Indian phone number",
+    ],
+  },
   password: {
     type: String,
     required: true,
@@ -36,8 +45,8 @@ const facultySchema = new mongoose.Schema({
     validate: [arrayLimit, "{PATH} must have at least one school"],
   },
   department: {
-    type: [String], 
-    default: undefined, 
+    type: [String],
+    default: undefined,
   },
   specialization: {
     type: [String],

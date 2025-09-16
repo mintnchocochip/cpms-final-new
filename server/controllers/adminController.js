@@ -25,17 +25,22 @@ export async function createOrUpdateMarkingSchema(req, res) {
 
   // Validate reviews structure
   for (const review of reviews) {
-    if (!review.reviewName || !review.facultyType || !['guide', 'panel'].includes(review.facultyType)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Each review must have reviewName and facultyType (guide or panel)" 
+    if (
+      !review.reviewName ||
+      !review.facultyType ||
+      !["guide", "panel"].includes(review.facultyType)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Each review must have reviewName and facultyType (guide or panel)",
       });
     }
-    
+
     if (!review.deadline || !review.deadline.from || !review.deadline.to) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Each review must have valid deadline with from and to dates" 
+      return res.status(400).json({
+        success: false,
+        message: "Each review must have valid deadline with from and to dates",
       });
     }
   }
@@ -47,16 +52,16 @@ export async function createOrUpdateMarkingSchema(req, res) {
       { new: true, upsert: true }
     );
 
-    res.status(200).json({ 
-      success: true, 
-      message: "Marking schema saved successfully.", 
-      data: updated 
+    res.status(200).json({
+      success: true,
+      message: "Marking schema saved successfully.",
+      data: updated,
     });
   } catch (error) {
     console.error("Error saving marking schema:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Server error while saving marking schema" 
+    res.status(500).json({
+      success: false,
+      message: "Server error while saving marking schema",
     });
   }
 }
@@ -87,14 +92,14 @@ export async function getDefaultDeadline(req, res) {
       data: {
         school: markingSchema.school,
         department: markingSchema.department,
-        reviews: markingSchema.reviews.map(review => ({
+        reviews: markingSchema.reviews.map((review) => ({
           reviewName: review.reviewName,
           displayName: review.displayName || review.reviewName,
-          facultyType: review.facultyType || 'guide',
+          facultyType: review.facultyType || "guide",
           components: review.components || [],
           deadline: review.deadline || null,
-          requiresPPT: review.requiresPPT || false
-        }))
+          requiresPPT: review.requiresPPT || false,
+        })),
       },
     });
   } catch (error) {
@@ -107,7 +112,6 @@ export async function getDefaultDeadline(req, res) {
   }
 }
 
-
 export async function createFaculty(req, res) {
   try {
     const {
@@ -119,26 +123,26 @@ export async function createFaculty(req, res) {
       department,
       specialization,
       imageUrl,
-      role = "faculty"
+      role = "faculty",
+      phoneNumber,
     } = req.body;
 
-    // Validate required fields
-    if (!name || !emailId || !password || !employeeId) {
+    if (!name || !emailId || !password || !employeeId || !phoneNumber) {
+      // ← phoneNumber required
       return res.status(400).json({
         success: false,
-        message: "Name, email, password, and employee ID are required",
+        message:
+          "Name, email, password, employee ID, and phone number are required",
       });
-    }
+    } // Only allow college emails
 
-    // Only allow college emails
     if (!emailId.endsWith("@vit.ac.in")) {
       return res.status(400).json({
         success: false,
         message: "Only college emails allowed!",
       });
-    }
+    } // Password validation
 
-    // Password validation
     if (
       password.length < 8 ||
       !/[A-Z]/.test(password) ||
@@ -151,60 +155,63 @@ export async function createFaculty(req, res) {
         message:
           "Password must be at least 8 characters and include uppercase, lowercase, number, and special character",
       });
-    }
+    } // Validate school, department, and specialization arrays
 
-    // Validate school, department, and specialization arrays
     if (!school || !Array.isArray(school) || school.length === 0) {
       return res.status(400).json({
         success: false,
         message: "School must be a non-empty array",
       });
+    } // if (!department || !Array.isArray(department) || department.length === 0) { //   return res.status(400).json({ //     success: false, //     message: "Department must be a non-empty array", //   }); // }
+
+    if (!/^(\+91[- ]?)?[6-9]\d{9}$/.test(phoneNumber.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid Indian phone number",
+      });
     }
 
-    // if (!department || !Array.isArray(department) || department.length === 0) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Department must be a non-empty array",
-    //   });
-    // }
-
-    if (!specialization || !Array.isArray(specialization) || specialization.length === 0) {
+    if (
+      !specialization ||
+      !Array.isArray(specialization) ||
+      specialization.length === 0
+    ) {
       return res.status(400).json({
         success: false,
         message: "Specialization must be a non-empty array",
       });
-    }
+    } // Check if email or phone number is already registered
 
-    // Check if email is already registered
-    const existingFaculty = await Faculty.findOne({ 
+    const existingFaculty = await Faculty.findOne({
       $or: [
         { emailId: emailId.trim().toLowerCase() },
-        { employeeId: employeeId.trim().toUpperCase() }
-      ]
+        { employeeId: employeeId.trim().toUpperCase() },
+        { phoneNumber: phoneNumber.trim() }, // ← Added uniqueness check for phoneNumber
+      ],
     });
-    
+
     if (existingFaculty) {
       return res.status(400).json({
         success: false,
-        message: "Faculty with this email or employee ID already exists!",
+        message:
+          "Faculty with this email, employee ID, or phone number already exists!",
       });
-    }
+    } // Hash password before saving
 
-    // Hash password before saving
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, salt); // Create faculty with correct field names matching schema
 
-    // Create faculty with correct field names matching schema
     const newFaculty = new Faculty({
       imageUrl: imageUrl || "",
       name: name.trim(),
       emailId: emailId.trim().toLowerCase(),
       password: hashedPassword,
       employeeId: employeeId.trim().toUpperCase(),
+      phoneNumber: phoneNumber.trim(), // ← Set phoneNumber
       role: role,
-      school: school.map(s => s.trim()), // Array field
-      department: department.map(d => d.trim()), // Array field
-      specialization: specialization.map(sp => sp.trim()), // Array field
+      school: school.map((s) => s.trim()),
+      department: department.map((d) => d.trim()),
+      specialization: specialization.map((sp) => sp.trim()),
     });
 
     await newFaculty.save();
@@ -213,7 +220,6 @@ export async function createFaculty(req, res) {
       success: true,
       message: "Faculty created successfully!",
     });
-
   } catch (error) {
     console.error("Error creating faculty:", error);
     return res.status(500).json({
@@ -295,7 +301,7 @@ export async function createFacultyBulk(req, res) {
             { employeeId: faculty.employeeId.trim().toUpperCase() },
           ],
         });
-        
+
         if (existingFaculty) {
           results.errors++;
           results.details.push({
@@ -323,7 +329,7 @@ export async function createFacultyBulk(req, res) {
         });
 
         await newFaculty.save();
-        console.log(newFaculty)
+        console.log(newFaculty);
         results.created++;
       } catch (error) {
         results.errors++;
@@ -425,7 +431,7 @@ export async function updateFaculty(req, res) {
     if (imageUrl !== undefined) faculty.imageUrl = imageUrl;
 
     await faculty.save();
-    console.log(faculty)
+    console.log(faculty);
 
     return res.status(200).json({
       success: true,
@@ -439,7 +445,6 @@ export async function updateFaculty(req, res) {
     });
   }
 }
-
 
 export async function getAllFaculty(req, res) {
   const { school, department, specialization, sortBy, sortOrder } = req.query;
@@ -498,7 +503,6 @@ export async function getAllFaculty(req, res) {
     });
   }
 }
-
 
 export async function getAllGuideWithProjects(req, res) {
   try {
@@ -604,7 +608,6 @@ export async function getAllPanelsWithProjects(req, res) {
   }
 }
 
-
 export async function deleteFacultyByEmployeeId(req, res) {
   const { employeeId } = req.params;
 
@@ -687,7 +690,6 @@ export async function createAdmin(req, res) {
     message: "Admin created successfully!",
   });
 }
-
 
 export async function setDefaultDeadline(req, res) {
   try {
@@ -1035,8 +1037,8 @@ export async function createPanelManually(req, res) {
 
 export async function autoCreatePanels(req, res) {
   try {
-    const { departments, school } = req.body; 
-    
+    const { departments, school } = req.body;
+
     if (!school) {
       return res.status(400).json({
         success: false,
@@ -1045,34 +1047,45 @@ export async function autoCreatePanels(req, res) {
     }
 
     // ✅ FIX 1: Get all already assigned faculty IDs from existing panels
-    const existingPanels = await Panel.find({}).populate('members', 'employeeId');
+    const existingPanels = await Panel.find({}).populate(
+      "members",
+      "employeeId"
+    );
     const alreadyAssignedFacultyIds = new Set();
-    
-    existingPanels.forEach(panel => {
-      panel.members.forEach(faculty => {
+
+    existingPanels.forEach((panel) => {
+      panel.members.forEach((faculty) => {
         if (faculty && faculty.employeeId) {
           alreadyAssignedFacultyIds.add(faculty.employeeId.toString());
         }
       });
     });
 
-    console.log('Already assigned faculty IDs:', Array.from(alreadyAssignedFacultyIds));
+    console.log(
+      "Already assigned faculty IDs:",
+      Array.from(alreadyAssignedFacultyIds)
+    );
 
     const createdPanels = [];
     const invalidFaculties = {};
     const facultiesToUpdate = {}; // { empid: Set(depts) }
-    
-    for (const [dept, { panelsNeeded, panelSize, faculties }] of Object.entries(departments)) {
-      
+
+    for (const [dept, { panelsNeeded, panelSize, faculties }] of Object.entries(
+      departments
+    )) {
       // ✅ FIX 2: Filter out already assigned faculties BEFORE processing
-      const availableFaculties = faculties.filter(empId => 
-        !alreadyAssignedFacultyIds.has(empId.toString())
+      const availableFaculties = faculties.filter(
+        (empId) => !alreadyAssignedFacultyIds.has(empId.toString())
       );
 
-      console.log(`Department ${dept}: Original ${faculties.length}, Available ${availableFaculties.length}`);
+      console.log(
+        `Department ${dept}: Original ${faculties.length}, Available ${availableFaculties.length}`
+      );
 
       if (availableFaculties.length === 0) {
-        invalidFaculties[dept] = ['All faculties already assigned to other panels'];
+        invalidFaculties[dept] = [
+          "All faculties already assigned to other panels",
+        ];
         continue;
       }
 
@@ -1080,12 +1093,12 @@ export async function autoCreatePanels(req, res) {
       const foundFaculties = await Faculty.find({
         employeeId: { $in: availableFaculties },
       });
-      
+
       const foundEmpIds = foundFaculties.map((f) => f.employeeId.toString());
       const missingEmpIds = availableFaculties.filter(
         (eid) => !foundEmpIds.includes(eid.toString())
       );
-      
+
       if (missingEmpIds.length > 0) {
         invalidFaculties[dept] = missingEmpIds;
         continue;
@@ -1098,62 +1111,76 @@ export async function autoCreatePanels(req, res) {
 
       const totalAvailable = foundFaculties.length;
       const requiredFaculty = panelsNeeded * panelSize;
-      
+
       // ✅ FIX 3: Adjust panel count if not enough faculty available
       let actualPanelsNeeded = panelsNeeded;
       if (totalAvailable < requiredFaculty) {
         actualPanelsNeeded = Math.floor(totalAvailable / panelSize);
-        
+
         if (actualPanelsNeeded === 0) {
           invalidFaculties[dept] = [
-            `Not enough available faculties for even 1 panel. Need ${panelSize}, found ${totalAvailable} (excluding already assigned)`
+            `Not enough available faculties for even 1 panel. Need ${panelSize}, found ${totalAvailable} (excluding already assigned)`,
           ];
           continue;
         }
-        
-        console.log(`Adjusted panels for ${dept}: ${panelsNeeded} → ${actualPanelsNeeded}`);
+
+        console.log(
+          `Adjusted panels for ${dept}: ${panelsNeeded} → ${actualPanelsNeeded}`
+        );
       }
 
       // 3. Make panels: most/least experienced pairing, never repeat
       const used = new Set();
       let facultyPool = [...foundFaculties];
-      
+
       for (let i = 0; i < actualPanelsNeeded; i++) {
         let panelMembers = [];
-        let left = 0, right = facultyPool.length - 1;
-        
+        let left = 0,
+          right = facultyPool.length - 1;
+
         while (panelMembers.length < panelSize && left <= right) {
           const leftFaculty = facultyPool[left];
           const rightFaculty = facultyPool[right];
-          
+
           // Add most experienced (left)
-          if (!used.has(leftFaculty.employeeId.toString()) && 
-              panelMembers.length < panelSize) {
+          if (
+            !used.has(leftFaculty.employeeId.toString()) &&
+            panelMembers.length < panelSize
+          ) {
             panelMembers.push(leftFaculty);
             used.add(leftFaculty.employeeId.toString());
             // ✅ FIX 4: Also add to global assigned set to prevent future use
             alreadyAssignedFacultyIds.add(leftFaculty.employeeId.toString());
           }
-          
+
           // Add least experienced (right) if different from left
-          if (left !== right && 
-              !used.has(rightFaculty.employeeId.toString()) && 
-              panelMembers.length < panelSize) {
+          if (
+            left !== right &&
+            !used.has(rightFaculty.employeeId.toString()) &&
+            panelMembers.length < panelSize
+          ) {
             panelMembers.push(rightFaculty);
             used.add(rightFaculty.employeeId.toString());
             // ✅ FIX 4: Also add to global assigned set
             alreadyAssignedFacultyIds.add(rightFaculty.employeeId.toString());
           }
-          
+
           left++;
           right--;
         }
 
         // ✅ FIX 5: Enhanced validation - ensure distinct members
-        const uniqueEmployeeIds = new Set(panelMembers.map(f => f.employeeId.toString()));
-        
-        if (panelMembers.length !== panelSize || uniqueEmployeeIds.size !== panelSize) {
-          console.log(`Skipping incomplete panel for ${dept}: got ${panelMembers.length}/${panelSize} members`);
+        const uniqueEmployeeIds = new Set(
+          panelMembers.map((f) => f.employeeId.toString())
+        );
+
+        if (
+          panelMembers.length !== panelSize ||
+          uniqueEmployeeIds.size !== panelSize
+        ) {
+          console.log(
+            `Skipping incomplete panel for ${dept}: got ${panelMembers.length}/${panelSize} members`
+          );
           continue;
         }
 
@@ -1171,11 +1198,14 @@ export async function autoCreatePanels(req, res) {
           department: dept,
           school: school,
         });
-        
+
         await panel.save();
         createdPanels.push(panel);
-        
-        console.log(`Created panel for ${dept} with faculty:`, panelMembers.map(f => f.employeeId));
+
+        console.log(
+          `Created panel for ${dept} with faculty:`,
+          panelMembers.map((f) => f.employeeId)
+        );
       }
     }
 
@@ -1183,8 +1213,12 @@ export async function autoCreatePanels(req, res) {
     for (const [empid, deptSet] of Object.entries(facultiesToUpdate)) {
       const doc = await Faculty.findOne({ employeeId: empid });
       if (doc) {
-        const prevDepartments = Array.isArray(doc.department) ? doc.department : [];
-        const nextDepartments = Array.from(new Set([...prevDepartments, ...deptSet]));
+        const prevDepartments = Array.isArray(doc.department)
+          ? doc.department
+          : [];
+        const nextDepartments = Array.from(
+          new Set([...prevDepartments, ...deptSet])
+        );
         doc.department = nextDepartments;
         await doc.save();
       }
@@ -1192,28 +1226,32 @@ export async function autoCreatePanels(req, res) {
 
     res.status(200).json({
       success: Object.keys(invalidFaculties).length === 0,
-      message: Object.keys(invalidFaculties).length === 0
-        ? `Successfully created ${createdPanels.length} panels and updated faculty departments.`
-        : `Created ${createdPanels.length} panels with some errors. Invalid/missing faculties: ${JSON.stringify(invalidFaculties)}`,
+      message:
+        Object.keys(invalidFaculties).length === 0
+          ? `Successfully created ${createdPanels.length} panels and updated faculty departments.`
+          : `Created ${
+              createdPanels.length
+            } panels with some errors. Invalid/missing faculties: ${JSON.stringify(
+              invalidFaculties
+            )}`,
       panelsCreated: createdPanels.length,
-      invalidFaculties: Object.keys(invalidFaculties).length > 0 ? invalidFaculties : undefined,
+      invalidFaculties:
+        Object.keys(invalidFaculties).length > 0 ? invalidFaculties : undefined,
       details: createdPanels.map((p) => ({
         department: p.department,
         facultyCount: p.members.length,
         school: p.school,
       })),
     });
-    
   } catch (error) {
-    console.error('Auto create panels error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Server error", 
-      error: error.message 
+    console.error("Auto create panels error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
     });
   }
 }
-
 
 export async function deletePanel(req, res) {
   try {
@@ -1247,7 +1285,6 @@ export async function deletePanel(req, res) {
   }
 }
 
-
 export async function getAllPanels(req, res) {
   try {
     const { school, department } = req.query;
@@ -1259,8 +1296,8 @@ export async function getAllPanels(req, res) {
     // ✅ FIXED: Populate 'members' array instead of 'faculty1' and 'faculty2'
     const panels = await Panel.find(filter)
       .populate({
-        path: 'members',
-        select: 'employeeId name emailId school department'
+        path: "members",
+        select: "employeeId name emailId school department",
       })
       .lean();
 
@@ -1278,7 +1315,6 @@ export async function getAllPanels(req, res) {
     });
   }
 }
-
 
 export async function assignPanelToProject(req, res) {
   try {
@@ -1361,18 +1397,22 @@ export async function autoAssignPanelsToProjects(req, res) {
       panelFilter.department = department;
     }
 
-    const unassignedProjects = await Project.find(projectFilter).populate("guideFaculty");
-    
+    const unassignedProjects = await Project.find(projectFilter).populate(
+      "guideFaculty"
+    );
+
     // ✅ FIXED: Populate members array (your schema uses members, not faculty1/faculty2)
     const panels = await Panel.find(panelFilter).populate({
       path: "members",
-      select: "employeeId name emailId school department"
+      select: "employeeId name emailId school department",
     });
 
     if (!panels.length) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `No panels available${department ? ` for ${department} department` : ''}` 
+      return res.status(400).json({
+        success: false,
+        message: `No panels available${
+          department ? ` for ${department} department` : ""
+        }`,
       });
     }
 
@@ -1388,16 +1428,15 @@ export async function autoAssignPanelsToProjects(req, res) {
           message: `Buffer (${buffer}) cannot be >= total panels (${panels.length}) for ${department}.`,
         });
       }
-      
+
       panelsToAssign = panels.slice(0, panels.length - buffer);
       bufferPanels = panels.slice(panels.length - buffer);
-      
     } else {
       // ✅ FIXED: Global mode - distribute buffer per department
       const panelsByDept = {};
-      
+
       // Group panels by department
-      panels.forEach(panel => {
+      panels.forEach((panel) => {
         if (!panelsByDept[panel.department]) {
           panelsByDept[panel.department] = [];
         }
@@ -1405,7 +1444,7 @@ export async function autoAssignPanelsToProjects(req, res) {
       });
 
       const departments = Object.keys(panelsByDept);
-      
+
       if (departments.length === 0) {
         return res.status(400).json({
           success: false,
@@ -1415,26 +1454,38 @@ export async function autoAssignPanelsToProjects(req, res) {
 
       // Calculate buffer per department
       const bufferPerDept = Math.ceil(buffer / departments.length);
-      
+
       panelsToAssign = [];
       bufferPanels = [];
 
       console.log(`=== BUFFER DISTRIBUTION ===`);
-      console.log(`Total buffer: ${buffer}, Departments: ${departments.length}, Buffer per dept: ${bufferPerDept}`);
+      console.log(
+        `Total buffer: ${buffer}, Departments: ${departments.length}, Buffer per dept: ${bufferPerDept}`
+      );
 
       // Apply distributed buffer per department
-      departments.forEach(dept => {
+      departments.forEach((dept) => {
         const deptPanels = panelsByDept[dept];
-        const actualBuffer = Math.min(bufferPerDept, Math.max(0, deptPanels.length - 1)); // At least 0 panels for assignment
-        
-        const deptPanelsToAssign = deptPanels.slice(0, deptPanels.length - actualBuffer);
-        const deptBufferPanels = deptPanels.slice(deptPanels.length - actualBuffer);
-        
-        console.log(`Dept: ${dept}, Total: ${deptPanels.length}, Buffer: ${actualBuffer}, Available: ${deptPanelsToAssign.length}`);
-        
+        const actualBuffer = Math.min(
+          bufferPerDept,
+          Math.max(0, deptPanels.length - 1)
+        ); // At least 0 panels for assignment
+
+        const deptPanelsToAssign = deptPanels.slice(
+          0,
+          deptPanels.length - actualBuffer
+        );
+        const deptBufferPanels = deptPanels.slice(
+          deptPanels.length - actualBuffer
+        );
+
+        console.log(
+          `Dept: ${dept}, Total: ${deptPanels.length}, Buffer: ${actualBuffer}, Available: ${deptPanelsToAssign.length}`
+        );
+
         panelsToAssign.push(...deptPanelsToAssign);
         bufferPanels.push(...deptBufferPanels);
-        
+
         // Initialize assignment stats per department
         assignmentStats[dept] = 0;
       });
@@ -1457,20 +1508,20 @@ export async function autoAssignPanelsToProjects(req, res) {
 
     // ✅ FIXED: Match projects to panels by department with conflict checking
     for (const project of unassignedProjects) {
-      const matchingPanels = panelsToAssign.filter(panel => 
-        panel.department === project.department
+      const matchingPanels = panelsToAssign.filter(
+        (panel) => panel.department === project.department
       );
 
       if (matchingPanels.length > 0) {
         // ✅ FIXED: Filter out conflict panels (guide faculty cannot be panel member)
-        const nonConflictPanels = matchingPanels.filter(panel => {
+        const nonConflictPanels = matchingPanels.filter((panel) => {
           const guideId = project.guideFaculty._id.toString();
-          
+
           // Check if guide faculty is in panel members
-          const hasConflict = panel.members.some(member => 
-            member._id.toString() === guideId
+          const hasConflict = panel.members.some(
+            (member) => member._id.toString() === guideId
           );
-          
+
           return !hasConflict;
         });
 
@@ -1479,35 +1530,45 @@ export async function autoAssignPanelsToProjects(req, res) {
           if (!assignmentStats[project.department]) {
             assignmentStats[project.department] = 0;
           }
-          
-          const panelIndex = assignmentStats[project.department] % nonConflictPanels.length;
+
+          const panelIndex =
+            assignmentStats[project.department] % nonConflictPanels.length;
           const selectedPanel = nonConflictPanels[panelIndex];
 
           project.panel = selectedPanel._id;
           await project.save();
-          
+
           panelAssignments[selectedPanel._id.toString()].push(project._id);
           assignedCount++;
           assignmentStats[project.department]++;
         } else {
           conflictCount++;
-          console.log(`⚠️ Conflict: Project ${project.name} guide ${project.guideFaculty.name} is in available panels`);
+          console.log(
+            `⚠️ Conflict: Project ${project.name} guide ${project.guideFaculty.name} is in available panels`
+          );
         }
       } else {
-        console.log(`⚠️ No panels available for department: ${project.department}`);
+        console.log(
+          `⚠️ No panels available for department: ${project.department}`
+        );
       }
     }
 
     // ✅ Enhanced response with detailed statistics
     return res.status(200).json({
       success: true,
-      message: `Assigned ${assignedCount} projects with ${department ? 'department-specific' : 'distributed per-department'} buffer strategy.`,
+      message: `Assigned ${assignedCount} projects with ${
+        department ? "department-specific" : "distributed per-department"
+      } buffer strategy.`,
       data: {
         assignments: panelAssignments,
-        bufferPanels: bufferPanels.map(p => ({
+        bufferPanels: bufferPanels.map((p) => ({
           id: p._id,
           department: p.department,
-          members: p.members.map(m => ({ name: m.name, employeeId: m.employeeId }))
+          members: p.members.map((m) => ({
+            name: m.name,
+            employeeId: m.employeeId,
+          })),
         })),
         statistics: {
           totalProjects: unassignedProjects.length,
@@ -1517,18 +1578,19 @@ export async function autoAssignPanelsToProjects(req, res) {
           totalPanelsAvailable: panels.length,
           panelsUsedForAssignment: panelsToAssign.length,
           panelsKeptAsBuffer: bufferPanels.length,
-          assignmentPerDepartment: assignmentStats
+          assignmentPerDepartment: assignmentStats,
         },
-        mode: department ? `Single Department (${department})` : "All Departments with Distributed Buffer"
-      }
+        mode: department
+          ? `Single Department (${department})`
+          : "All Departments with Distributed Buffer",
+      },
     });
-    
   } catch (error) {
     console.error("Error in autoAssignPanelsToProjects:", error);
-    return res.status(500).json({ 
-      success: false, 
-      message: "Server error", 
-      error: error.message 
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
     });
   }
 }
