@@ -382,9 +382,10 @@ export async function updateFaculty(req, res) {
       specialization,
       role,
       imageUrl,
+      phoneNumber, // Added phoneNumber here
     } = req.body;
 
-    // Find existing faculty by employeeId (normalize case if needed)
+    // Find existing faculty by employeeId (normalized case)
     const faculty = await Faculty.findOne({
       employeeId: employeeId.trim().toUpperCase(),
     });
@@ -414,6 +415,26 @@ export async function updateFaculty(req, res) {
       }
     }
 
+    // Validate phoneNumber similarly
+    if (phoneNumber) {
+      const phoneRegex = /^(\+91[- ]?)?[6-9]\d{9}$/;
+      if (!phoneRegex.test(phoneNumber)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid Indian phone number.",
+        });
+      }
+      if (phoneNumber !== faculty.phoneNumber) {
+        const phoneExists = await Faculty.findOne({ phoneNumber });
+        if (phoneExists) {
+          return res.status(400).json({
+            success: false,
+            message: "Another faculty with this phone number already exists.",
+          });
+        }
+      }
+    }
+
     // Validate password if provided
     if (password) {
       if (
@@ -437,6 +458,7 @@ export async function updateFaculty(req, res) {
     // Update fields if provided
     if (name) faculty.name = name;
     if (emailId) faculty.emailId = emailId.trim().toLowerCase();
+    if (phoneNumber) faculty.phoneNumber = phoneNumber;
     if (role && ["admin", "faculty"].includes(role)) faculty.role = role;
     if (Array.isArray(school) && school.length > 0) faculty.school = school;
     if (Array.isArray(department) && department.length > 0)
@@ -460,6 +482,7 @@ export async function updateFaculty(req, res) {
     });
   }
 }
+
 
 export async function getAllFaculty(req, res) {
   const { school, department, specialization, sortBy, sortOrder } = req.query;
@@ -550,6 +573,7 @@ export async function getAllGuideWithProjects(req, res) {
             emailId: faculty.emailId,
             school: faculty.school,
             department: faculty.department,
+            phoneNumber: faculty.phoneNumber,
           },
           guidedProjects,
         };
