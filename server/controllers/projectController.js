@@ -35,6 +35,7 @@ export async function createProject(req, res, next) {
       students: studentDetails,
       guideFacultyEmpId,
       specialization,
+      type, 
     } = req.body;
 
     if (!Array.isArray(studentDetails) || studentDetails.length === 0) {
@@ -64,7 +65,14 @@ export async function createProject(req, res, next) {
       });
     }
 
-    // Find marking schema with session
+    if (!type || !["hardware", "software"].includes(type)) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Project type must be either 'hardware' or 'software'.",
+      });
+    }
+
     const markingSchema = await MarkingSchema.findOne({
       school,
       department,
@@ -77,7 +85,6 @@ export async function createProject(req, res, next) {
       });
     }
 
-    // Validate guide faculty existence
     const guideFacultyDoc = await Faculty.findOne({
       employeeId: guideFacultyEmpId,
     }).session(session);
@@ -88,7 +95,6 @@ export async function createProject(req, res, next) {
       );
     }
 
-    // Extract review keys and deadlines
     const reviewKeys = markingSchema.reviews.map((review) => review.reviewName);
     const defaultDeadlinesMap = new Map();
     markingSchema.reviews.forEach((review) => {
@@ -102,7 +108,6 @@ export async function createProject(req, res, next) {
       }
     });
 
-    // Create student documents within transaction
     const studentIds = await Promise.all(
       studentDetails.map(async (studentObj) => {
         const {
@@ -129,7 +134,6 @@ export async function createProject(req, res, next) {
           throw new Error(`Student already exists with regNo ${regNo}`);
         }
 
-        // Build reviews map with defaults
         const reviewsMap = new Map();
         for (const reviewKey of reviewKeys) {
           const reviewDef = markingSchema.reviews.find(
@@ -157,7 +161,6 @@ export async function createProject(req, res, next) {
           });
         }
 
-        // Determine deadlines for student (use custom or default)
         let studentDeadlineMap;
         if (
           deadline &&
@@ -185,7 +188,7 @@ export async function createProject(req, res, next) {
       })
     );
 
-    // Create project referencing saved students and guide faculty
+    // Create project in DB including the new type field
     const newProject = new Project({
       name,
       students: studentIds,
@@ -194,6 +197,7 @@ export async function createProject(req, res, next) {
       school,
       department,
       specialization,
+      type, // <----- added here
     });
 
     await newProject.save({ session });
@@ -256,6 +260,7 @@ export async function createProject(req, res, next) {
   }
 }
 
+
 export async function getAllProjects(req, res) {
   try {
     const { school, department } = req.query;
@@ -270,12 +275,13 @@ export async function getAllProjects(req, res) {
       .populate({
         path: "students",
         model: "Student",
-        select: "regNo name emailId reviews pptApproved deadline school department"
+        select:
+          "regNo name emailId reviews pptApproved deadline school department",
       })
       .populate({
-        path: "guideFaculty", 
+        path: "guideFaculty",
         model: "Faculty",
-        select: "name emailId employeeId school department specialization"
+        select: "name emailId employeeId school department specialization",
       })
       .populate({
         path: "panel",
@@ -284,32 +290,32 @@ export async function getAllProjects(req, res) {
         populate: {
           path: "members",
           model: "Faculty",
-          select: "name emailId employeeId"
-        }
+          select: "name emailId employeeId",
+        },
       })
       .lean();
 
     console.log(`Found ${projects.length} projects`);
 
     // Process projects to convert Maps to Objects (if using Maps in Student schema)
-    const processedProjects = projects.map(project => {
-      const processedStudents = project.students.map(student => {
+    const processedProjects = projects.map((project) => {
+      const processedStudents = project.students.map((student) => {
         // Convert MongoDB Map to plain object for reviews
         let processedReviews = {};
         if (student.reviews) {
           if (student.reviews instanceof Map) {
             processedReviews = Object.fromEntries(student.reviews);
-          } else if (typeof student.reviews === 'object') {
+          } else if (typeof student.reviews === "object") {
             processedReviews = { ...student.reviews };
           }
         }
-        
+
         // Convert deadline Map to plain object
         let processedDeadlines = {};
         if (student.deadline) {
           if (student.deadline instanceof Map) {
             processedDeadlines = Object.fromEntries(student.deadline);
-          } else if (typeof student.deadline === 'object') {
+          } else if (typeof student.deadline === "object") {
             processedDeadlines = { ...student.deadline };
           }
         }
@@ -320,10 +326,13 @@ export async function getAllProjects(req, res) {
           name: student.name,
           emailId: student.emailId,
           reviews: processedReviews,
-          pptApproved: student.pptApproved || { approved: false, locked: false },
+          pptApproved: student.pptApproved || {
+            approved: false,
+            locked: false,
+          },
           deadline: processedDeadlines,
           school: student.school,
-          department: student.department
+          department: student.department,
         };
       });
 
@@ -333,9 +342,10 @@ export async function getAllProjects(req, res) {
         school: project.school,
         department: project.department,
         specialization: project.specialization,
+        type: project.type, // <-- include new 'type' attribute here
         students: processedStudents,
         guideFaculty: project.guideFaculty,
-        panel: project.panel
+        panel: project.panel,
       };
     });
 
@@ -343,9 +353,8 @@ export async function getAllProjects(req, res) {
       success: true,
       data: processedProjects,
       message: "All projects retrieved successfully",
-      count: processedProjects.length
+      count: processedProjects.length,
     });
-
   } catch (error) {
     console.error("Error in getAllProjects:", error);
     return res.status(500).json({
@@ -362,10 +371,8 @@ export async function createProjectsBulk(req, res) {
   try {
     session.startTransaction();
 
-    // Destructure request body with singular school and department keys
     const { school, department, projects, guideFacultyEmpId } = req.body;
 
-    // Validate required fields
     if (!school || !department) {
       await session.abortTransaction();
       return res.status(400).json({
@@ -388,7 +395,6 @@ export async function createProjectsBulk(req, res) {
       });
     }
 
-    // Verify MarkingSchema for school and department in transaction session
     const markingSchema = await MarkingSchema.findOne({
       school,
       department,
@@ -401,11 +407,10 @@ export async function createProjectsBulk(req, res) {
       });
     }
 
-    // Verify guide faculty existence within the school and department
     const guideFacultyDoc = await Faculty.findOne({
       employeeId: guideFacultyEmpId,
-      school,       // singular key here
-      department,   // singular key here
+      school,
+      department,
     }).session(session);
     if (!guideFacultyDoc) {
       await session.abortTransaction();
@@ -415,7 +420,6 @@ export async function createProjectsBulk(req, res) {
       });
     }
 
-    // Prepare reviews and deadlines from marking schema
     const reviewKeys = markingSchema.reviews.map((review) => review.reviewName);
     const defaultDeadlinesMap = new Map();
     markingSchema.reviews.forEach((review) => {
@@ -431,11 +435,14 @@ export async function createProjectsBulk(req, res) {
 
     const results = { created: 0, errors: 0, details: [] };
 
-    // Process projects sequentially for transactional safety
     for (let i = 0; i < projects.length; i++) {
       const project = projects[i];
       try {
-        if (!project.name || !Array.isArray(project.students) || project.students.length === 0) {
+        if (
+          !project.name ||
+          !Array.isArray(project.students) ||
+          project.students.length === 0
+        ) {
           results.errors++;
           results.details.push({
             project: project.name || `Project ${i + 1}`,
@@ -444,7 +451,16 @@ export async function createProjectsBulk(req, res) {
           continue;
         }
 
-        // Check if project already exists with same name, school, and department
+        // Validate type field for each project
+        if (!project.type || !["hardware", "software"].includes(project.type)) {
+          results.errors++;
+          results.details.push({
+            project: project.name || `Project ${i + 1}`,
+            error: "Project type must be either 'hardware' or 'software'.",
+          });
+          continue;
+        }
+
         const existingProject = await Project.findOne({
           name: project.name,
           school,
@@ -476,20 +492,19 @@ export async function createProjectsBulk(req, res) {
             );
           }
 
-          // Verify student's school and department match the provided ones
           if (studSchool !== school || studDepartment !== department) {
             throw new Error(
               `Student ${regNo} has mismatched school or department`
             );
           }
 
-          // Check if student already exists
-          const existingStudent = await Student.findOne({ regNo }).session(session);
+          const existingStudent = await Student.findOne({ regNo }).session(
+            session
+          );
           if (existingStudent) {
             throw new Error(`Student already exists with regNo ${regNo}`);
           }
 
-          // Build reviews map with defaults
           const reviewsMap = new Map();
           for (const reviewKey of reviewKeys) {
             const reviewDef = markingSchema.reviews.find(
@@ -509,7 +524,6 @@ export async function createProjectsBulk(req, res) {
             });
           }
 
-          // Create student document
           const student = new Student({
             regNo,
             name: studentName,
@@ -524,7 +538,7 @@ export async function createProjectsBulk(req, res) {
           studentIds.push(student._id);
         }
 
-        // Create project document referencing students and guide faculty
+        // Create project with the type field
         const newProject = new Project({
           name: project.name,
           students: studentIds,
@@ -533,6 +547,7 @@ export async function createProjectsBulk(req, res) {
           school,
           department,
           specialization: project.specialization || "",
+          type: project.type,
         });
         await newProject.save({ session });
 
@@ -564,7 +579,6 @@ export async function createProjectsBulk(req, res) {
     session.endSession();
   }
 }
-
 
 export async function deleteProject(req, res) {
   try {
@@ -600,63 +614,72 @@ export async function getAllGuideProjects(req, res) {
     const projects = await Project.find({
       guideFaculty: userId,
     })
-    .populate({
-      path: "students",
-      model: "Student",
-      select: "regNo name emailId reviews pptApproved deadline school department" // ✅ Include all student fields
-    })
-    .populate({
-      path: "guideFaculty", 
-      model: "Faculty",
-      select: "name emailId employeeId school department specialization" // ✅ Include all faculty fields
-    })
-    // ✅ REPLACE the panel populate sections with this fixed version:
-    .populate({
-      path: "panel",
-      model: "Panel",
-      select: "school department", // ✅ FIXED: Removed non-existent fields
-      populate: {
-        path: "members", // ✅ FIXED: Use 'members' not 'faculty1/faculty2'
+      .populate({
+        path: "students",
+        model: "Student",
+        select:
+          "regNo name emailId reviews pptApproved deadline school department", // ✅ Include all student fields
+      })
+      .populate({
+        path: "guideFaculty",
         model: "Faculty",
-        select: "name emailId employeeId"
-      }
-    })
+        select: "name emailId employeeId school department specialization", // ✅ Include all faculty fields
+      })
+      // ✅ REPLACE the panel populate sections with this fixed version:
+      .populate({
+        path: "panel",
+        model: "Panel",
+        select: "school department", // ✅ FIXED: Removed non-existent fields
+        populate: {
+          path: "members", // ✅ FIXED: Use 'members' not 'faculty1/faculty2'
+          model: "Faculty",
+          select: "name emailId employeeId",
+        },
+      })
 
-    .lean(); // ✅ Use lean() for better performance since we're converting to object anyway
+      .lean(); // ✅ Use lean() for better performance since we're converting to object anyway
 
     console.log("Found guide projects:", projects.length);
 
     // ✅ Process each project to ensure all data is properly formatted
-    const processedProjects = projects.map(project => {
+    const processedProjects = projects.map((project) => {
       console.log(`🔄 Processing project: ${project.name}`);
-      
+
       // ✅ Ensure students array is properly formatted with all nested data
-      const processedStudents = project.students.map(student => {
-        console.log(`👤 Processing student: ${student.name} (${student.regNo})`);
-        
+      const processedStudents = project.students.map((student) => {
+        console.log(
+          `👤 Processing student: ${student.name} (${student.regNo})`
+        );
+
         // ✅ Convert MongoDB Map to plain object for reviews
         let processedReviews = {};
         if (student.reviews) {
           if (student.reviews instanceof Map) {
             // Convert Map to plain object
             processedReviews = Object.fromEntries(student.reviews);
-          } else if (typeof student.reviews === 'object') {
+          } else if (typeof student.reviews === "object") {
             processedReviews = { ...student.reviews };
           }
         }
-        
+
         // ✅ Convert deadline Map to plain object
         let processedDeadlines = {};
         if (student.deadline) {
           if (student.deadline instanceof Map) {
             processedDeadlines = Object.fromEntries(student.deadline);
-          } else if (typeof student.deadline === 'object') {
+          } else if (typeof student.deadline === "object") {
             processedDeadlines = { ...student.deadline };
           }
         }
 
-        console.log(`📊 Student ${student.name} reviews:`, Object.keys(processedReviews));
-        console.log(`📅 Student ${student.name} deadlines:`, Object.keys(processedDeadlines));
+        console.log(
+          `📊 Student ${student.name} reviews:`,
+          Object.keys(processedReviews)
+        );
+        console.log(
+          `📅 Student ${student.name} deadlines:`,
+          Object.keys(processedDeadlines)
+        );
 
         return {
           _id: student._id,
@@ -664,71 +687,102 @@ export async function getAllGuideProjects(req, res) {
           name: student.name,
           emailId: student.emailId,
           reviews: processedReviews, // ✅ Plain object instead of Map
-          pptApproved: student.pptApproved || { approved: false, locked: false },
+          pptApproved: student.pptApproved || {
+            approved: false,
+            locked: false,
+          },
           deadline: processedDeadlines, // ✅ Plain object instead of Map
           school: student.school,
-          department: student.department
+          department: student.department,
         };
       });
 
       return {
         ...project,
-        students: processedStudents // ✅ Use processed students with converted Maps
+        students: processedStudents, // ✅ Use processed students with converted Maps
       };
     });
 
     console.log("✅ All projects processed with full population");
 
     // ✅ Find unique school-department pairs across all projects
-    const schoolDeptPairs = [...new Set(processedProjects.map(p => `${p.school}-${p.department}`))];
+    const schoolDeptPairs = [
+      ...new Set(processedProjects.map((p) => `${p.school}-${p.department}`)),
+    ];
     console.log("Unique school-dept pairs:", schoolDeptPairs);
 
     // ✅ Batch fetch marking schemas for all unique pairs
     const markingSchemas = {};
-    await Promise.all(schoolDeptPairs.map(async (pair) => {
-      const [school, department] = pair.split('-');
-      try {
-        const schema = await MarkingSchema.findOne({ school, department }).lean();
-        if (schema) {
-          markingSchemas[pair] = schema;
-          console.log(`✅ Found schema for ${school}-${department} with ${schema.reviews?.length || 0} reviews`);
-        } else {
-          console.log(`⚠️ No schema found for ${school}-${department}`);
+    await Promise.all(
+      schoolDeptPairs.map(async (pair) => {
+        const [school, department] = pair.split("-");
+        try {
+          const schema = await MarkingSchema.findOne({
+            school,
+            department,
+          }).lean();
+          if (schema) {
+            markingSchemas[pair] = schema;
+            console.log(
+              `✅ Found schema for ${school}-${department} with ${
+                schema.reviews?.length || 0
+              } reviews`
+            );
+          } else {
+            console.log(`⚠️ No schema found for ${school}-${department}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error fetching schema for ${pair}:`, error);
         }
-      } catch (error) {
-        console.error(`❌ Error fetching schema for ${pair}:`, error);
-      }
-    }));
+      })
+    );
 
     // ✅ Attach the correct marking schema to each project
-    const projectsWithSchemas = processedProjects.map(project => {
+    const projectsWithSchemas = processedProjects.map((project) => {
       const schemaKey = `${project.school}-${project.department}`;
       const projectSchema = markingSchemas[schemaKey];
-      
-      console.log(`Project ${project.name}: ${project.school}-${project.department} -> ${projectSchema ? 'HAS SCHEMA' : 'NO SCHEMA'}`);
-      
+
+      console.log(
+        `Project ${project.name}: ${project.school}-${project.department} -> ${
+          projectSchema ? "HAS SCHEMA" : "NO SCHEMA"
+        }`
+      );
+
       if (projectSchema) {
-        console.log(`📋 Schema reviews for ${project.name}:`, projectSchema.reviews?.map(r => r.reviewName) || []);
+        console.log(
+          `📋 Schema reviews for ${project.name}:`,
+          projectSchema.reviews?.map((r) => r.reviewName) || []
+        );
       }
-      
+
       return {
         ...project,
-        markingSchema: projectSchema || null // ✅ Each project gets its own schema
+        markingSchema: projectSchema || null, // ✅ Each project gets its own schema
       };
     });
 
     console.log("✅ Final response prepared with schemas and full population");
-    
+
     // ✅ Log final data structure for debugging
-    projectsWithSchemas.forEach(project => {
+    projectsWithSchemas.forEach((project) => {
       console.log(`\n📊 Final Project: ${project.name}`);
       console.log(`👥 Students: ${project.students.length}`);
-      project.students.forEach(student => {
-        console.log(`  - ${student.name}: ${Object.keys(student.reviews || {}).length} reviews`);
+      project.students.forEach((student) => {
+        console.log(
+          `  - ${student.name}: ${
+            Object.keys(student.reviews || {}).length
+          } reviews`
+        );
       });
-      console.log(`📋 Schema: ${project.markingSchema ? 'YES' : 'NO'}`);
+      console.log(`📋 Schema: ${project.markingSchema ? "YES" : "NO"}`);
       if (project.markingSchema) {
-        console.log(`📋 Schema Reviews: ${project.markingSchema.reviews?.map(r => r.reviewName).join(', ') || 'None'}`);
+        console.log(
+          `📋 Schema Reviews: ${
+            project.markingSchema.reviews
+              ?.map((r) => r.reviewName)
+              .join(", ") || "None"
+          }`
+        );
       }
     });
 
@@ -746,7 +800,6 @@ export async function getAllGuideProjects(req, res) {
     });
   }
 }
-
 
 /**
  * ✅ UPDATED: Get all projects where the logged-in faculty is a panel member
@@ -778,68 +831,77 @@ export async function getAllPanelProjects(req, res) {
     const panelProjects = await Project.find({
       panel: { $in: panelIds },
     })
-    .populate({
-      path: "students",
-      model: "Student",
-      select: "regNo name emailId reviews pptApproved deadline school department" // ✅ Include all student fields
-    })
-    .populate({
-      path: "guideFaculty", 
-      model: "Faculty",
-      select: "name emailId employeeId school department specialization" // ✅ Include all faculty fields
-    })
-    .populate({
-      path: "panel",
-      model: "Panel",
-      select: "name faculty1 faculty2 school department", // ✅ Include panel details
-      populate: [
-        {
-          path: "faculty1",
-          model: "Faculty",
-          select: "name emailId employeeId"
-        },
-        {
-          path: "faculty2", 
-          model: "Faculty",
-          select: "name emailId employeeId"
-        }
-      ]
-    })
-    .lean(); // ✅ Use lean() for better performance
+      .populate({
+        path: "students",
+        model: "Student",
+        select:
+          "regNo name emailId reviews pptApproved deadline school department", // ✅ Include all student fields
+      })
+      .populate({
+        path: "guideFaculty",
+        model: "Faculty",
+        select: "name emailId employeeId school department specialization", // ✅ Include all faculty fields
+      })
+      .populate({
+        path: "panel",
+        model: "Panel",
+        select: "name faculty1 faculty2 school department", // ✅ Include panel details
+        populate: [
+          {
+            path: "faculty1",
+            model: "Faculty",
+            select: "name emailId employeeId",
+          },
+          {
+            path: "faculty2",
+            model: "Faculty",
+            select: "name emailId employeeId",
+          },
+        ],
+      })
+      .lean(); // ✅ Use lean() for better performance
 
     console.log("Found panel projects:", panelProjects.length);
 
     // ✅ Process each project to ensure all data is properly formatted
-    const processedProjects = panelProjects.map(project => {
+    const processedProjects = panelProjects.map((project) => {
       console.log(`🔄 Processing panel project: ${project.name}`);
-      
+
       // ✅ Ensure students array is properly formatted with all nested data
-      const processedStudents = project.students.map(student => {
-        console.log(`👤 Processing panel student: ${student.name} (${student.regNo})`);
-        
+      const processedStudents = project.students.map((student) => {
+        console.log(
+          `👤 Processing panel student: ${student.name} (${student.regNo})`
+        );
+
         // ✅ Convert MongoDB Map to plain object for reviews
         let processedReviews = {};
         if (student.reviews) {
           if (student.reviews instanceof Map) {
             // Convert Map to plain object
             processedReviews = Object.fromEntries(student.reviews);
-          } else if (typeof student.reviews === 'object') {
+          } else if (typeof student.reviews === "object") {
             processedReviews = { ...student.reviews };
           }
         }
-        
+
         // ✅ Convert deadline Map to plain object
         let processedDeadlines = {};
         if (student.deadline) {
           if (student.deadline instanceof Map) {
             processedDeadlines = Object.fromEntries(student.deadline);
-          } else if (typeof student.deadline === 'object') {
+          } else if (typeof student.deadline === "object") {
             processedDeadlines = { ...student.deadline };
           }
         }
 
-        console.log(`📊 Panel student ${student.name} reviews:`, Object.keys(processedReviews));
-        console.log(`📅 Panel student ${student.name} deadlines:`, Object.keys(processedDeadlines));
+        console.log(
+          `📊 Panel student ${student.name} reviews:`,
+          Object.keys(processedReviews)
+        );
+        console.log(
+          `📅 Panel student ${student.name} deadlines:`,
+          Object.keys(processedDeadlines)
+        );
 
         return {
           _id: student._id,
@@ -847,71 +909,107 @@ export async function getAllPanelProjects(req, res) {
           name: student.name,
           emailId: student.emailId,
           reviews: processedReviews, // ✅ Plain object instead of Map
-          pptApproved: student.pptApproved || { approved: false, locked: false },
+          pptApproved: student.pptApproved || {
+            approved: false,
+            locked: false,
+          },
           deadline: processedDeadlines, // ✅ Plain object instead of Map
           school: student.school,
-          department: student.department
+          department: student.department,
         };
       });
 
       return {
         ...project,
-        students: processedStudents // ✅ Use processed students with converted Maps
+        students: processedStudents, // ✅ Use processed students with converted Maps
       };
     });
 
     console.log("✅ All panel projects processed with full population");
 
     // ✅ Find unique school-department pairs across all panel projects
-    const schoolDeptPairs = [...new Set(processedProjects.map(p => `${p.school}-${p.department}`))];
-    console.log("Unique school-dept pairs for panel projects:", schoolDeptPairs);
+    const schoolDeptPairs = [
+      ...new Set(processedProjects.map((p) => `${p.school}-${p.department}`)),
+    ];
+    console.log(
+      "Unique school-dept pairs for panel projects:",
+      schoolDeptPairs
+    );
 
     // ✅ Batch fetch marking schemas for all unique pairs
     const markingSchemas = {};
-    await Promise.all(schoolDeptPairs.map(async (pair) => {
-      const [school, department] = pair.split('-');
-      try {
-        const schema = await MarkingSchema.findOne({ school, department }).lean();
-        if (schema) {
-          markingSchemas[pair] = schema;
-          console.log(`✅ Found panel schema for ${school}-${department} with ${schema.reviews?.length || 0} reviews`);
-        } else {
-          console.log(`⚠️ No panel schema found for ${school}-${department}`);
+    await Promise.all(
+      schoolDeptPairs.map(async (pair) => {
+        const [school, department] = pair.split("-");
+        try {
+          const schema = await MarkingSchema.findOne({
+            school,
+            department,
+          }).lean();
+          if (schema) {
+            markingSchemas[pair] = schema;
+            console.log(
+              `✅ Found panel schema for ${school}-${department} with ${
+                schema.reviews?.length || 0
+              } reviews`
+            );
+          } else {
+            console.log(`⚠️ No panel schema found for ${school}-${department}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error fetching panel schema for ${pair}:`, error);
         }
-      } catch (error) {
-        console.error(`❌ Error fetching panel schema for ${pair}:`, error);
-      }
-    }));
+      })
+    );
 
     // ✅ Attach the correct marking schema to each project
-    const projectsWithSchemas = processedProjects.map(project => {
+    const projectsWithSchemas = processedProjects.map((project) => {
       const schemaKey = `${project.school}-${project.department}`;
       const projectSchema = markingSchemas[schemaKey];
-      
-      console.log(`Panel project ${project.name}: ${project.school}-${project.department} -> ${projectSchema ? 'HAS SCHEMA' : 'NO SCHEMA'}`);
-      
+
+      console.log(
+        `Panel project ${project.name}: ${project.school}-${
+          project.department
+        } -> ${projectSchema ? "HAS SCHEMA" : "NO SCHEMA"}`
+      );
+
       if (projectSchema) {
-        console.log(`📋 Panel schema reviews for ${project.name}:`, projectSchema.reviews?.map(r => r.reviewName) || []);
+        console.log(
+          `📋 Panel schema reviews for ${project.name}:`,
+          projectSchema.reviews?.map((r) => r.reviewName) || []
+        );
       }
-      
+
       return {
         ...project,
-        markingSchema: projectSchema || null // ✅ Each project gets its own schema
+        markingSchema: projectSchema || null, // ✅ Each project gets its own schema
       };
     });
 
-    console.log("✅ Final panel response prepared with schemas and full population");
-    
+    console.log(
+      "✅ Final panel response prepared with schemas and full population"
+    );
+
     // ✅ Log final data structure for debugging
-    projectsWithSchemas.forEach(project => {
+    projectsWithSchemas.forEach((project) => {
       console.log(`\n📊 Final Panel Project: ${project.name}`);
       console.log(`👥 Students: ${project.students.length}`);
-      project.students.forEach(student => {
-        console.log(`  - ${student.name}: ${Object.keys(student.reviews || {}).length} reviews`);
+      project.students.forEach((student) => {
+        console.log(
+          `  - ${student.name}: ${
+            Object.keys(student.reviews || {}).length
+          } reviews`
+        );
       });
-      console.log(`📋 Schema: ${project.markingSchema ? 'YES' : 'NO'}`);
+      console.log(`📋 Schema: ${project.markingSchema ? "YES" : "NO"}`);
       if (project.markingSchema) {
-        console.log(`📋 Panel Schema Reviews: ${project.markingSchema.reviews?.map(r => r.reviewName).join(', ') || 'None'}`);
+        console.log(
+          `📋 Panel Schema Reviews: ${
+            project.markingSchema.reviews
+              ?.map((r) => r.reviewName)
+              .join(", ") || "None"
+          }`
+        );
       }
     });
 
@@ -930,14 +1028,13 @@ export async function getAllPanelProjects(req, res) {
   }
 }
 
-
 /**
  * Update project details with review data
  */
 
 export const updateProjectDetails = async (req, res) => {
   const session = await mongoose.startSession();
-  
+
   try {
     session.startTransaction();
 
@@ -945,8 +1042,14 @@ export const updateProjectDetails = async (req, res) => {
 
     console.log("=== [BACKEND] UPDATE PROJECT STARTED ===");
     console.log("📋 [BACKEND] Project ID:", projectId);
-    console.log("📋 [BACKEND] Project Updates:", JSON.stringify(projectUpdates, null, 2));
-    console.log("📋 [BACKEND] Student Updates:", JSON.stringify(studentUpdates, null, 2));
+    console.log(
+      "📋 [BACKEND] Project Updates:",
+      JSON.stringify(projectUpdates, null, 2)
+    );
+    console.log(
+      "📋 [BACKEND] Student Updates:",
+      JSON.stringify(studentUpdates, null, 2)
+    );
 
     // Find the project with session
     const project = await Project.findById(projectId).session(session);
@@ -963,8 +1066,14 @@ export const updateProjectDetails = async (req, res) => {
     // Update project fields (excluding immutable ones)
     if (projectUpdates && typeof projectUpdates === "object") {
       const immutableFields = ["_id", "students", "guideFaculty", "panel"];
-      const updatableFields = ["name", "school", "department", "specialization"];
-      
+      const updatableFields = [
+        "name",
+        "school",
+        "department",
+        "specialization",
+        "type", // Added 'type' to updatable fields
+      ];
+
       for (const key of Object.keys(projectUpdates)) {
         if (!immutableFields.includes(key) && updatableFields.includes(key)) {
           project[key] = projectUpdates[key];
@@ -992,7 +1101,9 @@ export const updateProjectDetails = async (req, res) => {
       console.log("✅ [BACKEND] Processing student:", student.name);
 
       // Merge updates into existing reviews Map
-      for (const [reviewType, reviewData] of Object.entries(reviewsToUpdate || {})) {
+      for (const [reviewType, reviewData] of Object.entries(
+        reviewsToUpdate || {}
+      )) {
         if (!student.reviews) {
           student.reviews = new Map();
         }
@@ -1017,7 +1128,10 @@ export const updateProjectDetails = async (req, res) => {
     if (pptApproved !== undefined) {
       project.pptApproved = pptApproved;
       await project.save({ session });
-      console.log("📋 [BACKEND] Updated project-level PPT approval:", pptApproved);
+      console.log(
+        "📋 [BACKEND] Updated project-level PPT approval:",
+        pptApproved
+      );
     }
 
     await session.commitTransaction();
@@ -1025,15 +1139,16 @@ export const updateProjectDetails = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `Successfully updated project "${project.name}" and ${(studentUpdates || []).length} students`,
+      message: `Successfully updated project "${project.name}" and ${
+        (studentUpdates || []).length
+      } students`,
       projectId: project._id,
       updates: (studentUpdates || []).length,
     });
-
   } catch (error) {
     await session.abortTransaction();
     console.error("❌ [BACKEND] Error updating project:", error);
-    
+
     res.status(500).json({
       success: false,
       message: "Server error during project update",
@@ -1044,23 +1159,34 @@ export const updateProjectDetails = async (req, res) => {
   }
 };
 
-
-
-
-
-
-
 // Export other existing functions...
-
 
 export async function getProjectDetails(req, res) {
   try {
     const { projectId } = req.params;
 
+    // Fetch project with fully populated nested documents
     const requiredProject = await Project.findOne({ _id: projectId })
-      .populate("students")
-      .populate("guideFaculty")
-      .populate("panel");
+      .populate({
+        path: "students",
+        model: "Student",
+        select:
+          "regNo name emailId reviews pptApproved deadline school department",
+      })
+      .populate({
+        path: "guideFaculty",
+        model: "Faculty",
+        select: "name emailId employeeId school department specialization",
+      })
+      .populate({
+        path: "panel",
+        model: "Panel",
+        populate: {
+          path: "members",
+          model: "Faculty",
+          select: "name emailId employeeId",
+        },
+      });
 
     if (!requiredProject) {
       return res.status(404).send({
@@ -1068,7 +1194,53 @@ export async function getProjectDetails(req, res) {
       });
     }
 
-    return res.status(200).send({ results: requiredProject });
+    // Process students: convert Maps for reviews and deadline to plain objects
+    const processedStudents = requiredProject.students.map((student) => {
+      let processedReviews = {};
+      if (student.reviews) {
+        if (student.reviews instanceof Map) {
+          processedReviews = Object.fromEntries(student.reviews);
+        } else if (typeof student.reviews === "object") {
+          processedReviews = { ...student.reviews };
+        }
+      }
+
+      let processedDeadlines = {};
+      if (student.deadline) {
+        if (student.deadline instanceof Map) {
+          processedDeadlines = Object.fromEntries(student.deadline);
+        } else if (typeof student.deadline === "object") {
+          processedDeadlines = { ...student.deadline };
+        }
+      }
+
+      return {
+        _id: student._id,
+        regNo: student.regNo,
+        name: student.name,
+        emailId: student.emailId,
+        reviews: processedReviews,
+        pptApproved: student.pptApproved || { approved: false, locked: false },
+        deadline: processedDeadlines,
+        school: student.school,
+        department: student.department,
+      };
+    });
+
+    // Construct the response including the 'type' attribute
+    const projectData = {
+      _id: requiredProject._id,
+      name: requiredProject.name,
+      school: requiredProject.school,
+      department: requiredProject.department,
+      specialization: requiredProject.specialization,
+      type: requiredProject.type, // include type attribute
+      students: processedStudents,
+      guideFaculty: requiredProject.guideFaculty,
+      panel: requiredProject.panel,
+    };
+
+    return res.status(200).send({ results: projectData });
   } catch (error) {
     console.error("Error fetching project details: ", error);
     return res.status(500).json({
@@ -1077,3 +1249,4 @@ export async function getProjectDetails(req, res) {
     });
   }
 }
+

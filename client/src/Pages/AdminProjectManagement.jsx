@@ -51,7 +51,7 @@ const AdminProjectManagement = () => {
   const [expandedProjects, setExpandedProjects] = useState(new Set());
   const [showFilters, setShowFilters] = useState(false);
   
-  // ✅ NEW: Edit modal states
+  // Edit modal states
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingProjectData, setEditingProjectData] = useState(null);
   
@@ -171,6 +171,29 @@ const AdminProjectManagement = () => {
     return deps.sort();
   }, [projects]);
 
+  // Type options for the select element
+  const typeOptions = ['Software', 'Hardware'];
+
+  // Helper function to normalize type for backend
+  const normalizeType = (type) => {
+    if (!type) return '';
+    const displayMap = {
+      'Software': 'software',
+      'Hardware': 'hardware'
+    };
+    return displayMap[type] || type.toLowerCase().trim();
+  };
+
+  // Helper function to display type for frontend
+  const displayType = (type) => {
+    if (!type) return '';
+    const backendMap = {
+      'software': 'Software',
+      'hardware': 'Hardware'
+    };
+    return backendMap[type.toLowerCase()] || type;
+  };
+
   // Filter projects based on search and filters
   const filteredProjects = useMemo(() => {
     let filtered = [...projects];
@@ -232,18 +255,22 @@ const AdminProjectManagement = () => {
     }
   }, [fetchProjects, showNotification]);
 
-  // ✅ UPDATED: Edit project handler to show modal
+  // Edit project handler to show modal
   const handleEditProject = useCallback((project) => {
     if (!project || !project._id) {
       showNotification("error", "Invalid Project", "Project data is invalid or missing ID");
       return;
     }
     
-    setEditingProjectData({ ...project });
+    // Ensure type is in display format for the modal
+    setEditingProjectData({
+      ...project,
+      type: displayType(project.type)
+    });
     setShowEditModal(true);
-  }, []);
+  }, [showNotification]);
 
-  // ✅ NEW: Save edited project function
+  // Save edited project function
   const handleSaveProject = useCallback(async (editedProject) => {
     if (!editedProject || !editedProject._id) {
       showNotification("error", "Invalid Project", "Project data is invalid or missing ID");
@@ -253,13 +280,14 @@ const AdminProjectManagement = () => {
     try {
       setLoading(true);
 
-      // Prepare update payload
+      // Prepare update payload with normalized type
       const updatePayload = {
         projectUpdates: {
           name: editedProject.name,
           school: editedProject.school,
           department: editedProject.department,
-          specialization: editedProject.specialization
+          specialization: editedProject.specialization,
+          type: normalizeType(editedProject.type) // Normalize for backend
         },
         studentUpdates: (editedProject.students || []).map(student => ({
           studentId: student._id,
@@ -301,7 +329,7 @@ const AdminProjectManagement = () => {
     }
   }, [updateProject, fetchProjects, showNotification]);
 
-  // ✅ NEW: Cancel edit function
+  // Cancel edit function
   const handleCancelEdit = useCallback(() => {
     setEditingProjectData(null);
     setShowEditModal(false);
@@ -317,6 +345,7 @@ const AdminProjectManagement = () => {
           'School': project.school || '',
           'Department': project.department || '',
           'Specialization': project.specialization || '',
+          'Type': displayType(project.type) || '', // Use display format
           'Guide Faculty': project.guideFaculty?.name || '',
           'Guide Employee ID': project.guideFaculty?.employeeId || '',
           'Guide Email': project.guideFaculty?.emailId || '',
@@ -726,6 +755,10 @@ const AdminProjectManagement = () => {
                                       <span className="text-xs sm:text-sm font-semibold text-slate-700">Specialization:</span>
                                       <p className="text-slate-600">{project.specialization || 'Not specified'}</p>
                                     </div>
+                                    <div>
+                                      <span className="text-xs sm:text-sm font-semibold text-slate-700">Type:</span>
+                                      <p className="text-slate-600">{displayType(project.type) || 'Not specified'}</p>
+                                    </div>
                                   </div>
                                 </div>
 
@@ -857,7 +890,7 @@ const AdminProjectManagement = () => {
           </div>
         </div>
 
-        {/* ✅ NEW: Edit Project Modal */}
+        {/* Edit Project Modal */}
         {showEditModal && editingProjectData && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
             <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -959,6 +992,27 @@ const AdminProjectManagement = () => {
                   />
                 </div>
 
+                {/* Type */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">
+                    Type
+                  </label>
+                  <select
+                    value={editingProjectData.type || ''}
+                    onChange={(e) => setEditingProjectData(prev => ({
+                      ...prev,
+                      type: e.target.value
+                    }))}
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700"
+                    disabled={loading}
+                  >
+                    <option value="">Select Type</option>
+                    {typeOptions.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Students Info (Read-only display) */}
                 {editingProjectData.students && editingProjectData.students.length > 0 && (
                   <div>
@@ -986,7 +1040,7 @@ const AdminProjectManagement = () => {
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 mt-8 pt-6 border-t border-slate-200">
                 <button
                   onClick={() => handleSaveProject(editingProjectData)}
-                  disabled={loading || !editingProjectData.name?.trim()}
+                  disabled={loading || !editingProjectData.name?.trim() || !editingProjectData.name}
                   className="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                 >
                   {loading ? (

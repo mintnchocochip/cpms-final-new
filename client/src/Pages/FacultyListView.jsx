@@ -48,6 +48,7 @@ const FacultyEditModal = ({ faculty, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: '',
     emailId: '',
+    phoneNumber:'',
     employeeId: '',
     role: 'faculty',
     school: [],
@@ -70,6 +71,7 @@ const FacultyEditModal = ({ faculty, onClose, onSave }) => {
       setFormData({
         name: faculty.name || '',
         emailId: faculty.emailId || '',
+        phoneNumber: faculty.phoneNumber || '',
         employeeId: faculty.employeeId || '',
         role: faculty.role || 'faculty',
         school: Array.isArray(faculty.schools) 
@@ -123,6 +125,10 @@ const FacultyEditModal = ({ faculty, onClose, onSave }) => {
 
       if (!formData.emailId.endsWith('@vit.ac.in')) {
         throw new Error('Email must end with @vit.ac.in');
+      }
+
+      if(formData.phoneNumber.length ===0){
+        throw new Error('Invalid Phone number, Length of Phone number should be 10');
       }
 
       if (formData.school.length === 0 || formData.department.length === 0 || formData.specialization.length === 0) {
@@ -209,6 +215,20 @@ const FacultyEditModal = ({ faculty, onClose, onSave }) => {
                   type="email"
                   name="emailId"
                   value={formData.emailId}
+                  onChange={handleChange}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm sm:text-base"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1 sm:mb-2">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="phoneNumber"
+                  value={formData.phoneNumber}
                   onChange={handleChange}
                   className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm sm:text-base"
                   required
@@ -1215,6 +1235,15 @@ const FacultyListView = () => {
                                         className="text-blue-600 hover:underline block text-sm sm:text-base"
                                       >
                                         {faculty.emailId || 'N/A'}
+                                      </a>
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                      <label className="text-xs sm:text-sm font-semibold text-slate-600">Phone Number:</label>
+                                      <a 
+                                        href={`mailto:${faculty.phoneNumber}`} 
+                                        className="text-blue-600 hover:underline block text-sm sm:text-base"
+                                      >
+                                        {faculty.phoneNumber || 'N/A'}
                                       </a>
                                     </div>
                                   </div>

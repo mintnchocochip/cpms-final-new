@@ -85,7 +85,6 @@ function Leftmenu() {
                 </div>
               </button>
 
-              {/* NEW - Project Management Button */}
               <button 
                 onClick={() => active('admin/project-management')}
                 className={`h-16 w-32 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
@@ -154,80 +153,119 @@ function Leftmenu() {
               </button>
             </div>
             
-            {/* Menu items for collapsed menu */}
+            {/* Menu items for collapsed menu with tooltips */}
             <div className="flex flex-col items-center gap-5 pt-5">
-              <button 
-                onClick={() => active('admin/Request')}
-                className={`flex justify-center items-center h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/Request' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
-                }`}
-              >
-                <BellRing/>
-              </button>
+              <div className="relative group">
+                <button 
+                  onClick={() => active('admin/Request')}
+                  className={`flex justify-center items-center h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
+                    isactive === 'admin/Request' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                  }`}
+                >
+                  <BellRing className="h-5 w-5"/>
+                </button>
+                <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  Request
+                </span>
+              </div>
               
-              <button 
-                onClick={() => active('admin/createFaculty')}
-                className={`flex justify-center items-center h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/createFaculty' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
-                }`}
-              >
-                <UserRoundPlus/>
-              </button>
+              <div className="relative group">
+                <button 
+                  onClick={() => active('admin/createFaculty')}
+                  className={`flex justify-center items-center h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
+                    isactive === 'admin/createFaculty' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                  }`}
+                >
+                  <UserRoundPlus className="h-5 w-5"/>
+                </button>
+                <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  Add Faculty
+                </span>
+              </div>
               
-              <button 
-                onClick={() => active('admin/panel-management')} 
-                className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/panel-management' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
-                } rounded-md focus:outline-none`}
-              >
-                P
-              </button>
+              <div className="relative group">
+                <button 
+                  onClick={() => active('admin/panel-management')} 
+                  className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
+                    isactive === 'admin/panel-management' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                  } rounded-md focus:outline-none`}
+                >
+                  P
+                </button>
+                <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  Panel Management
+                </span>
+              </div>
 
-              {/* NEW - Project Management Collapsed Icon */}
-              <button 
-                onClick={() => active('admin/project-management')} 
-                className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/project-management' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
-                } rounded-md focus:outline-none`}
-              >
-                <Database className="h-5 w-5"/>
-              </button>
+              <div className="relative group">
+                <button 
+                  onClick={() => active('admin/project-management')} 
+                  className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
+                    isactive === 'admin/project-management' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                  } rounded-md focus:outline-none`}
+                >
+                  <Database className="h-5 w-5"/>
+                </button>
+                <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  Project Database
+                </span>
+              </div>
               
-              <button 
-                onClick={() => active('admin/facultylistview-adminGuide')} 
-                className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/facultylistview-adminGuide' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
-                } rounded-md focus:outline-none`}
-              >
-                F
-              </button>
+              <div className="relative group">
+                <button 
+                  onClick={() => active('admin/facultylistview-adminGuide')} 
+                  className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
+                    isactive === 'admin/facultylistview-adminGuide' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                  } rounded-md focus:outline-none`}
+                >
+                  F
+                </button>
+                <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  Faculty List
+                </span>
+              </div>
               
-              <button 
-                onClick={() => active('admin/addProject')} 
-                className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/addProject' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
-                } rounded-md focus:outline-none`}
-              >
-                <FileUp/>
-              </button>
+              <div className="relative group">
+                <button 
+                  onClick={() => active('admin/addProject')} 
+                  className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
+                    isactive === 'admin/addProject' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                  } rounded-md focus:outline-none`}
+                >
+                  <FileUp className="h-5 w-5"/>
+                </button>
+                <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  Add Projects
+                </span>
+              </div>
               
-              <button 
-                onClick={() => active('admin/Schedule')}
-                className={`flex justify-center items-center h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/Schedule' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
-                }`}
-              >
-                <Clock/>
-              </button>
+              <div className="relative group">
+                <button 
+                  onClick={() => active('admin/Schedule')}
+                  className={`flex justify-center items-center h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
+                    isactive === 'admin/Schedule' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                  }`}
+                >
+                  <Clock className="h-5 w-5"/>
+                </button>
+                <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  Schedule
+                </span>
+              </div>
               
-              <button 
-                onClick={() => active('admin/student-management')} 
-                className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
-                  isactive === 'admin/student-management' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
-                } rounded-md focus:outline-none`}
-              >
-                <Users className="h-5 w-5"/>
-              </button>
+              <div className="relative group">
+                <button 
+                  onClick={() => active('admin/student-management')} 
+                  className={`h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:scale-110 duration-300 text-2xl flex items-center justify-center hover:bg-[#22C55E] hover:text-white ${
+                    isactive === 'admin/student-management' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                  } rounded-md focus:outline-none`}
+                >
+                  <Users className="h-5 w-5"/>
+                </button>
+                <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  Student Management
+                </span>
+              </div>
             </div>
           </>
         )}

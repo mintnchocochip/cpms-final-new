@@ -35,6 +35,7 @@ const ProjectCreationPage = () => {
       school: '',
       department: '',
       specialization: [],
+      type: [],
       getDisplayString: () => '',
       clearContext: () => {},
       loading: false,
@@ -42,7 +43,7 @@ const ProjectCreationPage = () => {
     };
   }
 
-  const { school, department, specialization, getDisplayString, clearContext, loading: contextLoading, error: contextError } = hookResult;
+  const { school, department, specialization, type, getDisplayString, clearContext, loading: contextLoading, error: contextError } = hookResult;
 
   // Check authentication first
   useEffect(() => {
@@ -70,6 +71,7 @@ const ProjectCreationPage = () => {
   const schoolFromContext = adminContext?.school || school || '';
   const departmentFromContext = adminContext?.department || department || '';
   const specializationFromContext = adminContext?.specialization || specialization || [];
+  const typeFromContext = adminContext?.type || type || [];
   const hasContext = Boolean(schoolFromContext && departmentFromContext);
   const isAllMode = Boolean(adminContext?.skipped); // Super Admin mode
 
@@ -156,6 +158,9 @@ const ProjectCreationPage = () => {
     'Database Management'
   ];
 
+  // Type options
+  const typeOptionsDisplay = ['Software', 'Hardware'];
+
   // Helper function to normalize specialization for backend
   const normalizeSpecialization = (spec) => {
     if (!spec) return '';
@@ -177,6 +182,18 @@ const ProjectCreationPage = () => {
     };
     
     return displayMap[spec] || spec.toLowerCase().trim();
+  };
+
+  // Helper function to normalize type for backend
+  const normalizeType = (typ) => {
+    if (!typ) return '';
+    
+    const displayMap = {
+      'Software': 'software',
+      'Hardware': 'hardware'
+    };
+    
+    return displayMap[typ] || typ.toLowerCase().trim();
   };
 
   // Helper function to display specialization for frontend
@@ -202,6 +219,18 @@ const ProjectCreationPage = () => {
     return backendMap[spec.toLowerCase()] || spec;
   };
 
+  // Helper function to display type for frontend
+  const displayType = (typ) => {
+    if (!typ) return '';
+    
+    const backendMap = {
+      'software': 'Software',
+      'hardware': 'Hardware'
+    };
+    
+    return backendMap[typ.toLowerCase()] || typ;
+  };
+
   // Single project states
   const [singleProject, setSingleProject] = useState({
     name: "",
@@ -209,6 +238,7 @@ const ProjectCreationPage = () => {
     school: isAllMode ? "" : schoolFromContext,
     department: isAllMode ? "" : departmentFromContext,
     specialization: specializationFromContext && specializationFromContext.length > 0 ? specializationFromContext[0] : "",
+    type: typeFromContext && typeFromContext.length > 0 ? typeFromContext[0] : "",
     students: [{ name: "", regNo: "", emailId: "" }]
   });
 
@@ -227,6 +257,15 @@ const ProjectCreationPage = () => {
       }));
     }
   }, [schoolFromContext, departmentFromContext, specializationFromContext, hasContext]);
+
+  useEffect(() => {
+    if (hasContext && typeFromContext && typeFromContext.length > 0) {
+      setSingleProject(prev => ({
+        ...prev,
+        type: typeFromContext[0]
+      }));
+    }
+  }, [schoolFromContext, departmentFromContext, typeFromContext, hasContext]);
 
   // Handle context selection with proper navigation
   const handleSelectContext = () => {
@@ -385,6 +424,7 @@ const handleStudentChange = (index, field, value) => {
       school: isAllMode ? "" : schoolFromContext,
       department: isAllMode ? "" : departmentFromContext,
       specialization: specializationFromContext && specializationFromContext.length > 0 ? specializationFromContext[0] : "",
+      type: typeFromContext && typeFromContext.length > 0 ? typeFromContext[0] : "",
       students: [{ name: "", regNo: "", emailId: "" }]
     });
     setFieldErrors({});
@@ -431,6 +471,16 @@ const handleStudentChange = (index, field, value) => {
       
     if (!projectSpecialization) {
       setFieldError('specialization', 'Specialization is required.');
+      hasValidationErrors = true;
+    }
+
+    // type validation
+    const projectType = typeFromContext && typeFromContext.length > 0 
+      ? typeFromContext[0] 
+      : singleProject.type;
+      
+    if (!projectType) {
+      setFieldError('type', 'type is required.');
       hasValidationErrors = true;
     }
 
@@ -506,6 +556,7 @@ const handleStudentChange = (index, field, value) => {
         })),
         guideFacultyEmpId: singleProject.guideFacultyEmpId.trim().toUpperCase(),
         specialization: normalizeSpecialization(projectSpecialization), // Normalize for backend
+        type: normalizeType(projectType),
         school: projectSchool,
         department: projectDepartment
       };
@@ -542,10 +593,16 @@ const handleStudentChange = (index, field, value) => {
   const downloadTemplate = () => {
     console.log('🔽 Template download requested');
     console.log('Mode:', isAllMode ? 'All Mode' : 'Context Mode');
-    console.log('Context:', { schoolFromContext, departmentFromContext, specializationFromContext });
+    console.log('Context:', { schoolFromContext, departmentFromContext, specializationFromContext, typeFromContext });
 
     let template;
     let filename;
+
+    const hasFixedSpecialization = specializationFromContext && specializationFromContext.length > 0;
+    const hasFixedType = typeFromContext && typeFromContext.length > 0;
+
+    const contextSpecialization = hasFixedSpecialization ? displaySpecialization(specializationFromContext[0]) : "AI/ML";
+    const contextType = hasFixedType ? displayType(typeFromContext[0]) : "Software";
 
     if (isAllMode) {
       // ALL MODE: Include all columns
@@ -558,6 +615,7 @@ const handleStudentChange = (index, field, value) => {
           "School", 
           "Department", 
           "Specialization", 
+          "Type",
           "Student Name 1", 
           "Student RegNo 1", 
           "Student Email 1",
@@ -574,6 +632,7 @@ const handleStudentChange = (index, field, value) => {
           "SCOPE", 
           "BTech", 
           "AI/ML",
+          "Software",
           "John Doe", 
           "21BCE1001", 
           "john.doe@vitstudent.ac.in",
@@ -590,6 +649,7 @@ const handleStudentChange = (index, field, value) => {
           "SENSE", 
           "MCA", 
           "Web Development",
+          "Software",
           "Alice Brown", 
           "21MCA2001", 
           "alice.brown@vitstudent.ac.in",
@@ -608,32 +668,38 @@ const handleStudentChange = (index, field, value) => {
       // CONTEXT MODE: Limited columns (school/dept pre-filled)
       console.log('📊 Generating CONTEXT MODE template for:', schoolFromContext, departmentFromContext);
       
-      template = [
-        [
-          "Project Name", 
-          "Guide Faculty Employee ID", 
-          "Specialization", 
-          "Student Name 1", 
-          "Student RegNo 1", 
-          "Student Email 1",
-          "Student Name 2", 
-          "Student RegNo 2", 
-          "Student Email 2",
-          "Student Name 3", 
-          "Student RegNo 3", 
-          "Student Email 3"
-        ]
+      let headers = [
+        "Project Name", 
+        "Guide Faculty Employee ID", 
       ];
 
-      // Add example rows based on context
-      const contextSpecialization = specializationFromContext && specializationFromContext.length > 0 
-        ? displaySpecialization(specializationFromContext[0]) // Display format for template
-        : "AI/ML";
+      if (!hasFixedSpecialization) headers.push("Specialization");
+      if (!hasFixedType) headers.push("Type");
 
-      template.push([
+      headers = headers.concat([
+        "Student Name 1", 
+        "Student RegNo 1", 
+        "Student Email 1",
+        "Student Name 2", 
+        "Student RegNo 2", 
+        "Student Email 2",
+        "Student Name 3", 
+        "Student RegNo 3", 
+        "Student Email 3"
+      ]);
+
+      template = [headers];
+
+      // Add example rows based on context
+      let example1 = [
         "Smart Campus Management System", 
         "FAC11111", 
-        contextSpecialization,
+      ];
+
+      if (!hasFixedSpecialization) example1.push(contextSpecialization);
+      if (!hasFixedType) example1.push(contextType);
+
+      example1 = example1.concat([
         "Raj Patel", 
         "21BCE3001", 
         "raj.patel@vitstudent.ac.in",
@@ -645,10 +711,17 @@ const handleStudentChange = (index, field, value) => {
         "arjun.kumar@vitstudent.ac.in"
       ]);
 
-      template.push([
+      template.push(example1);
+
+      let example2 = [
         "IoT Weather Monitoring", 
         "FAC22222", 
-        contextSpecialization,
+      ];
+
+      if (!hasFixedSpecialization) example2.push(contextSpecialization);
+      if (!hasFixedType) example2.push(contextType);
+
+      example2 = example2.concat([
         "Neha Singh", 
         "21BCE4001", 
         "neha.singh@vitstudent.ac.in",
@@ -659,6 +732,8 @@ const handleStudentChange = (index, field, value) => {
         "", 
         ""
       ]);
+
+      template.push(example2);
 
       filename = `project_bulk_template_${schoolFromContext}_${departmentFromContext}.xlsx`;
 
@@ -673,6 +748,7 @@ const handleStudentChange = (index, field, value) => {
           "School", 
           "Department", 
           "Specialization", 
+          "Type",
           "Student Name 1", 
           "Student RegNo 1", 
           "Student Email 1",
@@ -689,6 +765,7 @@ const handleStudentChange = (index, field, value) => {
           "SCOPE", 
           "BTech", 
           "AI/ML",
+          "Software",
           "Student One", 
           "21BCE0001", 
           "student.one@vitstudent.ac.in",
@@ -723,6 +800,7 @@ const handleStudentChange = (index, field, value) => {
 
       colWidths.push(
         { wch: 18 }, // Specialization
+        { wch: 18 }, // Type
         { wch: 20 }, // Student Name 1
         { wch: 15 }, // RegNo 1
         { wch: 25 }, // Email 1
@@ -814,36 +892,49 @@ const handleStudentChange = (index, field, value) => {
         console.log('📋 Header row:', headerRow);
 
         let expectedColumns;
-        let columnMapping;
+        let columnMapping = {};
+        let studentStartCol;
+
+        const hasFixedSpecialization = !isAllMode && specializationFromContext && specializationFromContext.length > 0;
+        const hasFixedType = !isAllMode && typeFromContext && typeFromContext.length > 0;
 
         if (isAllMode) {
           // All Mode: Expect all columns
           expectedColumns = [
-            "Project Name", "Guide Faculty Employee ID", "School", "Department", "Specialization",
+            "Project Name", "Guide Faculty Employee ID", "School", "Department", "Specialization", "Type",
             "Student Name 1", "Student RegNo 1", "Student Email 1",
             "Student Name 2", "Student RegNo 2", "Student Email 2",
             "Student Name 3", "Student RegNo 3", "Student Email 3"
           ];
           columnMapping = {
-            projectName: 0, guideFacultyId: 1, school: 2, department: 3, specialization: 4,
-            student1Name: 5, student1RegNo: 6, student1Email: 7,
-            student2Name: 8, student2RegNo: 9, student2Email: 10,
-            student3Name: 11, student3RegNo: 12, student3Email: 13
+            projectName: 0, guideFacultyId: 1, school: 2, department: 3, specialization: 4, type: 5
           };
+          studentStartCol = 6;
         } else {
           // Context Mode: Expect fewer columns
           expectedColumns = [
-            "Project Name", "Guide Faculty Employee ID", "Specialization",
+            "Project Name", "Guide Faculty Employee ID"
+          ];
+          columnMapping.projectName = 0;
+          columnMapping.guideFacultyId = 1;
+          let colIndex = 2;
+
+          if (!hasFixedSpecialization) {
+            expectedColumns.push("Specialization");
+            columnMapping.specialization = colIndex++;
+          }
+
+          if (!hasFixedType) {
+            expectedColumns.push("Type");
+            columnMapping.type = colIndex++;
+          }
+
+          expectedColumns = expectedColumns.concat([
             "Student Name 1", "Student RegNo 1", "Student Email 1",
             "Student Name 2", "Student RegNo 2", "Student Email 2",
             "Student Name 3", "Student RegNo 3", "Student Email 3"
-          ];
-          columnMapping = {
-            projectName: 0, guideFacultyId: 1, specialization: 2,
-            student1Name: 3, student1RegNo: 4, student1Email: 5,
-            student2Name: 6, student2RegNo: 7, student2Email: 8,
-            student3Name: 9, student3RegNo: 10, student3Email: 11
-          };
+          ]);
+          studentStartCol = colIndex;
         }
 
         // Validate header columns
@@ -880,9 +971,9 @@ const handleStudentChange = (index, field, value) => {
           // Parse students
           let students = [];
           for (let s = 0; s < 3; s++) {
-            const nameCol = isAllMode ? 5 + s * 3 : 3 + s * 3;
-            const regNoCol = isAllMode ? 6 + s * 3 : 4 + s * 3;
-            const emailCol = isAllMode ? 7 + s * 3 : 5 + s * 3;
+            const nameCol = studentStartCol + s * 3;
+            const regNoCol = studentStartCol + 1 + s * 3;
+            const emailCol = studentStartCol + 2 + s * 3;
 
             const name = getCellValue(nameCol);
             const regNo = getCellValue(regNoCol);
@@ -897,7 +988,8 @@ const handleStudentChange = (index, field, value) => {
             idx: rowNum,
             name: getCellValue(columnMapping.projectName),
             guideFacultyEmpId: getCellValue(columnMapping.guideFacultyId),
-            specialization: getCellValue(columnMapping.specialization),
+            specialization: hasFixedSpecialization ? specializationFromContext[0] : getCellValue(columnMapping.specialization),
+            type: hasFixedType ? typeFromContext[0] : getCellValue(columnMapping.type),
             students
           };
 
@@ -966,6 +1058,12 @@ const handleStudentChange = (index, field, value) => {
         errors.push("Missing specialization");
       } else if (!specializationOptionsDisplay.includes(proj.specialization)) {
         errors.push(`Invalid specialization: ${proj.specialization}`);
+      }
+
+      if (!proj.type) {
+        errors.push("Missing type");
+      } else if (!typeOptionsDisplay.includes(proj.type)) {
+        errors.push(`Invalid type: ${proj.type}`);
       }
 
       if (isAllMode) {
@@ -1116,6 +1214,7 @@ const handleStudentChange = (index, field, value) => {
       const cleanedProjects = projects.map(proj => ({
         name: proj.name.trim(),
         specialization: normalizeSpecialization(proj.specialization), // normalized for backend
+        type: normalizeType(proj.type), // normalized for backend
         students: proj.students.map(student => ({
           name: student.name.trim(),
           regNo: student.regNo.trim().toUpperCase(),
@@ -1481,6 +1580,47 @@ if (contextLoading) {
                     )}
                   </div>
 
+                  {/* Type Selection */}
+                  <div>
+                    <label htmlFor="type" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                      Type <span className="text-red-500">*</span>
+                    </label>
+                    {!isAllMode && typeFromContext && typeFromContext.length > 0 ? (
+                      // Show context value if available (Context Mode)
+                      <div className="p-3 sm:p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
+                        <span className="text-blue-800 font-semibold text-sm sm:text-base">
+                          {typeFromContext.map(typ => displayType(typ)).join(', ')}
+                        </span>
+                        <p className="text-xs text-blue-600 mt-1">From admin context</p>
+                      </div>
+                    ) : (
+                      // Show dropdown (All Mode or no context)
+                      <>
+                        <select
+                          id="type"
+                          name="type"
+                          value={singleProject.type}
+                          onChange={handleSingleProjectChange}
+                          className={`block w-full px-3 sm:px-4 py-2 sm:py-4 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm sm:text-base ${
+                            fieldErrors.type ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                          }`}
+                          required
+                        >
+                          <option value="">Select Type</option>
+                          {typeOptionsDisplay.map(option => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                        {fieldErrors.type && (
+                          <p className="mt-2 text-xs sm:text-sm text-red-600 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                            {fieldErrors.type}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
                   {/* Students Section */}
                   <div>
                     <div className="flex items-center justify-between mb-4">
@@ -1717,6 +1857,7 @@ if (contextLoading) {
                               <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Faculty ID</th>
                               <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">School/Dept</th>
                               <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Specialization</th>
+                              <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Type</th>
                               <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Students</th>
                               <th className="px-3 sm:px-4 py-3 sm:py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
                             </tr>
@@ -1729,6 +1870,7 @@ if (contextLoading) {
                                 <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900 font-mono">{proj.guideFacultyEmpId}</td>
                                 <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">{proj.school}/{proj.department}</td>
                                 <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">{proj.specialization}</td>
+                                <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">{proj.type}</td>
                                 <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-slate-900">
                                   <div className="space-y-1">
                                     {proj.students.map((s, sidx) => (
@@ -1768,7 +1910,7 @@ if (contextLoading) {
                     <ul className="text-xs sm:text-sm text-blue-800 space-y-2">
                       <li>• Download the Excel template and fill in your project data</li>
                       <li>• Each row represents one project (max 3 students per project)</li>
-                      <li>• Required fields: Project Name, Guide Faculty ID{isAllMode ? ', School, Department' : ''}, Specialization</li>
+                      <li>• Required fields: Project Name, Guide Faculty ID{isAllMode ? ', School, Department' : ''}, Specialization, Type</li>
                       <li>• At least one student is required per project</li>
                       <li>• Student emails must end with @vitstudent.ac.in</li>
                       <li>• Registration numbers should follow format: 21BCE1001</li>
