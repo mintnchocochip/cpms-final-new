@@ -739,7 +739,7 @@ const handleStudentChange = (index, field, value) => {
 
     } else {
       // FALLBACK: Generic template
-      console.log('📊 Generating FALLBACK template');
+      console.log('Generating FALLBACK template');
       
       template = [
         [
@@ -828,205 +828,175 @@ const handleStudentChange = (index, field, value) => {
   };
 
   // Enhanced file upload with strict validation
-  const handleFileUpload = (e) => {
-    setProjects([]);
-    setBulkFieldErrors({});
-    setBulkPreviewMode(false);
-    
-    if (!e.target.files || e.target.files.length === 0) return;
-    
-    const file = e.target.files[0];
-    
-    // File type validation
-    const allowedTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'text/csv'
-    ];
-    
-    if (!allowedTypes.includes(file.type)) {
-      showNotification("error", "Invalid File", "Invalid file type. Please upload an Excel file (.xlsx, .xls) or CSV file (.csv).");
-      e.target.value = '';
-      return;
-    }
+const handleFileUpload = (e) => {
+  setProjects([]);
+  setBulkFieldErrors({});
+  setBulkPreviewMode(false);
+  
+  if (!e.target.files || e.target.files.length === 0) return;
+  
+  const file = e.target.files[0];
+  
+  // File type validation
+  const allowedTypes = [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'text/csv'
+  ];
+  
+  if (!allowedTypes.includes(file.type)) {
+    showNotification("error", "Invalid File", "Invalid file type. Please upload an Excel file (.xlsx, .xls) or CSV file (.csv).");
+    e.target.value = '';
+    return;
+  }
 
-    // File size validation (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-      showNotification("error", "File Too Large", "File size too large. Please upload a file smaller than 5MB.");
-      e.target.value = '';
-      return;
-    }
+  // File size validation (5MB limit)
+  if (file.size > 5 * 1024 * 1024) {
+    showNotification("error", "File Too Large", "File size too large. Please upload a file smaller than 5MB.");
+    e.target.value = '';
+    return;
+  }
 
-    setFileName(file.name);
-    console.log('📁 Processing file:', file.name, 'Size:', file.size, 'Type:', file.type);
-    
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        
-        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-          throw new Error("No sheets found in the Excel file");
-        }
-
-        const sheetName = workbook.SheetNames[0];
-        const ws = workbook.Sheets[sheetName];
-        
-        if (!ws) {
-          throw new Error("Unable to read the first sheet");
-        }
-
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-        
-        console.log('📊 Raw rows from Excel:', rows.length);
-        console.log('📊 First few rows:', rows.slice(0, 3));
-        
-        if (rows.length < 2) {
-          showNotification("error", "Empty File", "File is empty or missing data rows. Please ensure you have at least one project row after the header.");
-          return;
-        }
-
-        // Enhanced parsing with proper column detection
-        const headerRow = rows[0];
-        console.log('📋 Header row:', headerRow);
-
-        let expectedColumns;
-        let columnMapping = {};
-        let studentStartCol;
-
-        const hasFixedSpecialization = !isAllMode && specializationFromContext && specializationFromContext.length > 0;
-        const hasFixedType = !isAllMode && typeFromContext && typeFromContext.length > 0;
-
-        if (isAllMode) {
-          // All Mode: Expect all columns
-          expectedColumns = [
-            "Project Name", "Guide Faculty Employee ID", "School", "Department", "Specialization", "Type",
-            "Student Name 1", "Student RegNo 1", "Student Email 1",
-            "Student Name 2", "Student RegNo 2", "Student Email 2",
-            "Student Name 3", "Student RegNo 3", "Student Email 3"
-          ];
-          columnMapping = {
-            projectName: 0, guideFacultyId: 1, school: 2, department: 3, specialization: 4, type: 5
-          };
-          studentStartCol = 6;
-        } else {
-          // Context Mode: Expect fewer columns
-          expectedColumns = [
-            "Project Name", "Guide Faculty Employee ID"
-          ];
-          columnMapping.projectName = 0;
-          columnMapping.guideFacultyId = 1;
-          let colIndex = 2;
-
-          if (!hasFixedSpecialization) {
-            expectedColumns.push("Specialization");
-            columnMapping.specialization = colIndex++;
-          }
-
-          if (!hasFixedType) {
-            expectedColumns.push("Type");
-            columnMapping.type = colIndex++;
-          }
-
-          expectedColumns = expectedColumns.concat([
-            "Student Name 1", "Student RegNo 1", "Student Email 1",
-            "Student Name 2", "Student RegNo 2", "Student Email 2",
-            "Student Name 3", "Student RegNo 3", "Student Email 3"
-          ]);
-          studentStartCol = colIndex;
-        }
-
-        // Validate header columns
-        const missingColumns = expectedColumns.filter(col => 
-          !headerRow.some(header => header && header.toString().trim().toLowerCase() === col.toLowerCase())
-        );
-
-        if (missingColumns.length > 0) {
-          showNotification("error", "Invalid Format", `Invalid file format. Missing columns: ${missingColumns.join(', ')}. Please download and use the correct template.`);
-          return;
-        }
-
-        // Parse data rows
-        const dataRows = rows.slice(1).filter(row => 
-          row && row.length > 0 && row.some(cell => cell && cell.toString().trim())
-        );
-
-        console.log('📊 Data rows found:', dataRows.length);
-
-        if (dataRows.length === 0) {
-          showNotification("error", "No Data", "No data rows found. Please add project data to your file.");
-          return;
-        }
-
-        const parsedProjects = dataRows.map((row, idx) => {
-          const rowNum = idx + 2; // Excel row number (header + 1-based)
-          
-          // Helper function to safely get cell value
-          const getCellValue = (colIndex) => {
-            const value = row[colIndex];
-            return value ? value.toString().trim() : "";
-          };
-
-          // Parse students
-          let students = [];
-          for (let s = 0; s < 3; s++) {
-            const nameCol = studentStartCol + s * 3;
-            const regNoCol = studentStartCol + 1 + s * 3;
-            const emailCol = studentStartCol + 2 + s * 3;
-
-            const name = getCellValue(nameCol);
-            const regNo = getCellValue(regNoCol);
-            const emailId = getCellValue(emailCol);
-            
-            if (name && regNo && emailId) {
-              students.push({ name, regNo, emailId });
-            }
-          }
-
-          const projectData = {
-            idx: rowNum,
-            name: getCellValue(columnMapping.projectName),
-            guideFacultyEmpId: getCellValue(columnMapping.guideFacultyId),
-            specialization: hasFixedSpecialization ? specializationFromContext[0] : getCellValue(columnMapping.specialization),
-            type: hasFixedType ? typeFromContext[0] : getCellValue(columnMapping.type),
-            students
-          };
-
-          if (isAllMode) {
-            projectData.school = getCellValue(columnMapping.school);
-            projectData.department = getCellValue(columnMapping.department);
-          } else {
-            projectData.school = schoolFromContext;
-            projectData.department = departmentFromContext;
-          }
-
-          return projectData;
-        }).filter(proj => proj.name); // Filter out rows without project names
-
-        console.log('✅ Parsed projects:', parsedProjects.length);
-        setBulkPreviewMode(true);
-        setProjects(parsedProjects);
-        setBulkFieldErrors({});
-        
-        if (parsedProjects.length === 0) {
-          showNotification("error", "No Valid Projects", "No valid projects found in the file. Please check the data format.");
-        } else {
-          showNotification("success", "File Processed", `Successfully loaded ${parsedProjects.length} projects for preview. Review the data below before uploading.`);
-        }
-
-      } catch (err) {
-        console.error("❌ File parsing error:", err);
-        showNotification("error", "File Error", `Failed to parse the Excel file: ${err.message}. Please check the file format and try again.`);
+  setFileName(file.name);
+  console.log('📁 Processing file:', file.name, 'Size:', file.size, 'Type:', file.type);
+  
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        throw new Error("No sheets found in the Excel file");
       }
-    };
-    
-    reader.onerror = () => {
-      showNotification("error", "File Read Error", 'Error reading file. Please try again.');
-    };
 
-    reader.readAsArrayBuffer(file);
+      const sheetName = workbook.SheetNames[0];
+      const ws = workbook.Sheets[sheetName];
+      
+      if (!ws) {
+        throw new Error("Unable to read the first sheet");
+      }
+
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      
+      console.log('📊 Raw rows from Excel:', rows.length);
+      console.log('📊 First few rows:', rows.slice(0, 3));
+      
+      if (rows.length < 2) {
+        showNotification("error", "Empty File", "File is empty or missing data rows. Please ensure you have at least one project row after the header.");
+        return;
+      }
+
+      // Parse your specific Excel format
+      const headerRow = rows[0];
+      console.log('📋 Header row:', headerRow);
+
+      // Find column indices for your format
+      const getColumnIndex = (columnName) => {
+        return headerRow.findIndex(header => 
+          header && header.toString().trim().toLowerCase().includes(columnName.toLowerCase())
+        );
+      };
+
+      const projectTitleCol = getColumnIndex('project title');
+      const studentNameCol = getColumnIndex('student name');
+      const regNoCol = getColumnIndex('register no');
+      const employeeIdCol = getColumnIndex('employee id');
+
+      if (projectTitleCol === -1 || studentNameCol === -1 || regNoCol === -1 || employeeIdCol === -1) {
+        showNotification("error", "Invalid Format", "Required columns not found. Expected: Project Title, Student Name, Student Register No, Employee Id");
+        return;
+      }
+
+      // Process rows to group projects
+      const projects = [];
+      let currentProject = null;
+      
+      const dataRows = rows.slice(1).filter(row => 
+        row && row.length > 0 && row.some(cell => cell && cell.toString().trim())
+      );
+
+      for (const row of dataRows) {
+        const getCellValue = (colIndex) => {
+          const value = row[colIndex];
+          return value ? value.toString().trim() : "";
+        };
+
+        const projectTitle = getCellValue(projectTitleCol);
+        const studentName = getCellValue(studentNameCol);
+        const regNo = getCellValue(regNoCol);
+        const employeeId = getCellValue(employeeIdCol);
+
+        // If this row has a project title, start a new project
+        if (projectTitle && projectTitle !== '') {
+          // Save previous project
+          if (currentProject && currentProject.students.length > 0) {
+            projects.push(currentProject);
+          }
+
+          // Start new project
+          currentProject = {
+            idx: projects.length + 1,
+            name: projectTitle,
+            guideFacultyEmpId: employeeId,
+            specialization: specializationFromContext && specializationFromContext.length > 0 ? specializationFromContext[0] : "",
+            type: typeFromContext && typeFromContext.length > 0 ? typeFromContext[0] : "",
+            school: isAllMode ? "" : schoolFromContext,
+            department: isAllMode ? "" : departmentFromContext,
+            students: []
+          };
+
+          // Add first student if data exists
+          if (studentName && regNo) {
+            const emailId = `${regNo.replace(/\s+/g, '').toLowerCase()}@vitstudent.ac.in`;
+            currentProject.students.push({
+              name: studentName,
+              regNo: regNo.replace(/\s+/g, '').toUpperCase(),
+              emailId: emailId
+            });
+          }
+        }
+        // If no project title but student data exists, add to current project
+        else if (currentProject && studentName && regNo && employeeId === currentProject.guideFacultyEmpId) {
+          const emailId = `${regNo.replace(/\s+/g, '').toLowerCase()}@vitstudent.ac.in`;
+          currentProject.students.push({
+            name: studentName,
+            regNo: regNo.replace(/\s+/g, '').toUpperCase(),
+            emailId: emailId
+          });
+        }
+      }
+
+      // Don't forget the last project
+      if (currentProject && currentProject.students.length > 0) {
+        projects.push(currentProject);
+      }
+
+      console.log('✅ Parsed projects:', projects.length);
+      setBulkPreviewMode(true);
+      setProjects(projects);
+      setBulkFieldErrors({});
+      
+      if (projects.length === 0) {
+        showNotification("error", "No Valid Projects", "No valid projects found in the file. Please check the data format.");
+      } else {
+        showNotification("success", "File Processed", `Successfully loaded ${projects.length} projects for preview. Review the data below before uploading.`);
+      }
+
+    } catch (err) {
+      console.error("❌ File parsing error:", err);
+      showNotification("error", "File Error", `Failed to parse the Excel file: ${err.message}. Please check the file format and try again.`);
+    }
   };
+  
+  reader.onerror = () => {
+    showNotification("error", "File Read Error", 'Error reading file. Please try again.');
+  };
+
+  reader.readAsArrayBuffer(file);
+};
+
+
 
   // Enhanced validation for bulk projects
   const validateBulkProjects = (projectsToValidate) => {
