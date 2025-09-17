@@ -18,6 +18,8 @@ import helmet from "helmet";
 dotenv.config();
 connectDB();
 
+import "./utils/deadlineRemainder.js";
+
 const app = express();
 
 // Use Helmet
@@ -25,36 +27,38 @@ app.use(helmet());
 
 // Set HSTS for 1 year (in seconds)
 // Check if you're in development environment
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   // Disable HSTS completely in development
-  app.use(helmet({
-    hsts: false
-  }));
+  app.use(
+    helmet({
+      hsts: false,
+    })
+  );
 } else {
   // Keep HSTS enabled in production
   app.use(
     helmet.hsts({
-      maxAge: 31536000,       // 1 year in seconds
+      maxAge: 31536000, // 1 year in seconds
       includeSubDomains: true,
       preload: true,
     })
   );
 }
 
-
 const allowedOrigins = [
-  'http://localhost:3000', // for development// your deployed frontend on Vercel
-  'http://localhost:5173',
-  'https://cpms-latest.vercel.app',
-  'https://cpms-latest-projectpurposes-projects.vercel.app',
-  'https://cpms-latest-git-main-projectpurposes-projects.vercel.app'
+  "http://localhost:3000", // for development// your deployed frontend on Vercel
+  "http://localhost:5173",
+  "https://cpms-latest.vercel.app",
+  "https://cpms-latest-projectpurposes-projects.vercel.app",
+  "https://cpms-latest-git-main-projectpurposes-projects.vercel.app",
 ];
 
-
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 app.use(bodyParser.json());
