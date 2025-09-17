@@ -104,6 +104,7 @@ const FacultyManagement = () => {
     employeeId: '',
     name: '',
     emailId: '',
+    phoneNumber:'',
     password: '',
     role: 'faculty',
     school: schoolFromContext || '',
@@ -133,6 +134,7 @@ const FacultyManagement = () => {
       employeeId: '',
       name: '',
       emailId: '',
+      phoneNumber:'',
       password: '',
       role: 'faculty',
       school: schoolFromContext || '',
@@ -148,7 +150,7 @@ const FacultyManagement = () => {
   };
 
   const handleSelectContext = () => {
-    const hasUnsavedChanges = formData.name || formData.employeeId || formData.emailId || formData.password;
+    const hasUnsavedChanges = formData.name || formData.employeeId || formData.emailId || formData.password || formData.phoneNumber  ;
     if (hasUnsavedChanges) {
       const userConfirmed = window.confirm('You have unsaved changes. Are you sure you want to leave this page?');
       if (!userConfirmed) return;
@@ -180,6 +182,7 @@ const FacultyManagement = () => {
     if (!formData.employeeId.match(/^[A-Za-z0-9]+$/)) throw new Error('Employee ID must contain only letters and numbers');
     if (!formData.emailId.trim()) throw new Error('Email is required');
     if (!formData.emailId.endsWith('@vit.ac.in')) throw new Error('Only VIT email addresses are allowed (@vit.ac.in)');
+    if (!formData.phoneNumber.trim()) throw new Error('Phone Number is required');
     if (!formData.password) throw new Error('Password is required');
     if (formData.password.length < 8) throw new Error('Password must be at least 8 characters long');
     if (!/[A-Z]/.test(formData.password)) throw new Error('Password must contain at least one uppercase letter');
@@ -198,6 +201,7 @@ const FacultyManagement = () => {
       const apiData = {
         name: String(formData.name.trim()),
         emailId: String(formData.emailId.trim().toLowerCase()),
+        phoneNumber: String(formData.phoneNumber.trim()),
         password: String(formData.password),
         employeeId: String(formData.employeeId.trim().toUpperCase()),
         imageUrl: String(formData.imageUrl.trim()),
@@ -277,6 +281,7 @@ const FacultyManagement = () => {
             const name = cleanText(row.name);
             const employeeId = cleanText(row.employeeId);
             const emailId = cleanText(row.emailId).toLowerCase();
+            const phoneNumber = cleanText(row.phoneNumber);
             const password = row.password ? String(row.password).trim() : '';
             const role = cleanText(row.role);
             const imageUrl = cleanText(row.imageUrl) || '';
@@ -296,6 +301,7 @@ const FacultyManagement = () => {
             if (!name) rowErrors.push('Missing name');
             if (!employeeId) rowErrors.push('Missing employee ID');
             if (!emailId) rowErrors.push('Missing email');
+            if (!phoneNumber) rowErrors.push('Missing Phone Number');
             if (!password || password === '0') rowErrors.push('Missing password');
             
             const cleanEmployeeId = employeeId.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -333,6 +339,7 @@ const FacultyManagement = () => {
               name: name || '',
               employeeId: cleanEmployeeId || employeeId || '',
               emailId: emailId || '',
+              phoneNumber: phoneNumber || '',
               password: cleanPassword || '',
               role: validRole,
               imageUrl: imageUrl,
@@ -349,6 +356,7 @@ const FacultyManagement = () => {
               name: 'Error processing row', 
               employeeId: 'N/A', 
               emailId: 'N/A',
+              phoneNumber: 'N/A',
               errors: [`Row processing error: ${rowError.message}`]
             });
             
@@ -356,6 +364,7 @@ const FacultyManagement = () => {
               name: 'ERROR',
               employeeId: 'ERROR',
               emailId: 'ERROR',
+              phoneNumber:'ERROR',
               password: '',
               role: 'faculty',
               imageUrl: '',
@@ -435,6 +444,7 @@ const FacultyManagement = () => {
       const validatedData = validEntries.map(faculty => ({
         name: String(faculty.name).trim(),
         emailId: String(faculty.emailId).trim().toLowerCase(),
+        phoneNumber: String(faculty.phoneNumber).trim(),
         password: String(faculty.password),
         employeeId: String(faculty.employeeId).trim().toUpperCase(),
         role: faculty.role,
@@ -478,6 +488,7 @@ const FacultyManagement = () => {
         name: 'Dr. John Smith',
         employeeId: 'FAC001',
         emailId: 'john.smith@vit.ac.in',
+        phoneNumber:'+91 9000000001',
         password: 'TempPass@123',
         role: 'faculty',
         specializations: 'aiml,datascience',
@@ -487,6 +498,7 @@ const FacultyManagement = () => {
         name: 'Dr. Jane Admin',
         employeeId: 'ADM001',
         emailId: 'jane.admin@vit.ac.in',
+        phoneNumber:'+91 9000000002',
         password: 'AdminPass@456',
         role: 'admin',
         specializations: 'general',
@@ -497,6 +509,7 @@ const FacultyManagement = () => {
         name: 'Dr. John Smith',
         employeeId: 'FAC001',
         emailId: 'john.smith@vit.ac.in',
+        phoneNumber:'+91 9000000003',
         password: 'TempPass@123',
         role: 'faculty',
         school: 'SCOPE',
@@ -508,6 +521,7 @@ const FacultyManagement = () => {
         name: 'Dr. Jane Admin',
         employeeId: 'ADM001',
         emailId: 'jane.admin@vit.ac.in',
+        phoneNumber:'+91 9000000004',
         password: 'AdminPass@456',
         role: 'admin',
         school: 'SCOPE',
@@ -734,6 +748,27 @@ const FacultyManagement = () => {
                         placeholder="john.doe@vit.ac.in"
                         className="block w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700 placeholder-slate-400"
                         value={formData.emailId}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="phoneNumber" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                        <Mail size={16} className="sm:h-5 sm:w-5 text-slate-400" />
+                      </div>
+                      <input
+                        id="phoneNumber"
+                        name="phoneNumber"
+                        type="text"
+                        placeholder="+91 9000000001"
+                        className="block w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700 placeholder-slate-400"
+                        value={formData.phoneNumber}
                         onChange={handleInputChange}
                         required
                       />
