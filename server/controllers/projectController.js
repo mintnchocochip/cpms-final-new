@@ -367,218 +367,397 @@ export async function getAllProjects(req, res) {
 
 
 export async function createProjectsBulk(req, res) {
+  console.log("🚀 [BULK CREATE] Starting bulk project creation at", new Date().toISOString());
+  console.log("📥 [REQUEST BODY]", JSON.stringify(req.body, null, 2));
+  
   const session = await mongoose.startSession();
+  console.log("✅ [SESSION] MongoDB session created successfully");
+  
+  let transactionCommitted = false;
+  const transactionStart = Date.now();
+  
   try {
-    session.startTransaction();
+    // Start transaction with timeout configuration
+    session.startTransaction({
+      maxTimeMS: 50000, // 50-second timeout (less than default 60s)
+      readConcern: { level: "majority" },
+      writeConcern: { w: "majority", j: true }
+    });
+    console.log("🔄 [TRANSACTION] Transaction started with 50s timeout");
 
     const { school, department, projects, guideFacultyEmpId } = req.body;
+    console.log(`📋 [VALIDATION] School: ${school}, Department: ${department}, Projects count: ${projects?.length}, Guide: ${guideFacultyEmpId}`);
 
+    // Enhanced validation with logging
     if (!school || !department) {
+      console.log("❌ [VALIDATION ERROR] Missing school or department");
       await session.abortTransaction();
+      await session.endSession();
       return res.status(400).json({
         success: false,
         message: "School and department are required.",
       });
     }
+    
     if (!Array.isArray(projects) || projects.length === 0) {
+      console.log("❌ [VALIDATION ERROR] Invalid projects array:", typeof projects, projects?.length);
       await session.abortTransaction();
+      await session.endSession();
       return res.status(400).json({
         success: false,
         message: "Projects array is required and must be non-empty.",
       });
     }
+    
     if (!guideFacultyEmpId) {
+      console.log("❌ [VALIDATION ERROR] Missing guide faculty employee ID");
       await session.abortTransaction();
+      await session.endSession();
       return res.status(400).json({
         success: false,
         message: "Guide faculty employee ID is required.",
       });
     }
 
+    console.log("✅ [VALIDATION] All basic validations passed");
+
+    // Database operations with detailed logging
+    console.log(`🔍 [DB QUERY] Searching for marking schema: ${school}-${department}`);
     const markingSchema = await MarkingSchema.findOne({
       school,
       department,
     }).session(session);
+    
     if (!markingSchema) {
+      console.log(`❌ [DB ERROR] Marking schema not found for ${school}-${department}`);
       await session.abortTransaction();
+      await session.endSession();
       return res.status(400).json({
         success: false,
         message: `Marking schema not found for school: ${school}, department: ${department}`,
       });
     }
+    console.log("✅ [DB SUCCESS] Marking schema found:", markingSchema._id);
+    console.log("📊 [SCHEMA INFO] Reviews:", markingSchema.reviews?.map(r => r.reviewName));
 
+    console.log(`🔍 [DB QUERY] Searching for guide faculty: ${guideFacultyEmpId}`);
     const guideFacultyDoc = await Faculty.findOne({
       employeeId: guideFacultyEmpId,
       school,
       department,
     }).session(session);
+    
     if (!guideFacultyDoc) {
+      console.log(`❌ [DB ERROR] Guide faculty not found: ${guideFacultyEmpId} in ${school}-${department}`);
       await session.abortTransaction();
+      await session.endSession();
       return res.status(400).json({
         success: false,
         message: `Guide faculty with employee ID ${guideFacultyEmpId} not found in ${school}-${department}`,
       });
     }
+    console.log("✅ [DB SUCCESS] Guide faculty found:", guideFacultyDoc._id, guideFacultyDoc.name);
 
+    // Process reviews and deadlines - FIXED: Using plain objects instead of Map
     const reviewKeys = markingSchema.reviews.map((review) => review.reviewName);
-    const defaultDeadlinesMap = new Map();
+    console.log("📝 [PROCESSING] Review keys:", reviewKeys);
+    
+    console.log("✅ [FIXED] Using plain object for defaultDeadlinesMap instead of Map()");
+    const defaultDeadlinesObj = {};
     markingSchema.reviews.forEach((review) => {
-      if (review.deadline && review.deadline.from && review.deadline.to) {
-        defaultDeadlinesMap.set(review.reviewName, {
-          from: review.deadline.from,
-          to: review.deadline.to,
-        });
-      } else {
-        defaultDeadlinesMap.set(review.reviewName, null);
-      }
+      const deadlineInfo = review.deadline && review.deadline.from && review.deadline.to 
+        ? { from: review.deadline.from, to: review.deadline.to }
+        : null;
+      
+      defaultDeadlinesObj[review.reviewName] = deadlineInfo;
+      console.log(`📅 [DEADLINE] ${review.reviewName}:`, deadlineInfo);
     });
 
+    console.log("🏗️  [PROCESSING] Starting project creation loop");
     const results = { created: 0, errors: 0, details: [] };
 
-    for (let i = 0; i < projects.length; i++) {
-      const project = projects[i];
-      try {
-        if (
-          !project.name ||
-          !Array.isArray(project.students) ||
-          project.students.length === 0
-        ) {
-          results.errors++;
-          results.details.push({
-            project: project.name || `Project ${i + 1}`,
-            error: "Missing project name or students array",
-          });
-          continue;
-        }
+    // Process in smaller batches to avoid transaction limits - OPTIMIZED: Reduced batch size
+    const batchSize = 2; // Reduced from 5 to 2 for better transaction management
+    console.log(`📦 [BATCH INFO] Processing ${projects.length} projects in batches of ${batchSize}`);
 
-        // Validate type field for each project
-        if (!project.type || !["hardware", "software"].includes(project.type)) {
-          results.errors++;
-          results.details.push({
-            project: project.name || `Project ${i + 1}`,
-            error: "Project type must be either 'hardware' or 'software'.",
-          });
-          continue;
-        }
+    for (let batchStart = 0; batchStart < projects.length; batchStart += batchSize) {
+      const batch = projects.slice(batchStart, batchStart + batchSize);
+      const batchNumber = Math.floor(batchStart/batchSize) + 1;
+      const totalBatches = Math.ceil(projects.length / batchSize);
+      
+      console.log(`\n📦 [BATCH ${batchNumber}/${totalBatches}] Processing projects ${batchStart + 1}-${Math.min(batchStart + batchSize, projects.length)}`);
+      
+      // Check transaction timeout before processing each batch
+      const elapsedTime = Date.now() - transactionStart;
+      if (elapsedTime > 45000) { // 45 seconds warning
+        console.log(`⚠️ [TIMEOUT WARNING] Transaction running for ${elapsedTime}ms, approaching timeout`);
+      }
 
-        const existingProject = await Project.findOne({
-          name: project.name,
-          school,
-          department,
-        }).session(session);
-        if (existingProject) {
-          results.errors++;
-          results.details.push({
-            project: project.name,
-            error: "Project with this name already exists",
-          });
-          continue;
-        }
-
-        const studentIds = [];
-
-        for (const studentObj of project.students) {
-          const {
-            regNo,
-            name: studentName,
-            emailId,
-            school: studSchool,
-            department: studDepartment,
-          } = studentObj;
-
-          if (!regNo || !studentName || !emailId) {
-            throw new Error(
-              "Student missing required fields (regNo, name, emailId)"
-            );
-          }
-
-          if (studSchool !== school || studDepartment !== department) {
-            throw new Error(
-              `Student ${regNo} has mismatched school or department`
-            );
-          }
-
-          const existingStudent = await Student.findOne({ regNo }).session(
-            session
-          );
-          if (existingStudent) {
-            throw new Error(`Student already exists with regNo ${regNo}`);
-          }
-
-          const reviewsMap = new Map();
-          for (const reviewKey of reviewKeys) {
-            const reviewDef = markingSchema.reviews.find(
-              (rev) => rev.reviewName === reviewKey
-            );
-            const marks = {};
-            if (reviewDef && Array.isArray(reviewDef.components)) {
-              for (const comp of reviewDef.components) {
-                marks[comp.name] = 0;
-              }
-            }
-            reviewsMap.set(reviewKey, {
-              marks,
-              comments: "",
-              attendance: { value: false, locked: false },
-              locked: false,
+      for (let i = 0; i < batch.length; i++) {
+        const globalIndex = batchStart + i;
+        const project = batch[i];
+        console.log(`\n🔄 [PROJECT ${globalIndex + 1}/${projects.length}] Processing: ${project.name || "Unnamed"}`);
+        console.log(`📊 [PROJECT DATA]`, JSON.stringify(project, null, 2));
+        
+        try {
+          // Project validation with detailed logging
+          if (!project.name || !Array.isArray(project.students) || project.students.length === 0) {
+            console.log(`❌ [PROJECT ERROR] Invalid project data - name: ${!!project.name}, students: ${Array.isArray(project.students)}, count: ${project.students?.length}`);
+            results.errors++;
+            results.details.push({
+              project: project.name || `Project ${globalIndex + 1}`,
+              error: "Missing project name or students array",
             });
+            continue;
           }
 
-          const student = new Student({
-            regNo,
-            name: studentName,
-            emailId,
-            reviews: reviewsMap,
-            pptApproved: { approved: false, locked: false },
-            deadline: new Map(defaultDeadlinesMap),
+          // Type validation with detailed logging - FIXED: Case insensitive
+          console.log(`🔍 [TYPE CHECK] Project type: "${project.type}", Valid types: ["hardware", "software"]`);
+          if (!project.type || !["hardware", "software"].includes(project.type.toLowerCase())) {
+            console.log(`❌ [TYPE ERROR] Invalid project type: "${project.type}"`);
+            results.errors++;
+            results.details.push({
+              project: project.name || `Project ${globalIndex + 1}`,
+              error: "Project type must be either 'hardware' or 'software'.",
+            });
+            continue;
+          }
+
+          // Check existing project
+          console.log(`🔍 [DUPLICATE CHECK] Searching for existing project: ${project.name}`);
+          const existingProject = await Project.findOne({
+            name: project.name,
             school,
             department,
+          }).session(session);
+          
+          if (existingProject) {
+            console.log(`❌ [DUPLICATE ERROR] Project already exists: ${project.name}`);
+            results.errors++;
+            results.details.push({
+              project: project.name,
+              error: "Project with this name already exists",
+            });
+            continue;
+          }
+
+          console.log(`✅ [PROJECT VALID] Project validation passed: ${project.name}`);
+          const studentIds = [];
+
+          // Process students with detailed logging
+          console.log(`👥 [STUDENTS] Processing ${project.students.length} students`);
+          for (let j = 0; j < project.students.length; j++) {
+            const studentObj = project.students[j];
+            console.log(`\n  👤 [STUDENT ${j + 1}] Processing:`, studentObj.regNo);
+            
+            const {
+              regNo,
+              name: studentName,
+              emailId,
+              school: studSchool,
+              department: studDepartment,
+            } = studentObj;
+
+            // Student validation
+            if (!regNo || !studentName || !emailId) {
+              console.log(`  ❌ [STUDENT ERROR] Missing fields - regNo: ${!!regNo}, name: ${!!studentName}, email: ${!!emailId}`);
+              throw new Error("Student missing required fields (regNo, name, emailId)");
+            }
+
+            if (studSchool !== school || studDepartment !== department) {
+              console.log(`  ❌ [STUDENT ERROR] School/dept mismatch - Expected: ${school}/${department}, Got: ${studSchool}/${studDepartment}`);
+              throw new Error(`Student ${regNo} has mismatched school or department`);
+            }
+
+            // Check existing student
+            console.log(`  🔍 [STUDENT CHECK] Searching for existing student: ${regNo}`);
+            const existingStudent = await Student.findOne({ regNo }).session(session);
+            if (existingStudent) {
+              console.log(`  ❌ [STUDENT ERROR] Student already exists: ${regNo}`);
+              throw new Error(`Student already exists with regNo ${regNo}`);
+            }
+
+            // Create reviews object - FIXED: Using plain object instead of Map
+            console.log(`  ✅ [FIXED] Using plain object for reviewsObj instead of Map()`);
+            console.log(`  🔄 [REVIEWS] Creating reviews for ${reviewKeys.length} review types`);
+            const reviewsObj = {};
+            
+            for (const reviewKey of reviewKeys) {
+              const reviewDef = markingSchema.reviews.find((rev) => rev.reviewName === reviewKey);
+              console.log(`    📝 [REVIEW] Processing ${reviewKey}, components: ${reviewDef?.components?.length || 0}`);
+              
+              const marks = {};
+              if (reviewDef && Array.isArray(reviewDef.components)) {
+                for (const comp of reviewDef.components) {
+                  marks[comp.name] = 0;
+                }
+              }
+              
+              const reviewData = {
+                marks,
+                comments: "",
+                attendance: { value: false, locked: false },
+                locked: false,
+              };
+              
+              reviewsObj[reviewKey] = reviewData; // Plain object assignment
+              console.log(`    ✅ [REVIEW SET] ${reviewKey}:`, Object.keys(marks));
+            }
+
+            console.log(`  🏗️  [STUDENT CREATE] Creating student document`);
+            console.log(`  ✅ [FIXED] Using plain objects for reviews and deadline`);
+            
+            const student = new Student({
+              regNo,
+              name: studentName,
+              emailId,
+              reviews: reviewsObj, // ✅ FIXED: Plain object instead of Map
+              pptApproved: { approved: false, locked: false },
+              deadline: { ...defaultDeadlinesObj }, // ✅ FIXED: Plain object instead of Map
+              school,
+              department,
+            });
+            
+            console.log(`  💾 [STUDENT SAVE] Attempting to save student: ${regNo}`);
+            await student.save({ session });
+            console.log(`  ✅ [STUDENT SUCCESS] Student saved: ${regNo} -> ${student._id}`);
+            studentIds.push(student._id);
+          }
+
+          // Create project with detailed logging
+          console.log(`\n🏗️  [PROJECT CREATE] Creating project document with ${studentIds.length} students`);
+          const projectData = {
+            name: project.name,
+            students: studentIds,
+            guideFaculty: guideFacultyDoc._id,
+            panel: null,
+            school,
+            department,
+            specialization: project.specialization || "",
+            type: project.type.toLowerCase(), // Normalize case
+          };
+          console.log(`📊 [PROJECT DATA]`, JSON.stringify(projectData, null, 2));
+          
+          const newProject = new Project(projectData);
+          
+          console.log(`💾 [PROJECT SAVE] Attempting to save project: ${project.name}`);
+          await newProject.save({ session });
+          console.log(`✅ [PROJECT SUCCESS] Project saved: ${project.name} -> ${newProject._id}`);
+          results.created++;
+
+        } catch (error) {
+          console.log(`\n💥 [PROJECT FAILED] Error in project ${globalIndex + 1}:`, error.message);
+          console.log(`📊 [FULL ERROR]`, error);
+          results.errors++;
+          results.details.push({
+            project: project.name || `Project ${globalIndex + 1}`,
+            error: error.message,
           });
-          await student.save({ session });
-          studentIds.push(student._id);
         }
-
-        // Create project with the type field
-        const newProject = new Project({
-          name: project.name,
-          students: studentIds,
-          guideFaculty: guideFacultyDoc._id,
-          panel: null,
-          school,
-          department,
-          specialization: project.specialization || "",
-          type: project.type,
-        });
-        await newProject.save({ session });
-
-        results.created++;
-      } catch (error) {
-        results.errors++;
-        results.details.push({
-          project: project.name || `Project ${i + 1}`,
-          error: error.message,
-        });
       }
+      
+      // Brief pause between batches to avoid overwhelming the database
+      if (batchStart + batchSize < projects.length) {
+        console.log(`⏸️  [BATCH PAUSE] Pausing 200ms between batches...`);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      // Log progress
+      const progress = ((batchStart + batchSize) / projects.length * 100).toFixed(1);
+      console.log(`📈 [PROGRESS] ${progress}% completed (${Math.min(batchStart + batchSize, projects.length)}/${projects.length} projects)`);
     }
 
-    await session.commitTransaction();
-    return res.status(201).json({
-      success: true,
-      message: `Bulk project creation completed. ${results.created} created, ${results.errors} errors.`,
-      data: results,
-    });
+    // CRITICAL FIX: Commit transaction with proper timeout and error handling
+    const transactionDuration = Date.now() - transactionStart;
+    console.log(`\n🔄 [TRANSACTION] Attempting to commit transaction after ${transactionDuration}ms`);
+    console.log(`📊 [RESULTS SUMMARY] Created: ${results.created}, Errors: ${results.errors}`);
+    
+    try {
+      await session.commitTransaction();
+      transactionCommitted = true;
+      console.log(`✅ [TRANSACTION SUCCESS] Transaction committed successfully in ${transactionDuration}ms`);
+      
+      // Prepare response after successful commit
+      const response = {
+        success: true,
+        message: `Bulk project creation completed. ${results.created} created, ${results.errors} errors.`,
+        data: results,
+        timing: {
+          duration: transactionDuration,
+          projects: projects.length,
+          averagePerProject: Math.round(transactionDuration / projects.length)
+        }
+      };
+      
+      console.log(`🎉 [FINAL SUCCESS]`, JSON.stringify(response, null, 2));
+      
+      // End session and send response in success path
+      await session.endSession();
+      console.log(`✅ [SESSION END] Session ended successfully`);
+      
+      return res.status(201).json(response);
+      
+    } catch (commitError) {
+      console.log(`❌ [COMMIT ERROR] Transaction commit failed:`, commitError.message);
+      console.log(`📊 [COMMIT DETAILS]`, commitError);
+      
+      // Don't try to abort here - transaction is already aborted by MongoDB
+      transactionCommitted = false;
+      throw commitError; // Re-throw to be caught by outer catch block
+    }
+    
   } catch (error) {
-    await session.abortTransaction();
-    console.error("Error in bulk project creation:", error);
-    return res.status(500).json({
+    const errorDuration = Date.now() - transactionStart;
+    console.log(`\n💥 [FATAL ERROR] Critical error in bulk project creation after ${errorDuration}ms:`, error.message);
+    console.log(`📊 [FULL ERROR STACK]`, error.stack);
+    
+    // CRITICAL FIX: Only abort if transaction hasn't been committed yet
+    if (!transactionCommitted) {
+      console.log(`🔄 [CLEANUP] Attempting to abort transaction`);
+      try {
+        // Check if session still has an active transaction before aborting
+        if (session.inTransaction()) {
+          await session.abortTransaction();
+          console.log(`🚫 [ABORT SUCCESS] Transaction aborted`);
+        } else {
+          console.log(`ℹ️  [ABORT SKIP] No active transaction to abort - already aborted by MongoDB`);
+        }
+      } catch (abortError) {
+        console.log(`❌ [ABORT ERROR]`, abortError.message);
+        // MongoDB likely already aborted the transaction automatically
+      }
+    } else {
+      console.log(`ℹ️  [SKIP ABORT] Transaction already committed, skipping abort`);
+    }
+    
+    // Always try to end session
+    try {
+      await session.endSession();
+      console.log(`✅ [SESSION END] Session ended successfully`);
+    } catch (sessionError) {
+      console.log(`❌ [SESSION ERROR]`, sessionError.message);
+    }
+    
+    const errorResponse = {
       success: false,
       message: "Server error during bulk project creation",
       error: error.message,
-    });
+      timing: {
+        duration: errorDuration,
+        failedAt: "transaction_processing"
+      }
+    };
+    
+    console.log(`💀 [FINAL ERROR]`, JSON.stringify(errorResponse, null, 2));
+    return res.status(500).json(errorResponse);
+    
   } finally {
-    session.endSession();
+    const totalDuration = Date.now() - transactionStart;
+    console.log(`🏁 [COMPLETE] Bulk project creation function completed at ${new Date().toISOString()}`);
+    console.log(`⏱️  [TIMING] Total execution time: ${totalDuration}ms`);
   }
 }
+
 
 export async function deleteProject(req, res) {
   try {
@@ -809,14 +988,14 @@ export async function getAllPanelProjects(req, res) {
   try {
     const facultyId = req.user.id;
     console.log("getAllPanelProjects called for user:", facultyId);
-
+    
     // Find panels where this faculty is a member
     const panels = await Panel.find({
-      $or: [{ faculty1: facultyId }, { faculty2: facultyId }],
+      members: facultyId, // Updated to use members array
     });
-
+    
     console.log("Found panels:", panels.length);
-
+    
     if (panels.length === 0) {
       return res.status(200).json({
         success: true,
@@ -845,19 +1024,12 @@ export async function getAllPanelProjects(req, res) {
       .populate({
         path: "panel",
         model: "Panel",
-        select: "name faculty1 faculty2 school department", // ✅ Include panel details
-        populate: [
-          {
-            path: "faculty1",
-            model: "Faculty",
-            select: "name emailId employeeId",
-          },
-          {
-            path: "faculty2",
-            model: "Faculty",
-            select: "name emailId employeeId",
-          },
-        ],
+        select: "members venue school department", // ✅ Updated to use members instead of name/faculty1/faculty2
+        populate: {
+          path: "members", // ✅ Populate members array
+          model: "Faculty",
+          select: "name emailId employeeId",
+        },
       })
       .lean(); // ✅ Use lean() for better performance
 
@@ -866,13 +1038,13 @@ export async function getAllPanelProjects(req, res) {
     // ✅ Process each project to ensure all data is properly formatted
     const processedProjects = panelProjects.map((project) => {
       console.log(`🔄 Processing panel project: ${project.name}`);
-
+      
       // ✅ Ensure students array is properly formatted with all nested data
       const processedStudents = project.students.map((student) => {
         console.log(
           `👤 Processing panel student: ${student.name} (${student.regNo})`
         );
-
+        
         // ✅ Convert MongoDB Map to plain object for reviews
         let processedReviews = {};
         if (student.reviews) {
@@ -931,6 +1103,7 @@ export async function getAllPanelProjects(req, res) {
     const schoolDeptPairs = [
       ...new Set(processedProjects.map((p) => `${p.school}-${p.department}`)),
     ];
+    
     console.log(
       "Unique school-dept pairs for panel projects:",
       schoolDeptPairs
@@ -966,13 +1139,13 @@ export async function getAllPanelProjects(req, res) {
     const projectsWithSchemas = processedProjects.map((project) => {
       const schemaKey = `${project.school}-${project.department}`;
       const projectSchema = markingSchemas[schemaKey];
-
+      
       console.log(
         `Panel project ${project.name}: ${project.school}-${
           project.department
         } -> ${projectSchema ? "HAS SCHEMA" : "NO SCHEMA"}`
       );
-
+      
       if (projectSchema) {
         console.log(
           `📋 Panel schema reviews for ${project.name}:`,
@@ -1027,6 +1200,7 @@ export async function getAllPanelProjects(req, res) {
     });
   }
 }
+
 
 /**
  * Update project details with review data

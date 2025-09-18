@@ -125,9 +125,9 @@ export async function getFacultyProjects(req, res) {
       .populate("guideFaculty", "name employeeId")
       .lean();
 
-    // Panels where this faculty is a member
+    // ✅ FIXED: Panels where this faculty is a member (updated to use members array)
     const panels = await Panel.find({
-      $or: [{ faculty1: faculty._id }, { faculty2: faculty._id }],
+      members: faculty._id, // ✅ Updated from faculty1/faculty2 to members array
     }).select("_id");
 
     const panelIds = panels.map((panel) => panel._id);
@@ -136,7 +136,16 @@ export async function getFacultyProjects(req, res) {
     const panelProjects = await Project.find({ panel: { $in: panelIds } })
       .populate("students", "name regNo emailId")
       .populate("guideFaculty", "name employeeId")
-      .populate("panel")
+      .populate({
+        path: "panel",
+        model: "Panel",
+        select: "members venue school department", // ✅ Include venue field
+        populate: {
+          path: "members", // ✅ Populate members array
+          model: "Faculty",
+          select: "name employeeId",
+        },
+      })
       .lean();
 
     // Format response
@@ -156,7 +165,13 @@ export async function getFacultyProjects(req, res) {
               employeeId: project.guideFaculty.employeeId,
             }
           : null,
-        panel: project.panel || null,
+        panel: project.panel ? {
+          _id: project.panel._id,
+          members: project.panel.members || [], // ✅ Include members data
+          venue: project.panel.venue || null, // ✅ Include venue data
+          school: project.panel.school,
+          department: project.panel.department,
+        } : null,
       }));
 
     return res.status(200).json({

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import PopupReview from '../Components/PopupReview';
 import ReviewTable from '../Components/ReviewTable';
 import Navbar from '../Components/UniversalNavbar';
-import { ChevronRight, RefreshCw, Users, Calendar, AlertCircle } from 'lucide-react';
+import { ChevronRight, RefreshCw, Users, Calendar, AlertCircle, MapPin } from 'lucide-react';
 import { 
   getPanelProjects,
   updateProject,
@@ -22,6 +22,7 @@ function normalizeStudentData(student) {
       reviews = { ...student.reviews };
     }
   }
+  
   // --- Normalize deadline ---
   let deadline = {};
   if (student.deadline) {
@@ -31,6 +32,7 @@ function normalizeStudentData(student) {
       deadline = { ...student.deadline };
     }
   }
+  
   return {
     ...student,
     reviews,
@@ -95,13 +97,23 @@ const PanelContent = React.memo(({
                         </h3>
                         <p className="text-sm sm:text-base text-gray-600 mb-3">{team.description}</p>
                         
-                        <div className="flex items-center gap-4 mb-3">
+                        <div className="flex flex-wrap items-center gap-4 mb-3">
                           <div className="flex items-center gap-2 text-blue-600">
                             <Users className="w-4 h-4" />
                             <span className="text-sm font-medium">
                               {team.students.length} Student{team.students.length !== 1 ? 's' : ''}
                             </span>
                           </div>
+                          
+                          {/* ✅ Show venue if available */}
+                          {team.panel?.venue && (
+                            <div className="flex items-center gap-2 text-emerald-600">
+                              <MapPin className="w-4 h-4" />
+                              <span className="text-sm font-medium">
+                                Venue: {team.panel.venue}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         
                         {/* Status Information */}
@@ -208,6 +220,7 @@ const Panel = () => {
     try {
       setLoading(true);
       setError(null);
+      
       const [projectsRes, markingSchemaRes] = await Promise.all([
         getPanelProjects().catch(error => ({ data: { success: false, error: error.message } })),
         getFacultyMarkingSchema().catch(error => ({ data: { success: false, error: error.message } })),
@@ -221,10 +234,11 @@ const Panel = () => {
         mappedTeams = projects.map(project => ({
           id: project._id,
           title: project.name,
-          description: `Panel: ${[project.panel?.faculty1?.name, project.panel?.faculty2?.name].filter(Boolean).join(', ') || 'N/A'}`,
+          // ✅ Updated to use members array instead of faculty1/faculty2
+          description: `Panel: ${project.panel?.members?.map(member => member.name).join(', ') || 'N/A'}`,
           students: (project.students || []).map(normalizeStudentData),
           pptApproved: project.pptApproved || { approved: false, locked: false },
-          panel: project.panel,
+          panel: project.panel, // ✅ Include full panel data including venue
         }));
         setTeams(mappedTeams);
       } else {
@@ -254,6 +268,7 @@ const Panel = () => {
         if (mappedTeams.length > 0 && filteredReviews.length > 0) {
           const reviewTypes = filteredReviews.map(r => r.reviewName);
           const batchRequests = [];
+          
           mappedTeams.forEach(team => {
             team.students.forEach(student => {
               reviewTypes.forEach(reviewType => {
@@ -357,9 +372,11 @@ const Panel = () => {
   const isTeamDeadlinePassed = useCallback((reviewType, teamId) => {
     const team = teams.find(t => t.id === teamId);
     if (!team) return false;
+
     const now = new Date();
     const currentIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     const teamRequestStatus = getTeamRequestStatus(team, reviewType);
+
     // If approved request, check for individual extension per student for this review
     if (teamRequestStatus === 'approved') {
       const studentsWithOverride = team.students.filter(s => s.deadline && s.deadline[reviewType]);
@@ -378,6 +395,7 @@ const Panel = () => {
         if (latest) return currentIST > latest;
       }
     }
+
     // else, use global system deadline (from marking schema)
     if (!deadlines || !deadlines[reviewType]) return false;
     const d = deadlines[reviewType];
@@ -410,10 +428,13 @@ const Panel = () => {
     try {
       const team = teams.find(t => t.id === teamId);
       if (!team) return;
+
       const reviewConfig = markingSchema?.reviews?.find(r => r.reviewName === reviewType);
+
       // Merge student updates
       const studentUpdates = team.students.map(student => {
         const studentReviewData = reviewData[student.regNo] || {};
+        
         // Use schema to pick correct mark keys
         let marks = {};
         if (reviewConfig && reviewConfig.components) {
@@ -427,6 +448,7 @@ const Panel = () => {
             }
           });
         }
+
         return {
           studentId: student._id,
           reviews: {
@@ -440,11 +462,13 @@ const Panel = () => {
           ...(reviewConfig?.requiresPPT && pptObj?.pptApproved ? { pptApproved: pptObj.pptApproved } : {}),
         };
       });
+
       const updatePayload = {
         projectId: teamId,
         studentUpdates,
         ...(reviewConfig?.requiresPPT && pptObj ? { pptApproved: pptObj.pptApproved } : {}),
       };
+
       const response = await updateProject(updatePayload);
       if (response.data?.success || response.data?.updates) {
         setActivePopup(null);
@@ -466,13 +490,16 @@ const Panel = () => {
     try {
       const team = teams.find(t => t.id === teamId);
       if (!team) return;
+
       const reason = prompt('Please enter the reason for requesting edit access:', 'Need to correct marks after deadline');
       if (!reason?.trim()) return;
+
       const requestData = {
         regNo: team.students?.[0]?.regNo,
         reviewType: reviewType,
         reason: reason.trim()
       };
+
       const response = await createReviewRequest('panel', requestData);
       if (response.success) {
         alert('Edit request submitted successfully!');
@@ -488,6 +515,7 @@ const Panel = () => {
   }, [teams, handleRefresh]);
 
   // ---------------------------------------------------------
+
   if (loading) {
     return (
       <>
@@ -500,7 +528,7 @@ const Panel = () => {
                 <Users className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 animate-pulse" />
               </div>
             </div>
-            <h3 className="text-lg sm:text-2xl font-bold text-slate-800 mb-3">Loading Panel data Data</h3>
+            <h3 className="text-lg sm:text-2xl font-bold text-slate-800 mb-3">Loading Panel Data</h3>
             <p className="text-sm sm:text-base text-slate-600">Retrieving student records and academic data...</p>
           </div>
         </div>
@@ -566,7 +594,7 @@ const Panel = () => {
                 <span className="sm:hidden">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
             </div>
-
+            
             {/* Inner content that gets refreshed - Key changes to force re-render */}
             <PanelContent
               key={refreshKey} // This key changes on refresh, forcing re-render
@@ -589,10 +617,12 @@ const Panel = () => {
             {activePopup && (() => {
               const team = teams.find(t => t.id === activePopup.teamId);
               if (!team) return null;
+
               const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
               const requestStatus = getTeamRequestStatus(team, activePopup.type);
               const reviewTypes = getReviewTypes();
               const reviewTypeCfg = reviewTypes.find(r => r.key === activePopup.type);
+
               return (
                 <PopupReview
                   title={`${reviewTypeCfg?.name || activePopup.type} - ${team.title}`}
@@ -615,11 +645,6 @@ const Panel = () => {
           </div>
         </div>
       </div>
-
-
-
-
-
     </>
   );
 };
