@@ -54,7 +54,7 @@ function isDeadlineWithinDays(toDate, days) {
 }
 
 // Run every minute (as requested)
-cron.schedule("0 9 * * *", async () => {
+cron.schedule("* * * * *", async () => {
   console.log("=== CRON JOB RUNNING ===");
   console.log("Checking review deadlines at:", new Date().toISOString());
   

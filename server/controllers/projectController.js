@@ -35,7 +35,7 @@ export async function createProject(req, res, next) {
       students: studentDetails,
       guideFacultyEmpId,
       specialization,
-      type, 
+      type,
     } = req.body;
 
     if (!Array.isArray(studentDetails) || studentDetails.length === 0) {
@@ -260,7 +260,6 @@ export async function createProject(req, res, next) {
   }
 }
 
-
 export async function getAllProjects(req, res) {
   try {
     const { school, department } = req.query;
@@ -342,7 +341,8 @@ export async function getAllProjects(req, res) {
         school: project.school,
         department: project.department,
         specialization: project.specialization,
-        type: project.type, // <-- include new 'type' attribute here
+        type: project.type,
+        bestProject: !!project.bestProject, // <-- NEW LINE to include bestProject
         students: processedStudents,
         guideFaculty: project.guideFaculty,
         panel: project.panel,
@@ -365,28 +365,32 @@ export async function getAllProjects(req, res) {
   }
 }
 
-
 export async function createProjectsBulk(req, res) {
-  console.log("🚀 [BULK CREATE] Starting bulk project creation at", new Date().toISOString());
+  console.log(
+    "🚀 [BULK CREATE] Starting bulk project creation at",
+    new Date().toISOString()
+  );
   console.log("📥 [REQUEST BODY]", JSON.stringify(req.body, null, 2));
-  
+
   const session = await mongoose.startSession();
   console.log("✅ [SESSION] MongoDB session created successfully");
-  
+
   let transactionCommitted = false;
   const transactionStart = Date.now();
-  
+
   try {
     // Start transaction with timeout configuration
     session.startTransaction({
       maxTimeMS: 50000, // 50-second timeout (less than default 60s)
       readConcern: { level: "majority" },
-      writeConcern: { w: "majority", j: true }
+      writeConcern: { w: "majority", j: true },
     });
     console.log("🔄 [TRANSACTION] Transaction started with 50s timeout");
 
     const { school, department, projects, guideFacultyEmpId } = req.body;
-    console.log(`📋 [VALIDATION] School: ${school}, Department: ${department}, Projects count: ${projects?.length}, Guide: ${guideFacultyEmpId}`);
+    console.log(
+      `📋 [VALIDATION] School: ${school}, Department: ${department}, Projects count: ${projects?.length}, Guide: ${guideFacultyEmpId}`
+    );
 
     // Enhanced validation with logging
     if (!school || !department) {
@@ -398,9 +402,13 @@ export async function createProjectsBulk(req, res) {
         message: "School and department are required.",
       });
     }
-    
+
     if (!Array.isArray(projects) || projects.length === 0) {
-      console.log("❌ [VALIDATION ERROR] Invalid projects array:", typeof projects, projects?.length);
+      console.log(
+        "❌ [VALIDATION ERROR] Invalid projects array:",
+        typeof projects,
+        projects?.length
+      );
       await session.abortTransaction();
       await session.endSession();
       return res.status(400).json({
@@ -408,7 +416,7 @@ export async function createProjectsBulk(req, res) {
         message: "Projects array is required and must be non-empty.",
       });
     }
-    
+
     if (!guideFacultyEmpId) {
       console.log("❌ [VALIDATION ERROR] Missing guide faculty employee ID");
       await session.abortTransaction();
@@ -422,14 +430,18 @@ export async function createProjectsBulk(req, res) {
     console.log("✅ [VALIDATION] All basic validations passed");
 
     // Database operations with detailed logging
-    console.log(`🔍 [DB QUERY] Searching for marking schema: ${school}-${department}`);
+    console.log(
+      `🔍 [DB QUERY] Searching for marking schema: ${school}-${department}`
+    );
     const markingSchema = await MarkingSchema.findOne({
       school,
       department,
     }).session(session);
-    
+
     if (!markingSchema) {
-      console.log(`❌ [DB ERROR] Marking schema not found for ${school}-${department}`);
+      console.log(
+        `❌ [DB ERROR] Marking schema not found for ${school}-${department}`
+      );
       await session.abortTransaction();
       await session.endSession();
       return res.status(400).json({
@@ -438,17 +450,24 @@ export async function createProjectsBulk(req, res) {
       });
     }
     console.log("✅ [DB SUCCESS] Marking schema found:", markingSchema._id);
-    console.log("📊 [SCHEMA INFO] Reviews:", markingSchema.reviews?.map(r => r.reviewName));
+    console.log(
+      "📊 [SCHEMA INFO] Reviews:",
+      markingSchema.reviews?.map((r) => r.reviewName)
+    );
 
-    console.log(`🔍 [DB QUERY] Searching for guide faculty: ${guideFacultyEmpId}`);
+    console.log(
+      `🔍 [DB QUERY] Searching for guide faculty: ${guideFacultyEmpId}`
+    );
     const guideFacultyDoc = await Faculty.findOne({
       employeeId: guideFacultyEmpId,
       school,
       department,
     }).session(session);
-    
+
     if (!guideFacultyDoc) {
-      console.log(`❌ [DB ERROR] Guide faculty not found: ${guideFacultyEmpId} in ${school}-${department}`);
+      console.log(
+        `❌ [DB ERROR] Guide faculty not found: ${guideFacultyEmpId} in ${school}-${department}`
+      );
       await session.abortTransaction();
       await session.endSession();
       return res.status(400).json({
@@ -456,19 +475,26 @@ export async function createProjectsBulk(req, res) {
         message: `Guide faculty with employee ID ${guideFacultyEmpId} not found in ${school}-${department}`,
       });
     }
-    console.log("✅ [DB SUCCESS] Guide faculty found:", guideFacultyDoc._id, guideFacultyDoc.name);
+    console.log(
+      "✅ [DB SUCCESS] Guide faculty found:",
+      guideFacultyDoc._id,
+      guideFacultyDoc.name
+    );
 
     // Process reviews and deadlines - FIXED: Using plain objects instead of Map
     const reviewKeys = markingSchema.reviews.map((review) => review.reviewName);
     console.log("📝 [PROCESSING] Review keys:", reviewKeys);
-    
-    console.log("✅ [FIXED] Using plain object for defaultDeadlinesMap instead of Map()");
+
+    console.log(
+      "✅ [FIXED] Using plain object for defaultDeadlinesMap instead of Map()"
+    );
     const defaultDeadlinesObj = {};
     markingSchema.reviews.forEach((review) => {
-      const deadlineInfo = review.deadline && review.deadline.from && review.deadline.to 
-        ? { from: review.deadline.from, to: review.deadline.to }
-        : null;
-      
+      const deadlineInfo =
+        review.deadline && review.deadline.from && review.deadline.to
+          ? { from: review.deadline.from, to: review.deadline.to }
+          : null;
+
       defaultDeadlinesObj[review.reviewName] = deadlineInfo;
       console.log(`📅 [DEADLINE] ${review.reviewName}:`, deadlineInfo);
     });
@@ -478,31 +504,56 @@ export async function createProjectsBulk(req, res) {
 
     // Process in smaller batches to avoid transaction limits - OPTIMIZED: Reduced batch size
     const batchSize = 2; // Reduced from 5 to 2 for better transaction management
-    console.log(`📦 [BATCH INFO] Processing ${projects.length} projects in batches of ${batchSize}`);
+    console.log(
+      `📦 [BATCH INFO] Processing ${projects.length} projects in batches of ${batchSize}`
+    );
 
-    for (let batchStart = 0; batchStart < projects.length; batchStart += batchSize) {
+    for (
+      let batchStart = 0;
+      batchStart < projects.length;
+      batchStart += batchSize
+    ) {
       const batch = projects.slice(batchStart, batchStart + batchSize);
-      const batchNumber = Math.floor(batchStart/batchSize) + 1;
+      const batchNumber = Math.floor(batchStart / batchSize) + 1;
       const totalBatches = Math.ceil(projects.length / batchSize);
-      
-      console.log(`\n📦 [BATCH ${batchNumber}/${totalBatches}] Processing projects ${batchStart + 1}-${Math.min(batchStart + batchSize, projects.length)}`);
-      
+
+      console.log(
+        `\n📦 [BATCH ${batchNumber}/${totalBatches}] Processing projects ${
+          batchStart + 1
+        }-${Math.min(batchStart + batchSize, projects.length)}`
+      );
+
       // Check transaction timeout before processing each batch
       const elapsedTime = Date.now() - transactionStart;
-      if (elapsedTime > 45000) { // 45 seconds warning
-        console.log(`⚠️ [TIMEOUT WARNING] Transaction running for ${elapsedTime}ms, approaching timeout`);
+      if (elapsedTime > 45000) {
+        // 45 seconds warning
+        console.log(
+          `⚠️ [TIMEOUT WARNING] Transaction running for ${elapsedTime}ms, approaching timeout`
+        );
       }
 
       for (let i = 0; i < batch.length; i++) {
         const globalIndex = batchStart + i;
         const project = batch[i];
-        console.log(`\n🔄 [PROJECT ${globalIndex + 1}/${projects.length}] Processing: ${project.name || "Unnamed"}`);
+        console.log(
+          `\n🔄 [PROJECT ${globalIndex + 1}/${projects.length}] Processing: ${
+            project.name || "Unnamed"
+          }`
+        );
         console.log(`📊 [PROJECT DATA]`, JSON.stringify(project, null, 2));
-        
+
         try {
           // Project validation with detailed logging
-          if (!project.name || !Array.isArray(project.students) || project.students.length === 0) {
-            console.log(`❌ [PROJECT ERROR] Invalid project data - name: ${!!project.name}, students: ${Array.isArray(project.students)}, count: ${project.students?.length}`);
+          if (
+            !project.name ||
+            !Array.isArray(project.students) ||
+            project.students.length === 0
+          ) {
+            console.log(
+              `❌ [PROJECT ERROR] Invalid project data - name: ${!!project.name}, students: ${Array.isArray(
+                project.students
+              )}, count: ${project.students?.length}`
+            );
             results.errors++;
             results.details.push({
               project: project.name || `Project ${globalIndex + 1}`,
@@ -512,9 +563,16 @@ export async function createProjectsBulk(req, res) {
           }
 
           // Type validation with detailed logging - FIXED: Case insensitive
-          console.log(`🔍 [TYPE CHECK] Project type: "${project.type}", Valid types: ["hardware", "software"]`);
-          if (!project.type || !["hardware", "software"].includes(project.type.toLowerCase())) {
-            console.log(`❌ [TYPE ERROR] Invalid project type: "${project.type}"`);
+          console.log(
+            `🔍 [TYPE CHECK] Project type: "${project.type}", Valid types: ["hardware", "software"]`
+          );
+          if (
+            !project.type ||
+            !["hardware", "software"].includes(project.type.toLowerCase())
+          ) {
+            console.log(
+              `❌ [TYPE ERROR] Invalid project type: "${project.type}"`
+            );
             results.errors++;
             results.details.push({
               project: project.name || `Project ${globalIndex + 1}`,
@@ -524,15 +582,19 @@ export async function createProjectsBulk(req, res) {
           }
 
           // Check existing project
-          console.log(`🔍 [DUPLICATE CHECK] Searching for existing project: ${project.name}`);
+          console.log(
+            `🔍 [DUPLICATE CHECK] Searching for existing project: ${project.name}`
+          );
           const existingProject = await Project.findOne({
             name: project.name,
             school,
             department,
           }).session(session);
-          
+
           if (existingProject) {
-            console.log(`❌ [DUPLICATE ERROR] Project already exists: ${project.name}`);
+            console.log(
+              `❌ [DUPLICATE ERROR] Project already exists: ${project.name}`
+            );
             results.errors++;
             results.details.push({
               project: project.name,
@@ -541,15 +603,22 @@ export async function createProjectsBulk(req, res) {
             continue;
           }
 
-          console.log(`✅ [PROJECT VALID] Project validation passed: ${project.name}`);
+          console.log(
+            `✅ [PROJECT VALID] Project validation passed: ${project.name}`
+          );
           const studentIds = [];
 
           // Process students with detailed logging
-          console.log(`👥 [STUDENTS] Processing ${project.students.length} students`);
+          console.log(
+            `👥 [STUDENTS] Processing ${project.students.length} students`
+          );
           for (let j = 0; j < project.students.length; j++) {
             const studentObj = project.students[j];
-            console.log(`\n  👤 [STUDENT ${j + 1}] Processing:`, studentObj.regNo);
-            
+            console.log(
+              `\n  👤 [STUDENT ${j + 1}] Processing:`,
+              studentObj.regNo
+            );
+
             const {
               regNo,
               name: studentName,
@@ -560,53 +629,82 @@ export async function createProjectsBulk(req, res) {
 
             // Student validation
             if (!regNo || !studentName || !emailId) {
-              console.log(`  ❌ [STUDENT ERROR] Missing fields - regNo: ${!!regNo}, name: ${!!studentName}, email: ${!!emailId}`);
-              throw new Error("Student missing required fields (regNo, name, emailId)");
+              console.log(
+                `  ❌ [STUDENT ERROR] Missing fields - regNo: ${!!regNo}, name: ${!!studentName}, email: ${!!emailId}`
+              );
+              throw new Error(
+                "Student missing required fields (regNo, name, emailId)"
+              );
             }
 
             if (studSchool !== school || studDepartment !== department) {
-              console.log(`  ❌ [STUDENT ERROR] School/dept mismatch - Expected: ${school}/${department}, Got: ${studSchool}/${studDepartment}`);
-              throw new Error(`Student ${regNo} has mismatched school or department`);
+              console.log(
+                `  ❌ [STUDENT ERROR] School/dept mismatch - Expected: ${school}/${department}, Got: ${studSchool}/${studDepartment}`
+              );
+              throw new Error(
+                `Student ${regNo} has mismatched school or department`
+              );
             }
 
             // Check existing student
-            console.log(`  🔍 [STUDENT CHECK] Searching for existing student: ${regNo}`);
-            const existingStudent = await Student.findOne({ regNo }).session(session);
+            console.log(
+              `  🔍 [STUDENT CHECK] Searching for existing student: ${regNo}`
+            );
+            const existingStudent = await Student.findOne({ regNo }).session(
+              session
+            );
             if (existingStudent) {
-              console.log(`  ❌ [STUDENT ERROR] Student already exists: ${regNo}`);
+              console.log(
+                `  ❌ [STUDENT ERROR] Student already exists: ${regNo}`
+              );
               throw new Error(`Student already exists with regNo ${regNo}`);
             }
 
             // Create reviews object - FIXED: Using plain object instead of Map
-            console.log(`  ✅ [FIXED] Using plain object for reviewsObj instead of Map()`);
-            console.log(`  🔄 [REVIEWS] Creating reviews for ${reviewKeys.length} review types`);
+            console.log(
+              `  ✅ [FIXED] Using plain object for reviewsObj instead of Map()`
+            );
+            console.log(
+              `  🔄 [REVIEWS] Creating reviews for ${reviewKeys.length} review types`
+            );
             const reviewsObj = {};
-            
+
             for (const reviewKey of reviewKeys) {
-              const reviewDef = markingSchema.reviews.find((rev) => rev.reviewName === reviewKey);
-              console.log(`    📝 [REVIEW] Processing ${reviewKey}, components: ${reviewDef?.components?.length || 0}`);
-              
+              const reviewDef = markingSchema.reviews.find(
+                (rev) => rev.reviewName === reviewKey
+              );
+              console.log(
+                `    📝 [REVIEW] Processing ${reviewKey}, components: ${
+                  reviewDef?.components?.length || 0
+                }`
+              );
+
               const marks = {};
               if (reviewDef && Array.isArray(reviewDef.components)) {
                 for (const comp of reviewDef.components) {
                   marks[comp.name] = 0;
                 }
               }
-              
+
               const reviewData = {
                 marks,
                 comments: "",
                 attendance: { value: false, locked: false },
                 locked: false,
               };
-              
+
               reviewsObj[reviewKey] = reviewData; // Plain object assignment
-              console.log(`    ✅ [REVIEW SET] ${reviewKey}:`, Object.keys(marks));
+              console.log(
+                `    ✅ [REVIEW SET] ${reviewKey}:`,
+                Object.keys(marks)
+              );
             }
 
             console.log(`  🏗️  [STUDENT CREATE] Creating student document`);
-            console.log(`  ✅ [FIXED] Using plain objects for reviews and deadline`);
-            
+            console.log(
+              `  ✅ [FIXED] Using plain objects for reviews and deadline`
+            );
+
             const student = new Student({
               regNo,
               name: studentName,
@@ -617,15 +715,21 @@ export async function createProjectsBulk(req, res) {
               school,
               department,
             });
-            
-            console.log(`  💾 [STUDENT SAVE] Attempting to save student: ${regNo}`);
+
+            console.log(
+              `  💾 [STUDENT SAVE] Attempting to save student: ${regNo}`
+            );
             await student.save({ session });
-            console.log(`  ✅ [STUDENT SUCCESS] Student saved: ${regNo} -> ${student._id}`);
+            console.log(
+              `  ✅ [STUDENT SUCCESS] Student saved: ${regNo} -> ${student._id}`
+            );
             studentIds.push(student._id);
           }
 
           // Create project with detailed logging
-          console.log(`\n🏗️  [PROJECT CREATE] Creating project document with ${studentIds.length} students`);
+          console.log(
+            `\n🏗️  [PROJECT CREATE] Creating project document with ${studentIds.length} students`
+          );
           const projectData = {
             name: project.name,
             students: studentIds,
@@ -636,17 +740,26 @@ export async function createProjectsBulk(req, res) {
             specialization: project.specialization || "",
             type: project.type.toLowerCase(), // Normalize case
           };
-          console.log(`📊 [PROJECT DATA]`, JSON.stringify(projectData, null, 2));
-          
-          const newProject = new Project(projectData);
-          
-          console.log(`💾 [PROJECT SAVE] Attempting to save project: ${project.name}`);
-          await newProject.save({ session });
-          console.log(`✅ [PROJECT SUCCESS] Project saved: ${project.name} -> ${newProject._id}`);
-          results.created++;
+          console.log(
+            `📊 [PROJECT DATA]`,
+            JSON.stringify(projectData, null, 2)
+          );
 
+          const newProject = new Project(projectData);
+
+          console.log(
+            `💾 [PROJECT SAVE] Attempting to save project: ${project.name}`
+          );
+          await newProject.save({ session });
+          console.log(
+            `✅ [PROJECT SUCCESS] Project saved: ${project.name} -> ${newProject._id}`
+          );
+          results.created++;
         } catch (error) {
-          console.log(`\n💥 [PROJECT FAILED] Error in project ${globalIndex + 1}:`, error.message);
+          console.log(
+            `\n💥 [PROJECT FAILED] Error in project ${globalIndex + 1}:`,
+            error.message
+          );
           console.log(`📊 [FULL ERROR]`, error);
           results.errors++;
           results.details.push({
@@ -655,28 +768,42 @@ export async function createProjectsBulk(req, res) {
           });
         }
       }
-      
+
       // Brief pause between batches to avoid overwhelming the database
       if (batchStart + batchSize < projects.length) {
         console.log(`⏸️  [BATCH PAUSE] Pausing 200ms between batches...`);
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, 200));
       }
-      
+
       // Log progress
-      const progress = ((batchStart + batchSize) / projects.length * 100).toFixed(1);
-      console.log(`📈 [PROGRESS] ${progress}% completed (${Math.min(batchStart + batchSize, projects.length)}/${projects.length} projects)`);
+      const progress = (
+        ((batchStart + batchSize) / projects.length) *
+        100
+      ).toFixed(1);
+      console.log(
+        `📈 [PROGRESS] ${progress}% completed (${Math.min(
+          batchStart + batchSize,
+          projects.length
+        )}/${projects.length} projects)`
+      );
     }
 
     // CRITICAL FIX: Commit transaction with proper timeout and error handling
     const transactionDuration = Date.now() - transactionStart;
-    console.log(`\n🔄 [TRANSACTION] Attempting to commit transaction after ${transactionDuration}ms`);
-    console.log(`📊 [RESULTS SUMMARY] Created: ${results.created}, Errors: ${results.errors}`);
-    
+    console.log(
+      `\n🔄 [TRANSACTION] Attempting to commit transaction after ${transactionDuration}ms`
+    );
+    console.log(
+      `📊 [RESULTS SUMMARY] Created: ${results.created}, Errors: ${results.errors}`
+    );
+
     try {
       await session.commitTransaction();
       transactionCommitted = true;
-      console.log(`✅ [TRANSACTION SUCCESS] Transaction committed successfully in ${transactionDuration}ms`);
-      
+      console.log(
+        `✅ [TRANSACTION SUCCESS] Transaction committed successfully in ${transactionDuration}ms`
+      );
+
       // Prepare response after successful commit
       const response = {
         success: true,
@@ -685,32 +812,36 @@ export async function createProjectsBulk(req, res) {
         timing: {
           duration: transactionDuration,
           projects: projects.length,
-          averagePerProject: Math.round(transactionDuration / projects.length)
-        }
+          averagePerProject: Math.round(transactionDuration / projects.length),
+        },
       };
-      
+
       console.log(`🎉 [FINAL SUCCESS]`, JSON.stringify(response, null, 2));
-      
+
       // End session and send response in success path
       await session.endSession();
       console.log(`✅ [SESSION END] Session ended successfully`);
-      
+
       return res.status(201).json(response);
-      
     } catch (commitError) {
-      console.log(`❌ [COMMIT ERROR] Transaction commit failed:`, commitError.message);
+      console.log(
+        `❌ [COMMIT ERROR] Transaction commit failed:`,
+        commitError.message
+      );
       console.log(`📊 [COMMIT DETAILS]`, commitError);
-      
+
       // Don't try to abort here - transaction is already aborted by MongoDB
       transactionCommitted = false;
       throw commitError; // Re-throw to be caught by outer catch block
     }
-    
   } catch (error) {
     const errorDuration = Date.now() - transactionStart;
-    console.log(`\n💥 [FATAL ERROR] Critical error in bulk project creation after ${errorDuration}ms:`, error.message);
+    console.log(
+      `\n💥 [FATAL ERROR] Critical error in bulk project creation after ${errorDuration}ms:`,
+      error.message
+    );
     console.log(`📊 [FULL ERROR STACK]`, error.stack);
-    
+
     // CRITICAL FIX: Only abort if transaction hasn't been committed yet
     if (!transactionCommitted) {
       console.log(`🔄 [CLEANUP] Attempting to abort transaction`);
@@ -720,16 +851,20 @@ export async function createProjectsBulk(req, res) {
           await session.abortTransaction();
           console.log(`🚫 [ABORT SUCCESS] Transaction aborted`);
         } else {
-          console.log(`ℹ️  [ABORT SKIP] No active transaction to abort - already aborted by MongoDB`);
+          console.log(
+            `ℹ️  [ABORT SKIP] No active transaction to abort - already aborted by MongoDB`
+          );
         }
       } catch (abortError) {
         console.log(`❌ [ABORT ERROR]`, abortError.message);
         // MongoDB likely already aborted the transaction automatically
       }
     } else {
-      console.log(`ℹ️  [SKIP ABORT] Transaction already committed, skipping abort`);
+      console.log(
+        `ℹ️  [SKIP ABORT] Transaction already committed, skipping abort`
+      );
     }
-    
+
     // Always try to end session
     try {
       await session.endSession();
@@ -737,27 +872,27 @@ export async function createProjectsBulk(req, res) {
     } catch (sessionError) {
       console.log(`❌ [SESSION ERROR]`, sessionError.message);
     }
-    
+
     const errorResponse = {
       success: false,
       message: "Server error during bulk project creation",
       error: error.message,
       timing: {
         duration: errorDuration,
-        failedAt: "transaction_processing"
-      }
+        failedAt: "transaction_processing",
+      },
     };
-    
+
     console.log(`💀 [FINAL ERROR]`, JSON.stringify(errorResponse, null, 2));
     return res.status(500).json(errorResponse);
-    
   } finally {
     const totalDuration = Date.now() - transactionStart;
-    console.log(`🏁 [COMPLETE] Bulk project creation function completed at ${new Date().toISOString()}`);
+    console.log(
+      `🏁 [COMPLETE] Bulk project creation function completed at ${new Date().toISOString()}`
+    );
     console.log(`⏱️  [TIMING] Total execution time: ${totalDuration}ms`);
   }
 }
-
 
 export async function deleteProject(req, res) {
   try {
@@ -789,59 +924,43 @@ export async function getAllGuideProjects(req, res) {
     const userId = req.user.id;
     console.log("getAllGuideProjects called for user:", userId);
 
-    // ✅ FIXED: Populate ALL project details including student reviews and other nested data
-    const projects = await Project.find({
-      guideFaculty: userId,
-    })
+    const projects = await Project.find({ guideFaculty: userId })
       .populate({
         path: "students",
         model: "Student",
         select:
-          "regNo name emailId reviews pptApproved deadline school department", // ✅ Include all student fields
+          "regNo name emailId reviews pptApproved deadline school department",
       })
       .populate({
         path: "guideFaculty",
         model: "Faculty",
-        select: "name emailId employeeId school department specialization", // ✅ Include all faculty fields
+        select: "name emailId employeeId school department specialization",
       })
-      // ✅ REPLACE the panel populate sections with this fixed version:
       .populate({
         path: "panel",
         model: "Panel",
-        select: "school department", // ✅ FIXED: Removed non-existent fields
+        select: "school department",
         populate: {
-          path: "members", // ✅ FIXED: Use 'members' not 'faculty1/faculty2'
+          path: "members",
           model: "Faculty",
           select: "name emailId employeeId",
         },
       })
-
-      .lean(); // ✅ Use lean() for better performance since we're converting to object anyway
+      .lean();
 
     console.log("Found guide projects:", projects.length);
 
-    // ✅ Process each project to ensure all data is properly formatted
     const processedProjects = projects.map((project) => {
-      console.log(`🔄 Processing project: ${project.name}`);
-
-      // ✅ Ensure students array is properly formatted with all nested data
       const processedStudents = project.students.map((student) => {
-        console.log(
-          `👤 Processing student: ${student.name} (${student.regNo})`
-        );
-
-        // ✅ Convert MongoDB Map to plain object for reviews
         let processedReviews = {};
         if (student.reviews) {
           if (student.reviews instanceof Map) {
-            // Convert Map to plain object
             processedReviews = Object.fromEntries(student.reviews);
           } else if (typeof student.reviews === "object") {
             processedReviews = { ...student.reviews };
           }
         }
 
-        // ✅ Convert deadline Map to plain object
         let processedDeadlines = {};
         if (student.deadline) {
           if (student.deadline instanceof Map) {
@@ -851,26 +970,17 @@ export async function getAllGuideProjects(req, res) {
           }
         }
 
-        console.log(
-          `📊 Student ${student.name} reviews:`,
-          Object.keys(processedReviews)
-        );
-        console.log(
-          `📅 Student ${student.name} deadlines:`,
-          Object.keys(processedDeadlines)
-        );
-
         return {
           _id: student._id,
           regNo: student.regNo,
           name: student.name,
           emailId: student.emailId,
-          reviews: processedReviews, // ✅ Plain object instead of Map
+          reviews: processedReviews,
           pptApproved: student.pptApproved || {
             approved: false,
             locked: false,
           },
-          deadline: processedDeadlines, // ✅ Plain object instead of Map
+          deadline: processedDeadlines,
           school: student.school,
           department: student.department,
         };
@@ -878,7 +988,8 @@ export async function getAllGuideProjects(req, res) {
 
       return {
         ...project,
-        students: processedStudents, // ✅ Use processed students with converted Maps
+        bestProject: !!project.bestProject,
+        students: processedStudents,
       };
     });
 
@@ -936,6 +1047,7 @@ export async function getAllGuideProjects(req, res) {
 
       return {
         ...project,
+        bestProject: !!project.bestProject,
         markingSchema: projectSchema || null, // ✅ Each project gets its own schema
       };
     });
@@ -988,14 +1100,14 @@ export async function getAllPanelProjects(req, res) {
   try {
     const facultyId = req.user.id;
     console.log("getAllPanelProjects called for user:", facultyId);
-    
+
     // Find panels where this faculty is a member
     const panels = await Panel.find({
       members: facultyId, // Updated to use members array
     });
-    
+
     console.log("Found panels:", panels.length);
-    
+
     if (panels.length === 0) {
       return res.status(200).json({
         success: true,
@@ -1038,13 +1150,13 @@ export async function getAllPanelProjects(req, res) {
     // ✅ Process each project to ensure all data is properly formatted
     const processedProjects = panelProjects.map((project) => {
       console.log(`🔄 Processing panel project: ${project.name}`);
-      
+
       // ✅ Ensure students array is properly formatted with all nested data
       const processedStudents = project.students.map((student) => {
         console.log(
           `👤 Processing panel student: ${student.name} (${student.regNo})`
         );
-        
+
         // ✅ Convert MongoDB Map to plain object for reviews
         let processedReviews = {};
         if (student.reviews) {
@@ -1103,7 +1215,7 @@ export async function getAllPanelProjects(req, res) {
     const schoolDeptPairs = [
       ...new Set(processedProjects.map((p) => `${p.school}-${p.department}`)),
     ];
-    
+
     console.log(
       "Unique school-dept pairs for panel projects:",
       schoolDeptPairs
@@ -1139,13 +1251,13 @@ export async function getAllPanelProjects(req, res) {
     const projectsWithSchemas = processedProjects.map((project) => {
       const schemaKey = `${project.school}-${project.department}`;
       const projectSchema = markingSchemas[schemaKey];
-      
+
       console.log(
         `Panel project ${project.name}: ${project.school}-${
           project.department
         } -> ${projectSchema ? "HAS SCHEMA" : "NO SCHEMA"}`
       );
-      
+
       if (projectSchema) {
         console.log(
           `📋 Panel schema reviews for ${project.name}:`,
@@ -1201,7 +1313,6 @@ export async function getAllPanelProjects(req, res) {
   }
 }
 
-
 /**
  * Update project details with review data
  */
@@ -1245,7 +1356,8 @@ export const updateProjectDetails = async (req, res) => {
         "school",
         "department",
         "specialization",
-        "type", // Added 'type' to updatable fields
+        "type",
+        "bestProject", // <--- Add here!
       ];
 
       for (const key of Object.keys(projectUpdates)) {
@@ -1423,4 +1535,3 @@ export async function getProjectDetails(req, res) {
     });
   }
 }
-

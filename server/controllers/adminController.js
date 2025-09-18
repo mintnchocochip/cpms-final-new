@@ -989,7 +989,7 @@ export async function getAllRequests(req, res) {
 
 export async function createPanelManually(req, res) {
   try {
-    const { memberEmployeeIds, school, department } = req.body; // expecting array of employeeIds, optional school & department
+    const { memberEmployeeIds, school, department, venue } = req.body; // expecting array of employeeIds, optional school & department
 
     // Validate input
     if (
@@ -1052,11 +1052,12 @@ export async function createPanelManually(req, res) {
     }
 
     // Create and save panel
-    const panel = new Panel({
+    const panelData = {
       members: faculties.map((f) => f._id), // ObjectId references to Faculty
       school: panelSchool,
       department: panelDepartment,
-    });
+      ...(venue ? { venue } : {}),
+    };
 
     await panel.save();
 
