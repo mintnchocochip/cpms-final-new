@@ -1,4 +1,5 @@
 import React from 'react';
+import { Star } from 'lucide-react'; // ✅ Add Star icon
 
 const renderMarks = (reviewObj, components = []) => {
   if (!reviewObj) return <span className="text-gray-400">None</span>;
@@ -57,6 +58,7 @@ const ReviewTable = ({
   console.log('=== [ReviewTable] REVIEW TABLE RENDER ===');
   console.log('📋 [ReviewTable] Team:', team?.title);
   console.log('📋 [ReviewTable] Team Marking Schema:', team?.markingSchema);
+  console.log('🏆 [ReviewTable] Team Best Project Status:', team?.bestProject);
 
   const teamMarkingSchema = team?.markingSchema || markingSchema;
 
@@ -154,27 +156,39 @@ const ReviewTable = ({
       <div className="mt-1 p-4 bg-gray-50 rounded-lg">
         <h3 className="font-semibold text-lg mb-3">Team Summary</h3>
         
-        {/* <div className="mb-3">
-          <span className="font-medium">Overall PPT Approved: </span>
-          <span className={team.students.every(s => s.pptApproved?.approved) ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-            {team.students.every(s => s.pptApproved?.approved) ? 'Yes' : 'No'}
-          </span>
-        </div> */}
-        
-        {/* <div className="mb-3">
-          <div className="font-medium mb-2">Individual PPT Status:</div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {team.students.map((student) => (
-              <div key={student.regNo} className="text-sm">
-                <span>{student.name}: </span>
-                <span className={student.pptApproved?.approved ? 'text-green-600' : 'text-red-600'}>
-                  {student.pptApproved?.approved ? '✓' : '✗'}
+        {/* ✅ NEW: Best Project Status Display - ONLY for Panel Mode */}
+        {panelMode && (
+          <div className="mb-4">
+            <div className="flex items-center gap-3 p-3 rounded-lg border-2" style={{
+              backgroundColor: team?.bestProject ? '#fef3c7' : '#f3f4f6',
+              borderColor: team?.bestProject ? '#f59e0b' : '#d1d5db'
+            }}>
+              <Star 
+                className={`w-6 h-6 ${team?.bestProject ? 'text-yellow-600 fill-yellow-400' : 'text-gray-400'}`} 
+              />
+              <div className="flex-1">
+                <span className="font-bold text-lg">Best Project Status: </span>
+                <span className={`font-bold text-lg ${
+                  team?.bestProject ? 'text-yellow-800' : 'text-gray-600'
+                }`}>
+                  {team?.bestProject ? '⭐ MARKED AS BEST PROJECT' : 'Not marked as best project'}
                 </span>
               </div>
-            ))}
+              {team?.bestProject && (
+                <div className="bg-yellow-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                  🏆 BEST
+                </div>
+              )}
+            </div>
+            <p className="text-sm text-gray-600 mt-2">
+              {team?.bestProject 
+                ? 'This project has been recognized by the panel as one of the best projects.'
+                : 'Panel can mark this project as a best project during review evaluation.'}
+            </p>
           </div>
-        </div> */}
+        )}
         
+        {/* ✅ Rest of the Team Summary remains unchanged */}
         {Object.keys(deadlines).length > 0 && (
           <div>
             <div className="font-medium mb-2">Review Deadlines:</div>
@@ -207,143 +221,143 @@ const ReviewTable = ({
           </div>
         )}
       </div>
+      
+      {/* ✅ Rest of the table remains exactly the same */}
       <table className="min-w-full bg-white border border-gray-200">
-  <thead className="bg-gray-100">
-    <tr>
-      <th className="px-4 py-3 border font-semibold text-left sticky left-0 bg-gray-100 z-10 min-w-[150px]">
-        Student Name
-      </th>
-      {columns.map(col => (
-        <th key={col.key} className="px-4 py-3 border text-center min-w-[120px]">
-          <div className="flex flex-col items-center space-y-2">
-            <span className="font-semibold text-sm">{col.label}</span>
-            <div className="text-xs text-gray-600 leading-tight">
-              {col.components.length > 0 ? (
-                <div className="space-y-1">
-                  <div className="font-medium">Components:</div>
-                  <div>
-                    {col.components.map((comp, idx) => (
-                      <div key={idx} className="truncate max-w-[100px]" title={comp.name}>
-                        {comp.name} ({comp.weight || 10})
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="px-4 py-3 border font-semibold text-left sticky left-0 bg-gray-100 z-10 min-w-[150px]">
+              Student Name
+            </th>
+            {columns.map(col => (
+              <th key={col.key} className="px-4 py-3 border text-center min-w-[120px]">
+                <div className="flex flex-col items-center space-y-2">
+                  <span className="font-semibold text-sm">{col.label}</span>
+                  <div className="text-xs text-gray-600 leading-tight">
+                    {col.components.length > 0 ? (
+                      <div className="space-y-1">
+                        <div className="font-medium">Components:</div>
+                        <div>
+                          {col.components.map((comp, idx) => (
+                            <div key={idx} className="truncate max-w-[100px]" title={comp.name}>
+                              {comp.name} ({comp.weight || 10})
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-blue-600">+ Attendance</div>
                       </div>
-                    ))}
+                    ) : (
+                      'Marks | Attendance'
+                    )}
                   </div>
-                  <div className="text-blue-600">+ Attendance</div>
+                  {col.requiresPPT && (
+                    <div className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
+                      PPT Required
+                    </div>
+                  )}
                 </div>
-              ) : (
-                'Marks | Attendance'
-              )}
-            </div>
-            {col.requiresPPT && (
-              <div className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
-                PPT Required
-              </div>
-            )}
-          </div>
-          {team.students.some(student => checkReviewLocked(student, col.key)) && (
-            <div className="mt-2">
-              <span className="px-2 py-1 text-xs bg-red-200 text-red-700 rounded">
-                🔒 Locked
-              </span>
-            </div>
-          )}
-        </th>
-      ))}
-      <th className="px-4 py-3 border text-center min-w-[120px]">Comments</th>
-      <th className="px-4 py-3 border text-center min-w-[120px]">PPT Status</th>
-    </tr>
-  </thead>
-  <tbody>
-    {team.students.map((student, studentIndex) => (
-      <tr
-        key={`${student._id}_${forceRenderKey}`}
-        className={studentIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-      >
-        <td className="px-4 py-3 border font-semibold sticky left-0 bg-inherit z-10 min-w-[150px]">
-          <div className="break-words">
-            <div>{student.name}</div>
-            <div className="text-sm text-gray-600">{student.regNo}</div>
-          </div>
-        </td>
-        {columns.map(col => {
-          let reviewData = null;
-          if (student.reviews && typeof student.reviews.get === 'function') {
-            reviewData = student.reviews.get(col.key);
-          } else if (student.reviews && student.reviews[col.key]) {
-            reviewData = student.reviews[col.key];
-          }
-          const isLocked = checkReviewLocked(student, col.key);
-          return (
-            <td
-              key={`${student._id}_${col.key}`}
-              className="px-4 py-3 border text-center align-middle"
-            >
-              <div className="space-y-3">
-                <div>
-                  <div className="text-sm font-medium text-gray-700 mb-1">Marks:</div>
-                  <div className="font-semibold">{renderMarks(reviewData, col.components)}</div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-700 mb-1">Attendance:</div>
-                  <div>{renderAttendance(reviewData?.attendance)}</div>
-                </div>
-                {isLocked && (
-                  <div className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
-                    🔒 Locked
+                {team.students.some(student => checkReviewLocked(student, col.key)) && (
+                  <div className="mt-2">
+                    <span className="px-2 py-1 text-xs bg-red-200 text-red-700 rounded">
+                      🔒 Locked
+                    </span>
                   </div>
                 )}
-              </div>
-            </td>
-          );
-        })}
-        <td className="px-4 py-3 border align-middle max-w-md">
-          <div className="space-y-2">
-            {columns.map(col => {
-              let reviewData = null;
-              if (student.reviews && typeof student.reviews.get === 'function') {
-                reviewData = student.reviews.get(col.key);
-              } else if (student.reviews && student.reviews[col.key]) {
-                reviewData = student.reviews[col.key];
-              }
-              const comments = reviewData?.comments;
-              if (comments && comments.trim()) {
+              </th>
+            ))}
+            <th className="px-4 py-3 border text-center min-w-[120px]">Comments</th>
+            <th className="px-4 py-3 border text-center min-w-[120px]">PPT Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {team.students.map((student, studentIndex) => (
+            <tr
+              key={`${student._id}_${forceRenderKey}`}
+              className={studentIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
+            >
+              <td className="px-4 py-3 border font-semibold sticky left-0 bg-inherit z-10 min-w-[150px]">
+                <div className="break-words">
+                  <div>{student.name}</div>
+                  <div className="text-sm text-gray-600">{student.regNo}</div>
+                </div>
+              </td>
+              {columns.map(col => {
+                let reviewData = null;
+                if (student.reviews && typeof student.reviews.get === 'function') {
+                  reviewData = student.reviews.get(col.key);
+                } else if (student.reviews && student.reviews[col.key]) {
+                  reviewData = student.reviews[col.key];
+                }
+                const isLocked = checkReviewLocked(student, col.key);
                 return (
-                  <div key={`${student._id}_${col.key}_comment`} className="mb-3">
-                    <div className="text-sm font-medium text-gray-700 mb-1">{col.label}:</div>
-                    <div className="text-sm">{renderComments(comments)}</div>
-                  </div>
+                  <td
+                    key={`${student._id}_${col.key}`}
+                    className="px-4 py-3 border text-center align-middle"
+                  >
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-sm font-medium text-gray-700 mb-1">Marks:</div>
+                        <div className="font-semibold">{renderMarks(reviewData, col.components)}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-700 mb-1">Attendance:</div>
+                        <div>{renderAttendance(reviewData?.attendance)}</div>
+                      </div>
+                      {isLocked && (
+                        <div className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
+                          🔒 Locked
+                        </div>
+                      )}
+                    </div>
+                  </td>
                 );
-              }
-              return null;
-            })}
-            {!columns.some(col => {
-              let reviewData = null;
-              if (student.reviews && typeof student.reviews.get === 'function') {
-                reviewData = student.reviews.get(col.key);
-              } else if (student.reviews && student.reviews[col.key]) {
-                reviewData = student.reviews[col.key];
-              }
-              return reviewData?.comments && reviewData.comments.trim();
-            }) && <span className="text-gray-400 text-sm">No comments</span>}
-          </div>
-        </td>
-        <td className="px-4 py-3 border align-middle">
-          <div className="space-y-2">
-            <div className="text-sm  ">
-              <span
-                className={student.pptApproved?.approved ? 'text-green-600' : 'text-red-600'}
-              >
-                <b>{student.pptApproved?.approved ? 'PPT Approved' : 'PPT Not Approved'}</b>
-              </span>
-            </div>
-          </div>
-        </td>
-      </tr>
-    ))}
-  </tbody>
-</table>
-      
-      
+              })}
+              <td className="px-4 py-3 border align-middle max-w-md">
+                <div className="space-y-2">
+                  {columns.map(col => {
+                    let reviewData = null;
+                    if (student.reviews && typeof student.reviews.get === 'function') {
+                      reviewData = student.reviews.get(col.key);
+                    } else if (student.reviews && student.reviews[col.key]) {
+                      reviewData = student.reviews[col.key];
+                    }
+                    const comments = reviewData?.comments;
+                    if (comments && comments.trim()) {
+                      return (
+                        <div key={`${student._id}_${col.key}_comment`} className="mb-3">
+                          <div className="text-sm font-medium text-gray-700 mb-1">{col.label}:</div>
+                          <div className="text-sm">{renderComments(comments)}</div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                  {!columns.some(col => {
+                    let reviewData = null;
+                    if (student.reviews && typeof student.reviews.get === 'function') {
+                      reviewData = student.reviews.get(col.key);
+                    } else if (student.reviews && student.reviews[col.key]) {
+                      reviewData = student.reviews[col.key];
+                    }
+                    return reviewData?.comments && reviewData.comments.trim();
+                  }) && <span className="text-gray-400 text-sm">No comments</span>}
+                </div>
+              </td>
+              <td className="px-4 py-3 border align-middle">
+                <div className="space-y-2">
+                  <div className="text-sm">
+                    <span
+                      className={student.pptApproved?.approved ? 'text-green-600' : 'text-red-600'}
+                    >
+                      <b>{student.pptApproved?.approved ? 'PPT Approved' : 'PPT Not Approved'}</b>
+                    </span>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };

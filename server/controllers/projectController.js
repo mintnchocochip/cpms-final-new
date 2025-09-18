@@ -1148,66 +1148,63 @@ export async function getAllPanelProjects(req, res) {
     console.log("Found panel projects:", panelProjects.length);
 
     // ✅ Process each project to ensure all data is properly formatted
-    const processedProjects = panelProjects.map((project) => {
-      console.log(`🔄 Processing panel project: ${project.name}`);
+  // ✅ Process each project to ensure all data is properly formatted
+const processedProjects = panelProjects.map((project) => {
+  console.log(`🔄 Processing panel project: ${project.name}`);
+  // ✅ Ensure students array is properly formatted with all nested data
+  const processedStudents = project.students.map((student) => {
+    console.log(
+      `👤 Processing panel student: ${student.name} (${student.regNo})`
+    );
+    // ✅ Convert MongoDB Map to plain object for reviews
+    let processedReviews = {};
+    if (student.reviews) {
+      if (student.reviews instanceof Map) {
+        // Convert Map to plain object
+        processedReviews = Object.fromEntries(student.reviews);
+      } else if (typeof student.reviews === "object") {
+        processedReviews = { ...student.reviews };
+      }
+    }
+    // ✅ Convert deadline Map to plain object
+    let processedDeadlines = {};
+    if (student.deadline) {
+      if (student.deadline instanceof Map) {
+        processedDeadlines = Object.fromEntries(student.deadline);
+      } else if (typeof student.deadline === "object") {
+        processedDeadlines = { ...student.deadline };
+      }
+    }
+    console.log(
+      `📊 Panel student ${student.name} reviews:`,
+      Object.keys(processedReviews)
+    );
+    console.log(
+      `📅 Panel student ${student.name} deadlines:`,
+      Object.keys(processedDeadlines)
+    );
+    return {
+      _id: student._id,
+      regNo: student.regNo,
+      name: student.name,
+      emailId: student.emailId,
+      reviews: processedReviews, // ✅ Plain object instead of Map
+      pptApproved: student.pptApproved || {
+        approved: false,
+        locked: false,
+      },
+      deadline: processedDeadlines, // ✅ Plain object instead of Map
+      school: student.school,
+      department: student.department,
+    };
+  });
+  return {
+    ...project,
+    students: processedStudents, // ✅ Use processed students with converted Maps
+    bestProject: !!project.bestProject, // ✅ NEW LINE: Include bestProject field
+  };
+});
 
-      // ✅ Ensure students array is properly formatted with all nested data
-      const processedStudents = project.students.map((student) => {
-        console.log(
-          `👤 Processing panel student: ${student.name} (${student.regNo})`
-        );
-
-        // ✅ Convert MongoDB Map to plain object for reviews
-        let processedReviews = {};
-        if (student.reviews) {
-          if (student.reviews instanceof Map) {
-            // Convert Map to plain object
-            processedReviews = Object.fromEntries(student.reviews);
-          } else if (typeof student.reviews === "object") {
-            processedReviews = { ...student.reviews };
-          }
-        }
-
-        // ✅ Convert deadline Map to plain object
-        let processedDeadlines = {};
-        if (student.deadline) {
-          if (student.deadline instanceof Map) {
-            processedDeadlines = Object.fromEntries(student.deadline);
-          } else if (typeof student.deadline === "object") {
-            processedDeadlines = { ...student.deadline };
-          }
-        }
-
-        console.log(
-          `📊 Panel student ${student.name} reviews:`,
-          Object.keys(processedReviews)
-        );
-        console.log(
-          `📅 Panel student ${student.name} deadlines:`,
-          Object.keys(processedDeadlines)
-        );
-
-        return {
-          _id: student._id,
-          regNo: student.regNo,
-          name: student.name,
-          emailId: student.emailId,
-          reviews: processedReviews, // ✅ Plain object instead of Map
-          pptApproved: student.pptApproved || {
-            approved: false,
-            locked: false,
-          },
-          deadline: processedDeadlines, // ✅ Plain object instead of Map
-          school: student.school,
-          department: student.department,
-        };
-      });
-
-      return {
-        ...project,
-        students: processedStudents, // ✅ Use processed students with converted Maps
-      };
-    });
 
     console.log("✅ All panel projects processed with full population");
 

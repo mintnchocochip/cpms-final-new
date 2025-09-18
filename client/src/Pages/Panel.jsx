@@ -236,21 +236,24 @@ const Panel = () => {
       let mappedTeams = [];
       let schemaData = null;
       
-      if (projectsRes.data?.success) {
-        const projects = projectsRes.data.data;
-        mappedTeams = projects.map(project => ({
-          id: project._id,
-          title: project.name,
-          // ✅ Updated to use members array instead of faculty1/faculty2
-          description: `Panel: ${project.panel?.members?.map(member => member.name).join(', ') || 'N/A'}`,
-          students: (project.students || []).map(normalizeStudentData),
-          pptApproved: project.pptApproved || { approved: false, locked: false },
-          panel: project.panel, // ✅ Include full panel data including venue
-        }));
-        setTeams(mappedTeams);
-      } else {
-        setTeams([]);
-      }
+     if (projectsRes.data?.success) {
+  const projects = projectsRes.data.data;
+  mappedTeams = projects.map(project => ({
+    id: project._id,
+    title: project.name,
+    // ✅ Updated to use members array instead of faculty1/faculty2
+    description: `Panel: ${project.panel?.members?.map(member => member.name).join(', ') || 'N/A'}`,
+    students: (project.students || []).map(normalizeStudentData),
+    pptApproved: project.pptApproved || { approved: false, locked: false },
+    panel: project.panel, // ✅ Include full panel data including venue
+    bestProject: !!project.bestProject, // ✅ NEW: Map bestProject from backend
+  }));
+  setTeams(mappedTeams);
+  console.log('✅ [Panel] Teams mapped with bestProject status:', mappedTeams.map(t => ({ title: t.title, bestProject: t.bestProject })));
+} else {
+  setTeams([]);
+}
+
 
       // Handle marking schema
       if (markingSchemaRes.data?.success && markingSchemaRes.data.data) {
@@ -448,7 +451,7 @@ const isReviewLocked = useCallback((student, reviewType, teamId) => {
 
   // ----------------------------------------------------------
   // ----------- API Handling for Submit/Request --------------
-const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pptObj) => {
+const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pptObj, projectObj) => {
   try {
     console.log('=== [PANEL] REVIEW SUBMIT STARTED ===');
     
@@ -462,6 +465,7 @@ const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pp
     console.log('✅ [PANEL] Team found:', team.title);
     console.log('📋 [PANEL] Review Type:', reviewType);
     console.log('📋 [PANEL] Raw Review Data from popup:', reviewData);
+    console.log('🏆 [PANEL] Project data (best project):', projectObj);
 
     const reviewConfig = markingSchema?.reviews?.find(r => r.reviewName === reviewType);
     
@@ -500,6 +504,7 @@ const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pp
         }
       };
 
+      // ✅ PPT approval is STUDENT-LEVEL
       if (reviewConfig?.requiresPPT && pptObj?.pptApproved) {
         updateData.pptApproved = pptObj.pptApproved;
       }
@@ -507,20 +512,25 @@ const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pp
       return updateData;
     });
 
-    // ✅ FIXED: Create proper projectData object
+    // ✅ FIXED: Create proper projectData object with bestProject as PROJECT-LEVEL field
     const projectData = {
-      projectUpdates: {}, // Empty project updates
+      projectUpdates: {}, // Initialize empty
       studentUpdates: studentUpdates
     };
 
-    // Add PPT approval to project data if needed
+    // ✅ FIXED: bestProject goes in projectUpdates (PROJECT-LEVEL)
+    if (projectObj?.bestProject !== undefined) {
+      projectData.projectUpdates.bestProject = projectObj.bestProject;
+      console.log('🏆 [PANEL] Setting PROJECT-LEVEL best project status:', projectObj.bestProject);
+    }
+
+    // ✅ PPT approval at PROJECT-LEVEL if needed
     if (reviewConfig?.requiresPPT && pptObj) {
       projectData.pptApproved = pptObj.pptApproved;
     }
 
     console.log('📤 [PANEL] Final project data:', JSON.stringify(projectData, null, 2));
     
-    // ✅ FIXED: Call updateProject with correct parameters (projectId, projectData)
     const response = await updateProject(teamId, projectData);
     console.log('📨 [PANEL] Backend response received:', response);
     
@@ -529,7 +539,15 @@ const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pp
       
       setTimeout(async () => {
         await handleRefresh();
-        alert('Panel review submitted and saved successfully!');
+        
+        // ✅ Enhanced success message
+        if (projectObj?.bestProject) {
+          alert('🏆 SUCCESS! Panel review submitted and project marked as BEST PROJECT!');
+        } else if (response.data?.bestProject === false) {
+          alert('Panel review submitted. Project is no longer marked as best project.');
+        } else {
+          alert('Panel review submitted and saved successfully!');
+        }
       }, 300);
       
     } else {
@@ -541,6 +559,8 @@ const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pp
     alert(`Error submitting panel review: ${error.message}`);
   }
 }, [teams, markingSchema, handleRefresh]);
+
+
 
 
   const handleRequestEdit = useCallback(async (teamId, reviewType) => {
@@ -672,6 +692,7 @@ const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pp
             
             {/* Popup Review Modal */}
 {/* Popup Review Modal */}
+{/* Popup Review Modal */}
 {activePopup && (() => {
   const team = teams.find(t => t.id === activePopup.teamId);
   if (!team) return null;
@@ -689,10 +710,12 @@ const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pp
       isOpen={true}
       locked={isLocked}
       markingSchema={markingSchema}
-      requestStatus={requestStatus} // ✅ NEW: Pass request status
+      requestStatus={requestStatus}
+      panelMode={true} // ✅ NEW: Enable panel mode
+      currentBestProject={team.bestProject || false} // ✅ NEW: Pass current best project status
       onClose={() => setActivePopup(null)}
-      onSubmit={(data, pptObj) => {
-        handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj);
+      onSubmit={(data, pptObj, projectObj) => { // ✅ NEW: Accept third parameter
+        handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj, projectObj);
       }}
       onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
       requestEditVisible={isLocked && (requestStatus === 'none' || requestStatus === 'rejected')}
@@ -701,6 +724,7 @@ const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pp
     />
   );
 })()}
+
 
           </div>
         </div>

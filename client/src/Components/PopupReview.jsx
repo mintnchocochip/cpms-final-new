@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Award } from 'lucide-react';
+import { X, Award, Star } from 'lucide-react'; // ✅ Added Star icon
 
 const PopupReview = ({
   title,
@@ -14,12 +14,15 @@ const PopupReview = ({
   requestPending = false,
   requiresPPT = false,
   markingSchema = null,
-  requestStatus = 'none', // ✅ NEW: Add request status prop
+  requestStatus = 'none',
+  panelMode = false, // ✅ NEW: Add panel mode prop
+  currentBestProject = false, // ✅ NEW: Current best project status
 }) => {
   const [marks, setMarks] = useState({});
   const [comments, setComments] = useState({});
   const [attendance, setAttendance] = useState({});
   const [teamPptApproved, setTeamPptApproved] = useState(false);
+  const [bestProject, setBestProject] = useState(false); // ✅ NEW: Best project state
   const [componentLabels, setComponentLabels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,6 +42,7 @@ const PopupReview = ({
       console.log('📋 [PopupReview] Review type:', reviewType);
       console.log('📋 [PopupReview] Request status:', requestStatus);
       console.log('📋 [PopupReview] Form locked:', isFormLocked);
+      console.log('🏆 [PopupReview] Panel mode:', panelMode);
       
       let components = [];
       let hasValidSchema = false;
@@ -77,7 +81,7 @@ const PopupReview = ({
     } finally {
       setLoading(false);
     }
-  }, [isOpen, reviewType, markingSchema, requestStatus, isFormLocked]);
+  }, [isOpen, reviewType, markingSchema, requestStatus, isFormLocked, panelMode]);
 
   // ✅ Initialize form data from existing student data
   useEffect(() => {
@@ -125,6 +129,9 @@ const PopupReview = ({
       setAttendance(initialAttendance);
     }
 
+    // ✅ Initialize best project status
+    setBestProject(currentBestProject || false);
+
     // ✅ Update sub state based on comments
     const allCommentsFilled = teamMembers.every(member => 
       initialComments[member._id]?.trim() !== ''
@@ -139,10 +146,11 @@ const PopupReview = ({
     }
     
     console.log('✅ [PopupReview] Form data initialized');
-  }, [isOpen, teamMembers, reviewType, loading, componentLabels, hasAttendance, requiresPPT]);
+    console.log('🏆 [PopupReview] Best project initialized:', currentBestProject);
+  }, [isOpen, teamMembers, reviewType, loading, componentLabels, hasAttendance, requiresPPT, currentBestProject]);
 
   const handleMarksChange = (memberId, value, componentKey) => {
-    if (isFormLocked) return; // ✅ FIXED: Use isFormLocked instead of locked
+    if (isFormLocked) return;
     if (hasAttendance && attendance[memberId] === false) return;
 
     const componentInfo = componentLabels.find(comp => comp.key === componentKey);
@@ -169,7 +177,7 @@ const PopupReview = ({
   };
 
   const handleAttendanceChange = (memberId, isPresent) => {
-    if (isFormLocked) return; // ✅ FIXED: Use isFormLocked instead of locked
+    if (isFormLocked) return;
     
     setAttendance(prev => ({ ...prev, [memberId]: isPresent }));
     
@@ -189,7 +197,7 @@ const PopupReview = ({
   };
 
   const handleCommentsChange = (memberId, value) => {
-    if (isFormLocked) return; // ✅ FIXED: Use isFormLocked instead of locked
+    if (isFormLocked) return;
     
     setComments(prev => ({ ...prev, [memberId]: value }));
     
@@ -200,9 +208,10 @@ const PopupReview = ({
   };
 
   const handleSubmit = () => {
-    if (isFormLocked || sub === 'Locked') return; // ✅ FIXED: Use isFormLocked
+    if (isFormLocked || sub === 'Locked') return;
     
     console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
+    console.log('🏆 [PopupReview] Best project status:', bestProject);
     
     const submission = {};
     
@@ -229,7 +238,21 @@ const PopupReview = ({
 
     console.log('📤 [PopupReview] Final submission object:', submission);
 
-    if (requiresPPT) {
+    // ✅ Handle different submission scenarios
+    if (requiresPPT && panelMode) {
+      // Panel with PPT - include both PPT and best project
+      const teamPptObj = {
+        pptApproved: {
+          approved: teamPptApproved,
+          locked: false
+        }
+      };
+      onSubmit(submission, teamPptObj, { bestProject }); // ✅ Pass best project as third param
+    } else if (panelMode) {
+      // Panel without PPT - include best project
+      onSubmit(submission, null, { bestProject }); // ✅ Pass best project as third param
+    } else if (requiresPPT) {
+      // Guide with PPT - original behavior
       const teamPptObj = {
         pptApproved: {
           approved: teamPptApproved,
@@ -238,6 +261,7 @@ const PopupReview = ({
       };
       onSubmit(submission, teamPptObj);
     } else {
+      // Guide without PPT - original behavior
       onSubmit(submission);
     }
   };
@@ -280,7 +304,18 @@ const PopupReview = ({
                     PPT Required
                   </span>
                 )}
-                {/* ✅ FIXED: Show extension status */}
+                {/* ✅ Show panel mode */}
+                {panelMode && (
+                  <span className="bg-purple-400/30 px-3 py-1 rounded-full">
+                    👥 Panel Review
+                  </span>
+                )}
+                {/* ✅ Show best project status */}
+                {panelMode && bestProject && (
+                  <span className="bg-yellow-500/30 px-3 py-1 rounded-full">
+                    ⭐ Best Project
+                  </span>
+                )}
                 {requestStatus === 'approved' && (
                   <span className="bg-green-400/30 px-3 py-1 rounded-full">
                     🔓 Extension Approved
@@ -310,25 +345,49 @@ const PopupReview = ({
             </div>
           )}
 
+          {/* ✅ PANEL ONLY: Best Project Selection */}
+          {panelMode && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={bestProject}
+                  onChange={(e) => setBestProject(e.target.checked)}
+                  disabled={isFormLocked}
+                  className="w-5 h-5 text-yellow-600 bg-yellow-50 border-yellow-300 rounded focus:ring-2 focus:ring-yellow-500"
+                />
+                <Star className="w-5 h-5 text-yellow-600" />
+                <div>
+                  <span className="font-bold text-yellow-800 text-lg">
+                    Mark as Best Project
+                  </span>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Select this if you consider this project to be among the best in the evaluation
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
+
           {/* Team PPT Approval */}
           {requiresPPT && (
-            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
               <label className="flex items-center space-x-3">
                 <input
                   type="checkbox"
                   checked={teamPptApproved}
                   onChange={(e) => setTeamPptApproved(e.target.checked)}
-                  disabled={isFormLocked} // ✅ FIXED: Use isFormLocked
+                  disabled={isFormLocked}
                   className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
-                <span className="font-semibold text-yellow-800">
+                <span className="font-semibold text-blue-800">
                   Team PPT Approved
                 </span>
               </label>
             </div>
           )}
 
-          {/* Students Grid */}
+          {/* Students Grid - Rest of the component remains the same */}
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {teamMembers.map(member => (
               <div 
@@ -350,7 +409,7 @@ const PopupReview = ({
                       <select
                         value={attendance[member._id] ? 'present' : 'absent'}
                         onChange={(e) => handleAttendanceChange(member._id, e.target.value === 'present')}
-                        disabled={isFormLocked} // ✅ FIXED: Use isFormLocked
+                        disabled={isFormLocked}
                         className={`px-3 py-2 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 ${
                           attendance[member._id] 
                             ? 'bg-green-50 border-green-300 text-green-800' 
@@ -378,7 +437,7 @@ const PopupReview = ({
                           max={comp.points}
                           value={marks[member._id]?.[comp.key] || ''}
                           onChange={(e) => handleMarksChange(member._id, e.target.value, comp.key)}
-                          disabled={isFormLocked || (hasAttendance && attendance[member._id] === false)} // ✅ FIXED: Use isFormLocked
+                          disabled={isFormLocked || (hasAttendance && attendance[member._id] === false)}
                           className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                           placeholder="0"
                         />
@@ -394,7 +453,7 @@ const PopupReview = ({
                 <textarea
                   value={comments[member._id] || ''}
                   onChange={(e) => handleCommentsChange(member._id, e.target.value)}
-                  disabled={isFormLocked || (hasAttendance && attendance[member._id] === false)} // ✅ FIXED: Use isFormLocked
+                  disabled={isFormLocked || (hasAttendance && attendance[member._id] === false)}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   rows="3"
@@ -432,18 +491,25 @@ const PopupReview = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={isFormLocked || sub === 'Locked'} // ✅ FIXED: Use isFormLocked
+              disabled={isFormLocked || sub === 'Locked'}
               className={`px-6 py-2 rounded-lg font-medium transition-colors ${
                 isFormLocked || sub === 'Locked'
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : panelMode && bestProject
+                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
               }`}
             >
-              {/* ✅ FIXED: Better button text */}
-              {requestStatus === 'approved' && !isFormLocked ? 'Submit Review (Extended)' :
-               isFormLocked ? 'Locked' : 
-               sub === 'Locked' ? 'Comments Required' : 
-               'Submit Review'}
+              {/* ✅ Updated button text */}
+              {requestStatus === 'approved' && !isFormLocked 
+                ? `Submit ${panelMode ? 'Panel ' : ''}Review (Extended)` 
+                : isFormLocked 
+                  ? 'Locked' 
+                  : sub === 'Locked' 
+                    ? 'Comments Required' 
+                    : panelMode && bestProject
+                      ? '⭐ Submit Best Project Review'
+                      : `Submit ${panelMode ? 'Panel ' : ''}Review`}
             </button>
           </div>
         </div>
