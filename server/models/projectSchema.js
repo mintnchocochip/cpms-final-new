@@ -31,6 +31,10 @@ const projectSchema = new mongoose.Schema({
     required: true,
     enum: ["hardware", "software"],
   },
+  bestProject: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const Project = mongoose.model("Project", projectSchema);
