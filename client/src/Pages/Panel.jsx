@@ -153,27 +153,34 @@ const PanelContent = React.memo(({
                       const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
                       const requestStatus = getTeamRequestStatus(team, reviewType.key);
                       return (
-                        <button
-                          key={reviewType.key}
-                          onClick={() => setActivePopup({ type: reviewType.key, teamId: team.id })}
-                          className={`px-4 py-3 text-white text-sm font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${getButtonColor(reviewType.key)} ${
-                            isPassed ? 'opacity-75' : ''
-                          } flex items-center gap-2 whitespace-nowrap min-w-0`}
-                          title={`${reviewType.components?.length || 0} components${
-                            requestStatus === 'approved' ? ' | Extended by Admin' : ''
-                          }${isPassed ? ' | DEADLINE PASSED' : ''}`}
-                        >
-                          <span className="truncate max-w-24 sm:max-w-none">{reviewType.name}</span>
-                          {reviewType.requiresPPT && (
-                            <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">PPT</span>
-                          )}
-                          {requestStatus === 'approved' && (
-                            <span className="text-xs bg-purple-500 px-2 py-1 rounded-full flex-shrink-0 font-bold">EXT</span>
-                          )}
-                          {isPassed && (
-                            <span className="text-xs bg-red-500 px-2 py-1 rounded-full flex-shrink-0">🔒</span>
-                          )}
-                        </button>
+                       <button
+  key={reviewType.key}
+  onClick={() => setActivePopup({ 
+    type: reviewType.key, 
+    teamId: team.id,
+    teamTitle: team.title,
+    students: team.students,
+    markingSchema: markingSchema
+  })}
+  className={`px-4 py-3 text-white text-sm font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${getButtonColor(reviewType.key)} ${
+    isPassed ? 'opacity-75' : ''
+  } flex items-center gap-2 whitespace-nowrap min-w-0`}
+  title={`${reviewType.components?.length || 0} components${
+    requestStatus === 'approved' ? ' | Extended by Admin' : ''
+  }${isPassed ? ' | DEADLINE PASSED' : ''}`}
+>
+  <span className="truncate max-w-24 sm:max-w-none">{reviewType.name}</span>
+  {reviewType.requiresPPT && (
+    <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">PPT</span>
+  )}
+  {requestStatus === 'approved' && (
+    <span className="text-xs bg-purple-500 px-2 py-1 rounded-full flex-shrink-0 font-bold">EXT</span>
+  )}
+  {isPassed && (
+    <span className="text-xs bg-red-500 px-2 py-1 rounded-full flex-shrink-0">🔒</span>
+  )}
+</button>
+
                       );
                     })}
                   </div>
@@ -413,78 +420,128 @@ const Panel = () => {
     return false;
   }, [teams, deadlines, getTeamRequestStatus]);
 
-  const isReviewLocked = useCallback((student, reviewType, teamId) => {
-    // Check manual lock
-    const reviewData = student.reviews && typeof student.reviews.get === 'function'
-      ? student.reviews.get(reviewType)
-      : student.reviews?.[reviewType];
-    if (reviewData?.locked) return true;
-    return isTeamDeadlinePassed(reviewType, teamId);
-  }, [isTeamDeadlinePassed]);
+const isReviewLocked = useCallback((student, reviewType, teamId) => {
+  // ✅ FIXED: Check if review is explicitly locked first
+  const reviewData = student.reviews && typeof student.reviews.get === 'function'
+    ? student.reviews.get(reviewType)
+    : student.reviews?.[reviewType];
+  if (reviewData?.locked) {
+    return true;
+  }
+  
+  // ✅ FIXED: Check if deadline extension is approved
+  const team = teams.find(t => t.id === teamId);
+  if (team) {
+    const requestStatus = getTeamRequestStatus(team, reviewType);
+    if (requestStatus === 'approved') {
+      console.log(`🔓 [Panel] Extension approved for ${reviewType} - UNLOCKING`);
+      return false; // Extension approved = unlocked
+    }
+  }
+  
+  // Only check deadline if no extension is approved
+  const deadlinePassed = isTeamDeadlinePassed(reviewType, teamId);
+  console.log(`🔒 [Panel] Deadline passed: ${deadlinePassed}, Review type: ${reviewType}`);
+  return deadlinePassed;
+}, [isTeamDeadlinePassed, teams, getTeamRequestStatus]);
+
 
   // ----------------------------------------------------------
   // ----------- API Handling for Submit/Request --------------
-  const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pptObj) => {
-    try {
-      const team = teams.find(t => t.id === teamId);
-      if (!team) return;
+const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pptObj) => {
+  try {
+    console.log('=== [PANEL] REVIEW SUBMIT STARTED ===');
+    
+    const team = teams.find(t => t.id === teamId);
+    if (!team) {
+      console.error('❌ [PANEL] Team not found for ID:', teamId);
+      alert('Team not found! Please refresh and try again.');
+      return;
+    }
 
-      const reviewConfig = markingSchema?.reviews?.find(r => r.reviewName === reviewType);
+    console.log('✅ [PANEL] Team found:', team.title);
+    console.log('📋 [PANEL] Review Type:', reviewType);
+    console.log('📋 [PANEL] Raw Review Data from popup:', reviewData);
 
-      // Merge student updates
-      const studentUpdates = team.students.map(student => {
-        const studentReviewData = reviewData[student.regNo] || {};
-        
-        // Use schema to pick correct mark keys
-        let marks = {};
-        if (reviewConfig && reviewConfig.components) {
-          reviewConfig.components.forEach(comp => {
-            marks[comp.name] = Number(studentReviewData[comp.name]) || 0;
-          });
-        } else {
-          Object.keys(studentReviewData).forEach(key => {
-            if (key !== 'comments' && key !== 'attendance' && key !== 'locked') {
-              marks[key] = Number(studentReviewData[key]) || 0;
-            }
-          });
+    const reviewConfig = markingSchema?.reviews?.find(r => r.reviewName === reviewType);
+    
+    if (!reviewConfig) {
+      console.error('❌ [PANEL] Review config not found for type:', reviewType);
+      alert('Review configuration not found! Please refresh and try again.');
+      return;
+    }
+
+    // Process student updates
+    const studentUpdates = team.students.map(student => {
+      console.log(`🎓 [PANEL] Processing student: ${student.name} (${student.regNo})`);
+      
+      const studentReviewData = reviewData[student.regNo] || {};
+      console.log(`📊 [PANEL] Student review data for ${student.name}:`, studentReviewData);
+      
+      // Build marks object using component names from schema
+      const marks = {};
+      if (reviewConfig.components && reviewConfig.components.length > 0) {
+        reviewConfig.components.forEach(comp => {
+          const markValue = Number(studentReviewData[comp.name]) || 0;
+          marks[comp.name] = markValue;
+          console.log(`📊 [PANEL] Component ${comp.name}: ${markValue} for ${student.name}`);
+        });
+      }
+
+      const updateData = {
+        studentId: student._id,
+        reviews: {
+          [reviewType]: {
+            marks: marks,
+            attendance: studentReviewData.attendance || { value: false, locked: false },
+            locked: studentReviewData.locked || false,
+            comments: studentReviewData.comments || ''
+          }
         }
-
-        return {
-          studentId: student._id,
-          reviews: {
-            [reviewType]: {
-              marks,
-              attendance: studentReviewData.attendance || { value: false, locked: false },
-              locked: studentReviewData.locked || false,
-              comments: studentReviewData.comments || '',
-            },
-          },
-          ...(reviewConfig?.requiresPPT && pptObj?.pptApproved ? { pptApproved: pptObj.pptApproved } : {}),
-        };
-      });
-
-      const updatePayload = {
-        projectId: teamId,
-        studentUpdates,
-        ...(reviewConfig?.requiresPPT && pptObj ? { pptApproved: pptObj.pptApproved } : {}),
       };
 
-      const response = await updateProject(updatePayload);
-      if (response.data?.success || response.data?.updates) {
-        setActivePopup(null);
-        // Refresh data after successful submission
-        setTimeout(() => {
-          handleRefresh(); // This will only refresh the inner content
-        }, 500);
-        alert('Panel review submitted and saved successfully!');
-      } else {
-        throw new Error(response.data?.message || 'Panel update failed');
+      if (reviewConfig?.requiresPPT && pptObj?.pptApproved) {
+        updateData.pptApproved = pptObj.pptApproved;
       }
-    } catch (error) {
-      console.error('❌ [Panel] Error submitting review:', error);
-      alert('Error submitting panel review. Please try again.');
+
+      return updateData;
+    });
+
+    // ✅ FIXED: Create proper projectData object
+    const projectData = {
+      projectUpdates: {}, // Empty project updates
+      studentUpdates: studentUpdates
+    };
+
+    // Add PPT approval to project data if needed
+    if (reviewConfig?.requiresPPT && pptObj) {
+      projectData.pptApproved = pptObj.pptApproved;
     }
-  }, [teams, markingSchema, handleRefresh]);
+
+    console.log('📤 [PANEL] Final project data:', JSON.stringify(projectData, null, 2));
+    
+    // ✅ FIXED: Call updateProject with correct parameters (projectId, projectData)
+    const response = await updateProject(teamId, projectData);
+    console.log('📨 [PANEL] Backend response received:', response);
+    
+    if (response.data?.success || response.data?.updates) {
+      setActivePopup(null);
+      
+      setTimeout(async () => {
+        await handleRefresh();
+        alert('Panel review submitted and saved successfully!');
+      }, 300);
+      
+    } else {
+      console.error('❌ [PANEL] Backend response indicates failure:', response.data);
+      alert('Review submission failed. Please try again.');
+    }
+  } catch (error) {
+    console.error('❌ [PANEL] Critical error during submission:', error);
+    alert(`Error submitting panel review: ${error.message}`);
+  }
+}, [teams, markingSchema, handleRefresh]);
+
 
   const handleRequestEdit = useCallback(async (teamId, reviewType) => {
     try {
@@ -614,34 +671,37 @@ const Panel = () => {
             />
             
             {/* Popup Review Modal */}
-            {activePopup && (() => {
-              const team = teams.find(t => t.id === activePopup.teamId);
-              if (!team) return null;
+{/* Popup Review Modal */}
+{activePopup && (() => {
+  const team = teams.find(t => t.id === activePopup.teamId);
+  if (!team) return null;
 
-              const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
-              const requestStatus = getTeamRequestStatus(team, activePopup.type);
-              const reviewTypes = getReviewTypes();
-              const reviewTypeCfg = reviewTypes.find(r => r.key === activePopup.type);
+  const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
+  const requestStatus = getTeamRequestStatus(team, activePopup.type);
+  const reviewTypes = getReviewTypes();
+  const reviewTypeCfg = reviewTypes.find(r => r.key === activePopup.type);
 
-              return (
-                <PopupReview
-                  title={`${reviewTypeCfg?.name || activePopup.type} - ${team.title}`}
-                  teamMembers={team.students}
-                  reviewType={activePopup.type}
-                  isOpen={true}
-                  locked={isLocked}
-                  onClose={() => setActivePopup(null)}
-                  onSubmit={(data, pptObj) => {
-                    handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj);
-                  }}
-                  onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
-                  requestEditVisible={isLocked && (requestStatus === 'none' || requestStatus === 'rejected')}
-                  requestPending={requestStatus === 'pending'}
-                  markingSchema={markingSchema}
-                  requiresPPT={!!reviewTypeCfg?.requiresPPT}
-                />
-              );
-            })()}
+  return (
+    <PopupReview
+      title={`${reviewTypeCfg?.name || activePopup.type} - ${team.title}`}
+      teamMembers={team.students}
+      reviewType={activePopup.type}
+      isOpen={true}
+      locked={isLocked}
+      markingSchema={markingSchema}
+      requestStatus={requestStatus} // ✅ NEW: Pass request status
+      onClose={() => setActivePopup(null)}
+      onSubmit={(data, pptObj) => {
+        handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj);
+      }}
+      onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
+      requestEditVisible={isLocked && (requestStatus === 'none' || requestStatus === 'rejected')}
+      requestPending={requestStatus === 'pending'}
+      requiresPPT={!!reviewTypeCfg?.requiresPPT}
+    />
+  );
+})()}
+
           </div>
         </div>
       </div>

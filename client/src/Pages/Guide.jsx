@@ -405,15 +405,29 @@ const Guide = () => {
     return false;
   }, [teams, getDeadlines]);
 
-  const isReviewLocked = useCallback((student, reviewType, teamId) => {
-    const reviewData = student.reviews?.get ? student.reviews.get(reviewType) : student.reviews?.[reviewType];
-    if (reviewData?.locked) {
-      return true;
+ const isReviewLocked = useCallback((student, reviewType, teamId) => {
+  // ✅ FIXED: Check if review is explicitly locked first
+  const reviewData = student.reviews?.get ? student.reviews.get(reviewType) : student.reviews?.[reviewType];
+  if (reviewData?.locked) {
+    return true;
+  }
+  
+  // ✅ FIXED: Check if deadline extension is approved
+  const team = teams.find(t => t.id === teamId);
+  if (team) {
+    const requestStatus = getTeamRequestStatus(team, reviewType);
+    if (requestStatus === 'approved') {
+      console.log(`🔓 [isReviewLocked] Extension approved for ${reviewType} - UNLOCKING`);
+      return false; // Extension approved = unlocked
     }
-    
-    const deadlinePassed = isTeamDeadlinePassed(reviewType, teamId);
-    return deadlinePassed;
-  }, [isTeamDeadlinePassed]);
+  }
+  
+  // Only check deadline if no extension is approved
+  const deadlinePassed = isTeamDeadlinePassed(reviewType, teamId);
+  console.log(`🔒 [isReviewLocked] Deadline passed: ${deadlinePassed}, Review type: ${reviewType}`);
+  return deadlinePassed;
+}, [isTeamDeadlinePassed, teams, getTeamRequestStatus]);
+
 
   const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pptObj) => {
     try {
@@ -642,33 +656,36 @@ const Guide = () => {
             />
 
             {/* Popup Review Modal */}
-            {activePopup && (() => {
-              const team = teams.find(t => t.id === activePopup.teamId);
-              const reviewTypes = getReviewTypes(team.markingSchema);
-              const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
-              const requestStatus = getTeamRequestStatus(team, activePopup.type);
-              
-              const showRequestEdit = isLocked && (requestStatus === 'none' || requestStatus === 'rejected');
-              
-              return (
-                <PopupReview
-                  title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
-                  teamMembers={activePopup.students}
-                  reviewType={activePopup.type}
-                  isOpen={true}
-                  locked={isLocked}
-                  markingSchema={activePopup.markingSchema}
-                  onClose={() => setActivePopup(null)}
-                  onSubmit={(data, pptObj) => {
-                    handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj);
-                  }}
-                  onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
-                  requestEditVisible={showRequestEdit}
-                  requestPending={requestStatus === 'pending'}
-                  requiresPPT={reviewTypes.find(r => r.key === activePopup.type)?.requiresPPT || false}
-                />
-              );
-            })()}
+{/* Popup Review Modal */}
+{activePopup && (() => {
+  const team = teams.find(t => t.id === activePopup.teamId);
+  const reviewTypes = getReviewTypes(team.markingSchema);
+  const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
+  const requestStatus = getTeamRequestStatus(team, activePopup.type);
+  
+  const showRequestEdit = isLocked && (requestStatus === 'none' || requestStatus === 'rejected');
+  
+  return (
+    <PopupReview
+      title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
+      teamMembers={activePopup.students}
+      reviewType={activePopup.type}
+      isOpen={true}
+      locked={isLocked}
+      markingSchema={activePopup.markingSchema}
+      requestStatus={requestStatus} // ✅ NEW: Pass request status
+      onClose={() => setActivePopup(null)}
+      onSubmit={(data, pptObj) => {
+        handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj);
+      }}
+      onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
+      requestEditVisible={showRequestEdit}
+      requestPending={requestStatus === 'pending'}
+      requiresPPT={reviewTypes.find(r => r.key === activePopup.type)?.requiresPPT || false}
+    />
+  );
+})()} 
+
           </div>
         </div>
       </div>

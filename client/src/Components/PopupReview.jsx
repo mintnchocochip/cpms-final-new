@@ -14,6 +14,7 @@ const PopupReview = ({
   requestPending = false,
   requiresPPT = false,
   markingSchema = null,
+  requestStatus = 'none', // ✅ NEW: Add request status prop
 }) => {
   const [marks, setMarks] = useState({});
   const [comments, setComments] = useState({});
@@ -23,7 +24,10 @@ const PopupReview = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [hasAttendance, setHasAttendance] = useState(true);
-  const [sub, setSub] = useState('Locked'); // ✅ Initialize sub as 'Locked'
+  const [sub, setSub] = useState('Locked');
+
+  // ✅ FIXED: Calculate if form should be locked considering extension status
+  const isFormLocked = locked && requestStatus !== 'approved';
 
   // ✅ Load schema and initialize components
   useEffect(() => {
@@ -33,7 +37,8 @@ const PopupReview = ({
     try {
       console.log('=== [PopupReview] LOADING MARKING SCHEMA ===');
       console.log('📋 [PopupReview] Review type:', reviewType);
-      console.log('📋 [PopupReview] Schema:', markingSchema);
+      console.log('📋 [PopupReview] Request status:', requestStatus);
+      console.log('📋 [PopupReview] Form locked:', isFormLocked);
       
       let components = [];
       let hasValidSchema = false;
@@ -72,7 +77,7 @@ const PopupReview = ({
     } finally {
       setLoading(false);
     }
-  }, [isOpen, reviewType, markingSchema]);
+  }, [isOpen, reviewType, markingSchema, requestStatus, isFormLocked]);
 
   // ✅ Initialize form data from existing student data
   useEffect(() => {
@@ -137,7 +142,7 @@ const PopupReview = ({
   }, [isOpen, teamMembers, reviewType, loading, componentLabels, hasAttendance, requiresPPT]);
 
   const handleMarksChange = (memberId, value, componentKey) => {
-    if (locked) return;
+    if (isFormLocked) return; // ✅ FIXED: Use isFormLocked instead of locked
     if (hasAttendance && attendance[memberId] === false) return;
 
     const componentInfo = componentLabels.find(comp => comp.key === componentKey);
@@ -164,7 +169,7 @@ const PopupReview = ({
   };
 
   const handleAttendanceChange = (memberId, isPresent) => {
-    if (locked) return;
+    if (isFormLocked) return; // ✅ FIXED: Use isFormLocked instead of locked
     
     setAttendance(prev => ({ ...prev, [memberId]: isPresent }));
     
@@ -175,7 +180,7 @@ const PopupReview = ({
       });
       setMarks(prev => ({ ...prev, [memberId]: zeroedMarks }));
       setComments(prev => ({ ...prev, [memberId]: '' }));
-      // ✅ Update sub state after clearing comments
+      
       const allCommentsFilled = teamMembers.every(member => 
         member._id === memberId ? true : (comments[member._id]?.trim() !== '')
       );
@@ -184,11 +189,10 @@ const PopupReview = ({
   };
 
   const handleCommentsChange = (memberId, value) => {
-    if (locked) return;
+    if (isFormLocked) return; // ✅ FIXED: Use isFormLocked instead of locked
     
     setComments(prev => ({ ...prev, [memberId]: value }));
     
-    // ✅ Update sub state based on all comments
     const allCommentsFilled = teamMembers.every(member => 
       member._id === memberId ? value.trim() !== '' : (comments[member._id]?.trim() !== '')
     );
@@ -196,7 +200,7 @@ const PopupReview = ({
   };
 
   const handleSubmit = () => {
-    if (locked || sub === 'Locked') return;
+    if (isFormLocked || sub === 'Locked') return; // ✅ FIXED: Use isFormLocked
     
     console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
     
@@ -276,7 +280,13 @@ const PopupReview = ({
                     PPT Required
                   </span>
                 )}
-                {locked && (
+                {/* ✅ FIXED: Show extension status */}
+                {requestStatus === 'approved' && (
+                  <span className="bg-green-400/30 px-3 py-1 rounded-full">
+                    🔓 Extension Approved
+                  </span>
+                )}
+                {isFormLocked && (
                   <span className="bg-red-400/30 px-3 py-1 rounded-full">
                     🔒 Locked
                   </span>
@@ -308,7 +318,7 @@ const PopupReview = ({
                   type="checkbox"
                   checked={teamPptApproved}
                   onChange={(e) => setTeamPptApproved(e.target.checked)}
-                  disabled={locked}
+                  disabled={isFormLocked} // ✅ FIXED: Use isFormLocked
                   className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="font-semibold text-yellow-800">
@@ -340,7 +350,7 @@ const PopupReview = ({
                       <select
                         value={attendance[member._id] ? 'present' : 'absent'}
                         onChange={(e) => handleAttendanceChange(member._id, e.target.value === 'present')}
-                        disabled={locked}
+                        disabled={isFormLocked} // ✅ FIXED: Use isFormLocked
                         className={`px-3 py-2 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 ${
                           attendance[member._id] 
                             ? 'bg-green-50 border-green-300 text-green-800' 
@@ -368,7 +378,7 @@ const PopupReview = ({
                           max={comp.points}
                           value={marks[member._id]?.[comp.key] || ''}
                           onChange={(e) => handleMarksChange(member._id, e.target.value, comp.key)}
-                          disabled={locked || (hasAttendance && attendance[member._id] === false)}
+                          disabled={isFormLocked || (hasAttendance && attendance[member._id] === false)} // ✅ FIXED: Use isFormLocked
                           className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                           placeholder="0"
                         />
@@ -384,7 +394,7 @@ const PopupReview = ({
                 <textarea
                   value={comments[member._id] || ''}
                   onChange={(e) => handleCommentsChange(member._id, e.target.value)}
-                  // disabled={locked || (hasAttendance && attendance[member._id] === false)}
+                  disabled={isFormLocked || (hasAttendance && attendance[member._id] === false)} // ✅ FIXED: Use isFormLocked
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   rows="3"
@@ -422,14 +432,18 @@ const PopupReview = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={locked || sub === 'Locked'}
+              disabled={isFormLocked || sub === 'Locked'} // ✅ FIXED: Use isFormLocked
               className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                locked || sub === 'Locked'
+                isFormLocked || sub === 'Locked'
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 text-white'
               }`}
             >
-              {locked ? 'Locked' : sub === 'Locked' ? 'Comments Required' : 'Submit Review'}
+              {/* ✅ FIXED: Better button text */}
+              {requestStatus === 'approved' && !isFormLocked ? 'Submit Review (Extended)' :
+               isFormLocked ? 'Locked' : 
+               sub === 'Locked' ? 'Comments Required' : 
+               'Submit Review'}
             </button>
           </div>
         </div>

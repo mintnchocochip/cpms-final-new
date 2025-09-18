@@ -253,23 +253,32 @@ export const getAllProjects = (params = new URLSearchParams()) => {
 };
 
 // Update project (using existing project/update endpoint)
-export const updateProject = async (projectId, projectData) => {
+export const updateProject = async (projectIdOrData, projectData = null) => {
   try {
-    // Validate required parameters
-    if (!projectId) {
-      throw new Error('Project ID is required');
-    }
-
-    // Prepare the payload to match backend expectations exactly
-    const payload = {
-      projectId: projectId,
-      projectUpdates: projectData.projectUpdates || {},
-      studentUpdates: projectData.studentUpdates || [],
-    };
-
-    // Only include pptApproved if it's explicitly provided
-    if (projectData.hasOwnProperty('pptApproved')) {
-      payload.pptApproved = projectData.pptApproved;
+    let payload;
+    
+    // Handle both calling patterns
+    if (typeof projectIdOrData === 'string' && projectData) {
+      // Called as updateProject(projectId, projectData)
+      payload = {
+        projectId: projectIdOrData,
+        projectUpdates: projectData.projectUpdates || {},
+        studentUpdates: projectData.studentUpdates || [],
+      };
+      
+      if (projectData.hasOwnProperty('pptApproved')) {
+        payload.pptApproved = projectData.pptApproved;
+      }
+    } else if (typeof projectIdOrData === 'object') {
+      // Called as updateProject(updatePayload) - your current pattern
+      payload = projectIdOrData;
+      
+      // Validate required fields
+      if (!payload.projectId) {
+        throw new Error('Project ID is required');
+      }
+    } else {
+      throw new Error('Invalid parameters - expected (projectId, projectData) or (updatePayload)');
     }
 
     console.log("📤 [FRONTEND] Sending update request:", JSON.stringify(payload, null, 2));
@@ -285,6 +294,7 @@ export const updateProject = async (projectId, projectData) => {
     throw error;
   }
 };
+
 
 
 // Delete project (using existing project/:projectId endpoint)
