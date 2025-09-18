@@ -8,6 +8,10 @@ const panelSchema = new mongoose.Schema({
       required: true,
     },
   ],
+  venue: {
+    type: String,
+    required: false, // Not required as specified
+  },
   school: {
     type: String,
     required: true,

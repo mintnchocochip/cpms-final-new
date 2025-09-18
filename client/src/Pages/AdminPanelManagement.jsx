@@ -36,6 +36,7 @@ import {
   BarChart3,
   RefreshCw,
   Download,
+  MapPin, // ✅ Add this import
 } from "lucide-react";
 
 const AdminPanelManagement = () => {
@@ -143,15 +144,18 @@ const AdminPanelManagement = () => {
       });
 
       // ✅ ENHANCED: Format panels with faculty employee IDs directly from API response
-      const formattedPanels = allPanelsData.map((panel) => ({
-        panelId: panel._id,
-        facultyIds: (panel.members || []).map(m => m._id).filter(Boolean),
-        facultyNames: (panel.members || []).map(m => m.name).filter(Boolean),
-        facultyEmployeeIds: (panel.members || []).map(m => m.employeeId).filter(Boolean), // ✅ NEW: Direct from API
-        department: panel.department || "Unknown",
-        school: panel.school || "Unknown",
-        teams: panelTeamsMap.get(panel._id) || [],
-      }));
+      // ✅ ENHANCED: Format panels with faculty employee IDs directly from API response
+const formattedPanels = allPanelsData.map((panel) => ({
+  panelId: panel._id,
+  facultyIds: (panel.members || []).map(m => m._id).filter(Boolean),
+  facultyNames: (panel.members || []).map(m => m.name).filter(Boolean),
+  facultyEmployeeIds: (panel.members || []).map(m => m.employeeId).filter(Boolean), // ✅ NEW: Direct from API
+  venue: panel.venue, // ✅ Include venue data
+  department: panel.department || "Unknown",
+  school: panel.school || "Unknown",
+  teams: panelTeamsMap.get(panel._id) || [],
+}));
+
 
       console.log('✅ Formatted panels with employee IDs:', formattedPanels);
       setPanels(formattedPanels);
@@ -786,11 +790,13 @@ const AdminPanelManagement = () => {
                 <div className="space-y-4">
                   {panels.map((panel, idx) => {
                     const shouldShow =
-                      !searchQuery ||
-                      panel.facultyNames.some((name) => filterMatches(name)) ||
-                      panel.teams.some(
-                        (team) => filterMatches(team.name) || filterMatches(team.domain)
-                      );
+  !searchQuery ||
+  panel.facultyNames.some((name) => filterMatches(name)) ||
+  panel.teams.some(
+    (team) => filterMatches(team.name) || filterMatches(team.domain)
+  ) ||
+  (panel.venue && filterMatches(panel.venue)); // ✅ Include venue in search
+
 
                     if (!shouldShow) return null;
 

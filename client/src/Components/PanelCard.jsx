@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, ChevronDown, Users, Building2, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Users, Building2, Trash2, MapPin } from 'lucide-react';
 
 const PanelCard = ({ 
   panel, 
@@ -29,9 +29,18 @@ const PanelCard = ({
             )}
           </div>
           <div className="flex-1">
-            <h4 className="font-bold text-lg sm:text-xl text-slate-800 mb-1">
-              Panel {index + 1}: {panel.facultyNames.join(" & ")}
-            </h4>
+            <div className="flex items-center gap-3 mb-2">
+              <h4 className="font-bold text-lg sm:text-xl text-slate-800">
+                Panel {index + 1}: {panel.facultyNames.join(" & ")}
+              </h4>
+              {/* ✅ Display venue if available */}
+              {panel.venue && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
+                  <MapPin className="w-3 h-3" />
+                  <span>{panel.venue}</span>
+                </div>
+              )}
+            </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-xs sm:text-sm text-slate-600">
               <span className="flex items-center space-x-1">
                 <Users className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -67,6 +76,16 @@ const PanelCard = ({
       {/* Expanded Panel Content */}
       {isExpanded && (
         <div className="border-t border-slate-200 p-4 sm:p-6 bg-slate-50">
+          {/* Panel Information */}
+          {panel.venue && (
+            <div className="mb-6 bg-white rounded-xl p-4 border border-slate-200">
+              <div className="flex items-center gap-2 text-emerald-600">
+                <MapPin className="w-5 h-5" />
+                <span className="font-medium">Venue: {panel.venue}</span>
+              </div>
+            </div>
+          )}
+          
           {/* Assigned Teams Section */}
           <div className="mb-8">
             <h5 className="font-bold text-lg sm:text-xl mb-4 sm:mb-6 text-slate-800 flex items-center space-x-2">

@@ -127,7 +127,7 @@ const FacultyEditModal = ({ faculty, onClose, onSave }) => {
         throw new Error('Email must end with @vit.ac.in');
       }
 
-      if(formData.phoneNumber.length ===0){
+      if(formData.phoneNumber.length === 0){
         throw new Error('Invalid Phone number, Length of Phone number should be 10');
       }
 
@@ -367,7 +367,7 @@ const FacultyEditModal = ({ faculty, onClose, onSave }) => {
   );
 };
 
-// Team Popup Component
+// ✅ FIXED: Team Popup Component with venue display
 const TeamPopup = ({ team, onClose }) => {
   if (!team) return null;
 
@@ -378,11 +378,20 @@ const TeamPopup = ({ team, onClose }) => {
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-lg sm:text-2xl font-bold mb-2">{team.title || team.name || 'Project Details'}</h2>
-              {team.domain && team.domain !== 'N/A' && (
-                <span className="bg-white/20 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
-                  {team.domain}
-                </span>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {team.specialization && team.specialization !== 'N/A' && (
+                  <span className="bg-white/20 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
+                    {team.specialization}
+                  </span>
+                )}
+                {/* ✅ Show venue if available */}
+                {team.panel?.venue && (
+                  <span className="bg-emerald-500/20 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {team.panel.venue}
+                  </span>
+                )}
+              </div>
             </div>
             <button
               className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white/20 rounded-lg"
@@ -415,19 +424,6 @@ const TeamPopup = ({ team, onClose }) => {
                             {student.emailId}
                           </p>
                         )}
-                        {student.school && (
-                          <p className="text-xs sm:text-sm text-slate-600 flex items-center gap-1 mt-1">
-                            <MapPin className="h-3 w-3" />
-                            {student.school} - {student.department}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-left sm:text-right mt-2 sm:mt-0">
-                        {student.department && (
-                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                            {student.department}
-                          </span>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -441,45 +437,50 @@ const TeamPopup = ({ team, onClose }) => {
             )}
           </div>
 
-          {(team.school || team.department || team.specialization) && (
-            <div className="mb-4 sm:mb-6">
-              <h3 className="font-semibold text-base sm:text-lg mb-2 sm:mb-3 text-slate-800">Project Information</h3>
-              <div className="bg-blue-50 p-3 sm:p-4 rounded-xl border border-blue-200 space-y-2">
-                {team.school && (
-                  <p className="text-xs sm:text-sm">
-                    <span className="font-medium">School:</span> {team.school}
-                  </p>
-                )}
-                {team.department && (
-                  <p className="text-xs sm:text-sm">
-                    <span className="font-medium">Department:</span> {team.department}
-                  </p>
-                )}
-                {team.specialization && (
-                  <p className="text-xs sm:text-sm">
-                    <span className="font-medium">Specialization:</span> {team.specialization}
-                  </p>
-                )}
-              </div>
+          {/* ✅ Project Information with venue display */}
+          <div className="mb-4 sm:mb-6">
+            <h3 className="font-semibold text-base sm:text-lg mb-2 sm:mb-3 text-slate-800">Project Information</h3>
+            <div className="bg-blue-50 p-3 sm:p-4 rounded-xl border border-blue-200 space-y-2">
+              {team.school && (
+                <p className="text-xs sm:text-sm">
+                  <span className="font-medium">School:</span> {team.school}
+                </p>
+              )}
+              {team.department && (
+                <p className="text-xs sm:text-sm">
+                  <span className="font-medium">Department:</span> {team.department}
+                </p>
+              )}
+              {team.specialization && (
+                <p className="text-xs sm:text-sm">
+                  <span className="font-medium">Specialization:</span> {team.specialization}
+                </p>
+              )}
+              {/* ✅ Display venue in project information */}
+              {team.panel?.venue && (
+                <p className="text-xs sm:text-sm">
+                  <span className="font-medium">Venue:</span> {team.panel.venue}
+                </p>
+              )}
+              {/* ✅ Display panel members */}
+              {team.panel?.members && team.panel.members.length > 0 && (
+                <p className="text-xs sm:text-sm">
+                  <span className="font-medium">Panel Members:</span> {team.panel.members.map(member => member.name).join(', ')}
+                </p>
+              )}
             </div>
-          )}
+          </div>
 
-          {team.faculty && (
+          {/* Guide Faculty Information */}
+          {team.guideFaculty && (
             <div className="mb-4 sm:mb-6">
-              <h3 className="font-semibold text-base sm:text-lg mb-2 sm:mb-3 text-slate-800">Faculty Assignment</h3>
+              <h3 className="font-semibold text-base sm:text-lg mb-2 sm:mb-3 text-slate-800">Guide Faculty</h3>
               <div className="bg-emerald-50 p-3 sm:p-4 rounded-xl border border-emerald-200">
                 <p className="text-xs sm:text-sm">
-                  <span className="font-medium">Employee ID:</span> {team.faculty.employeeId}
+                  <span className="font-medium">Name:</span> {team.guideFaculty.name}
                 </p>
                 <p className="text-xs sm:text-sm">
-                  <span className="font-medium">Role:</span> 
-                  <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                    team.faculty.role === 'guide' 
-                      ? 'bg-emerald-100 text-emerald-800' 
-                      : 'bg-orange-100 text-orange-800'
-                  }`}>
-                    {team.faculty.role}
-                  </span>
+                  <span className="font-medium">Employee ID:</span> {team.guideFaculty.employeeId}
                 </p>
               </div>
             </div>
@@ -668,32 +669,53 @@ const FacultyListView = () => {
     }
   };
 
-  // Fetch faculty projects
+  // ✅ FIXED: Fetch faculty projects with proper data handling
   const fetchFacultyProjects = async (employeeId) => {
     try {
       setLoadingProjects(prev => ({ ...prev, [employeeId]: true }));
+      console.log(`🔍 Fetching projects for faculty: ${employeeId}`);
+      
       const response = await getFacultyProjects(employeeId);
+      console.log(`📊 API response for ${employeeId}:`, response);
       
       let projectData = { guide: [], panel: [], total: 0, lastUpdated: new Date().toISOString() };
       
       if (response.data?.success && response.data.data) {
-        const guideProjects = response.data.data.guideProjects || [];
-        const panelProjects = response.data.data.panelProjects || [];
+        const { guideProjects = [], panelProjects = [] } = response.data.data;
+        
+        console.log(`📋 Guide projects for ${employeeId}:`, guideProjects.length);
+        console.log(`📋 Panel projects for ${employeeId}:`, panelProjects.length);
+        
+        // ✅ Map guide projects with proper structure
+        const mappedGuideProjects = guideProjects.map(project => ({
+          ...project,
+          title: project.name,
+          students: project.students || [],
+          // Include venue information if available
+          venue: project.panel?.venue || null,
+          panel: project.panel || null
+        }));
+        
+        // ✅ Map panel projects with proper structure and venue information
+        const mappedPanelProjects = panelProjects.map(project => ({
+          ...project,
+          title: project.name,
+          students: project.students || [],
+          // ✅ Include venue and panel member information
+          venue: project.panel?.venue || null,
+          panel: project.panel || null
+        }));
         
         projectData = {
-          guide: guideProjects.map(project => ({
-            ...project,
-            title: project.name,
-            students: project.students || []
-          })),
-          panel: panelProjects.map(project => ({
-            ...project,
-            title: project.name,
-            students: project.students || []
-          })),
-          total: guideProjects.length + panelProjects.length,
+          guide: mappedGuideProjects,
+          panel: mappedPanelProjects,
+          total: mappedGuideProjects.length + mappedPanelProjects.length,
           lastUpdated: new Date().toISOString()
         };
+        
+        console.log(`✅ Processed project data for ${employeeId}:`, projectData);
+      } else {
+        console.log(`⚠️ No project data found for ${employeeId}`);
       }
 
       setFacultyProjects(prev => ({
@@ -703,7 +725,7 @@ const FacultyListView = () => {
 
       return projectData;
     } catch (error) {
-      console.error(`Error fetching projects for ${employeeId}:`, error);
+      console.error(`❌ Error fetching projects for ${employeeId}:`, error);
       const errorData = { 
         guide: [], 
         panel: [], 
@@ -1240,7 +1262,7 @@ const FacultyListView = () => {
                                     <div className="sm:col-span-2">
                                       <label className="text-xs sm:text-sm font-semibold text-slate-600">Phone Number:</label>
                                       <a 
-                                        href={`mailto:${faculty.phoneNumber}`} 
+                                        href={`tel:${faculty.phoneNumber}`} 
                                         className="text-blue-600 hover:underline block text-sm sm:text-base"
                                       >
                                         {faculty.phoneNumber || 'N/A'}
@@ -1405,6 +1427,13 @@ const FacultyListView = () => {
                                                           {project.specialization}
                                                         </div>
                                                       )}
+                                                      {/* ✅ Show venue for guide projects if available */}
+                                                      {project.venue && (
+                                                        <div className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                                                          <MapPin className="w-3 h-3" />
+                                                          Venue: {project.venue}
+                                                        </div>
+                                                      )}
                                                     </div>
                                                     <button
                                                       onClick={(e) => {
@@ -1446,6 +1475,13 @@ const FacultyListView = () => {
                                                       {project.specialization && (
                                                         <div className="text-xs text-orange-600 mt-1">
                                                           {project.specialization}
+                                                        </div>
+                                                      )}
+                                                      {/* ✅ Show venue for panel projects */}
+                                                      {project.venue && (
+                                                        <div className="text-xs text-orange-600 mt-1 flex items-center gap-1">
+                                                          <MapPin className="w-3 h-3" />
+                                                          Venue: {project.venue}
                                                         </div>
                                                       )}
                                                     </div>
