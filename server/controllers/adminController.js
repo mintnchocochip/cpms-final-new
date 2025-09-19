@@ -128,19 +128,20 @@ export async function createFaculty(req, res) {
     } = req.body;
 
     if (!name || !emailId || !password || !employeeId || !phoneNumber) {
+      // ← phoneNumber required
       return res.status(400).json({
         success: false,
         message:
           "Name, email, password, employee ID, and phone number are required",
       });
-    }
+    } // Only allow college emails
 
     if (!emailId.endsWith("@vit.ac.in")) {
       return res.status(400).json({
         success: false,
         message: "Only college emails allowed!",
       });
-    }
+    } // Password validation
 
     if (
       password.length < 8 ||
@@ -154,14 +155,14 @@ export async function createFaculty(req, res) {
         message:
           "Password must be at least 8 characters and include uppercase, lowercase, number, and special character",
       });
-    }
+    } // Validate school, department, and specialization arrays
 
     if (!school || !Array.isArray(school) || school.length === 0) {
       return res.status(400).json({
         success: false,
         message: "School must be a non-empty array",
       });
-    }
+    } // if (!department || !Array.isArray(department) || department.length === 0) { //   return res.status(400).json({ //     success: false, //     message: "Department must be a non-empty array", //   }); // }
 
     if (!/^(\+91[- ]?)?[6-9]\d{9}$/.test(phoneNumber.trim())) {
       return res.status(400).json({
@@ -179,45 +180,37 @@ export async function createFaculty(req, res) {
         success: false,
         message: "Specialization must be a non-empty array",
       });
-    }
+    } // Check if email or phone number is already registered
 
-    // Check if email/employeeId/phoneNumber already in DB
     const existingFaculty = await Faculty.findOne({
       $or: [
         { emailId: emailId.trim().toLowerCase() },
         { employeeId: employeeId.trim().toUpperCase() },
-        { phoneNumber: phoneNumber.trim() },
+        { phoneNumber: phoneNumber.trim() }, // ← Added uniqueness check for phoneNumber
       ],
     });
+
     if (existingFaculty) {
       return res.status(400).json({
         success: false,
         message:
           "Faculty with this email, employee ID, or phone number already exists!",
       });
-    }
+    } // Hash password before saving
 
-    // Hash password before saving
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, salt); // Create faculty with correct field names matching schema
 
-    // Departments: assign empty array if not provided or not a valid array
-    let departmentArr = [];
-    if (Array.isArray(department) && department.length > 0) {
-      departmentArr = department.map((d) => d.trim());
-    }
-
-    // Create faculty
     const newFaculty = new Faculty({
       imageUrl: imageUrl || "",
       name: name.trim(),
       emailId: emailId.trim().toLowerCase(),
       password: hashedPassword,
       employeeId: employeeId.trim().toUpperCase(),
-      phoneNumber: phoneNumber.trim(),
+      phoneNumber: phoneNumber.trim(), // ← Set phoneNumber
       role: role,
       school: school.map((s) => s.trim()),
-      department: departmentArr,
+      department: department.map((d) => d.trim()),
       specialization: specialization.map((sp) => sp.trim()),
     });
 
@@ -236,7 +229,6 @@ export async function createFaculty(req, res) {
     });
   }
 }
-
 
 export async function createFacultyBulk(req, res) {
   try {

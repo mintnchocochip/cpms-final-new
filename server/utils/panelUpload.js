@@ -375,62 +375,72 @@ const rawPanels = [
   [
     ["52262", "Dr. Mercy Rajaselvi Beaulah P"],
     ["53619", "Dr. Manikandan P"],
+    "AB3-607 Classroom",
   ],
   [
     ["52263", "Dr. Om Kumar C U"],
     ["53623", "Dr. Saranyaraj D"],
+    "AB3-608 Classroom",
   ],
   [
     ["52264", "Dr. Krithiga R"],
     ["53624", "Dr. Hemalatha K"],
+    "AB3-609 Classroom",
   ],
   [
     ["52266", "Dr. Suseela S"],
     ["53626", "Dr. Jai Vinitha L"],
+    "AB3-612 Classroom",
   ],
   [
     ["52273", "Dr. S A Amutha Jeevakumari"],
     ["53627", "Dr. Parvathy A K"],
+    "AB3-703 Classroom",
   ],
   [
     ["52275", "Dr. Noel Jeygar Robert V"],
     ["53629", "Dr. Jeipratha P N"],
+    "AB3-704 Classroom",
   ],
   [
     ["52277", "Dr. V Arunkumar"],
     ["53630", "Dr. Sambath M"],
+    "AB3-705 Classroom",
   ],
   [
     ["52278", "Dr. Manjula V"],
     ["53633", "Dr. Ranjith Kumar M"],
+    "AB3-706 Classroom",
   ],
   [
     ["52279", "Dr. Rama Prabha K P"],
     ["53637", "Dr. Saranya G"],
+    "AB3-707 Classroom",
   ],
   [
     ["50879", "Dr. Rajalakshmi R"],
     ["53638", "Dr. Omana J"],
+    "AB3-708 Classroom",
   ],
   [
     ["52281", "Dr. Sivakumar P"],
     ["53641", "Dr. Vidhya Lakshmi M"],
+    "AB3-709 Classroom",
   ],
   [
     ["52283", "Dr. Monica K M"],
     ["53642", "Dr. Sarita Kumari"],
+    "AB3-713 Classroom",
   ],
 ];
-
 
 async function createPanels() {
   try {
     await connectDB();
 
     for (let i = 0; i < rawPanels.length; i++) {
-      const [f1, f2] = rawPanels[i];
+      const [f1, f2, venue] = rawPanels[i];
       const facultyDocs = [];
-
       // Query faculty documents — get ObjectIds
       for (const [employeeId, name] of [f1, f2]) {
         const faculty = await Faculty.findOne({
@@ -446,12 +456,17 @@ async function createPanels() {
       if (facultyDocs.length === 2) {
         const newPanel = new Panel({
           members: facultyDocs, // Assign ObjectId array here for relation
+          venue: venue,
           school: "SCOPE",
           department: "MCA",
         });
-
         await newPanel.save();
-        console.log(`Created Panel ${i + 1} with members`, facultyDocs);
+        console.log(
+          `Created Panel ${i + 1} with members`,
+          facultyDocs,
+          "Venue:",
+          venue
+        );
       } else {
         console.error(
           `Panel ${i + 1} creation skipped due to missing faculties`
@@ -465,5 +480,4 @@ async function createPanels() {
     console.log("Disconnected from DB");
   }
 }
-
 createPanels();
