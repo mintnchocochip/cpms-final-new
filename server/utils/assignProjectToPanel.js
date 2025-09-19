@@ -7,7 +7,8 @@ dotenv.config();
 const EXCEL_PATH = "./projects-with-panel.xlsx"; // Adjust path as needed
 const API_BASE_URL =
   process.env.API_BASE_URL || "http://localhost:3000/api/admin";
-const AUTH_TOKEN = process.env.ADMIN_JWT_TOKEN; // You need to set this JWT token for admin auth
+const AUTH_TOKEN =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4Y2QwMGY4MjdmNzI5NDhjMzQzNjY4MSIsImVtYWlsSWQiOiJhZG1pbkB2aXQuYWMuaW4iLCJlbXBsb3llZUlkIjoiQURNSU4wMDEiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTgyODU2NzQsImV4cCI6MTc1ODM3MjA3NH0.t1KSe8rof5vG6r1d97qMuAQGkGX0BYAX4J0Y_-Eb91A"; // You need to set this JWT token for admin auth
 
 async function assignPanelsManually() {
   const workbook = xlsx.readFile(EXCEL_PATH);

@@ -1,9 +1,8 @@
-
-
 import xlsx from "xlsx";
 import axios from "axios";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
+import fs from "fs";
 import connectDB from "./db.js";
 import Panel from "../models/panelSchema.js";
 import Project from "../models/projectSchema.js";
@@ -11,7 +10,8 @@ import Faculty from "../models/facultySchema.js";
 
 dotenv.config();
 
-const EXCEL_PATH = "E:/Desktop/CPMS/btech project panel assignment.xlsx"; // Update path if needed
+const EXCEL_PATH =
+  "E:/Desktop/CPMS/cpms-final/server/utils/project panel assignment mca.xlsx";
 const API_BASE_URL =
   process.env.API_BASE_URL || "http://localhost:3000/api/admin";
 const AUTH_TOKEN =
@@ -19,6 +19,13 @@ const AUTH_TOKEN =
 
 async function main() {
   await connectDB();
+
+  // Check if Excel file exists before reading
+  if (!fs.existsSync(EXCEL_PATH)) {
+    console.error("Excel file does not exist at path:", EXCEL_PATH);
+    process.exit(1);
+  }
+
   const workbook = xlsx.readFile(EXCEL_PATH);
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
@@ -96,7 +103,6 @@ async function main() {
         "| Row data:",
         row
       );
-      // Optionally: Try to get more info from backend:
       try {
         const res = await axios.get(`${API_BASE_URL}/projectByName`, {
           params: { name: projectTitle },
@@ -118,7 +124,6 @@ async function main() {
         { panelId: panel._id, projectId: project._id },
         { headers: { Authorization: `Bearer ${AUTH_TOKEN}` } }
       );
-      // Success log (minimal):
       console.log(`Project with name "${projectTitle}" assigned`);
     } catch (error) {
       console.error(
@@ -127,6 +132,7 @@ async function main() {
       );
     }
   }
+
   await mongoose.disconnect();
 }
 
