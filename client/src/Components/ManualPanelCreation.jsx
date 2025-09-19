@@ -41,10 +41,8 @@ const ManualPanelCreation = ({
       filtered = facultyList.filter(faculty => {
         const facultySchools = Array.isArray(faculty.school) ? faculty.school : [faculty.school];
         const facultyDepts = Array.isArray(faculty.department) ? faculty.department : [faculty.department];
-
         const schoolMatch = school ? facultySchools.includes(school) : true;
         const deptMatch = department ? facultyDepts.includes(department) : true;
-
         return schoolMatch && deptMatch;
       });
       console.log('After admin context filtering:', filtered.length);
@@ -70,7 +68,6 @@ const ManualPanelCreation = ({
     console.log(`After excluding used faculty: ${filtered.length} (excluded ${beforeExclusion - filtered.length})`);
     console.log('Final filtered faculty:', filtered.map(f => `${f.name} (${f.employeeId})`));
     console.log('=== END FILTERING ===');
-
     return filtered;
   }, [facultyList, adminContext, usedFacultyIds]);
 
@@ -115,18 +112,30 @@ const ManualPanelCreation = ({
 
   const clearAll = () => setSelectedMembers([]);
 
+  // ✅ FIXED: Handle both context mode and all mode properly
   const handleSubmit = () => {
     if (selectedMembers.length < 2) {
       alert("Please select at least two distinct faculty members.");
       return;
     }
     
-    const payload = {
-      memberEmployeeIds: selectedMembers,
-      ...(selectedSchool && { school: selectedSchool }),
-      ...(selectedDepartment && { department: selectedDepartment })
+    // ✅ FIXED: Create payload based on context mode
+    let payload = {
+      memberEmployeeIds: selectedMembers
     };
-    
+
+    // ✅ FIXED: Add school and department based on mode
+    if (adminContext?.skipped) {
+      // ✅ ALL MODE: Use manually selected school/department from dropdowns
+      if (selectedSchool) payload.school = selectedSchool;
+      if (selectedDepartment) payload.department = selectedDepartment;
+    } else {
+      // ✅ CONTEXT MODE: Use the admin context school/department
+      if (adminContext?.school) payload.school = adminContext.school;
+      if (adminContext?.department) payload.department = adminContext.department;
+    }
+
+    console.log('✅ Submitting payload:', payload);
     onSubmit(payload);
   };
 
@@ -195,11 +204,11 @@ const ManualPanelCreation = ({
             </div>
           )}
 
-          {/* ✅ UPDATED: Show current context info with employee ID exclusion info */}
+          {/* ✅ UPDATED: Show current context info with school/department that will be used */}
           {!adminContext?.skipped && (
             <div className="mb-6 p-4 bg-green-50 rounded-xl border border-green-200">
               <p className="text-sm text-green-800">
-                <strong>Showing faculty for:</strong> {adminContext?.school} - {adminContext?.department}
+                <strong>Panel will be created for:</strong> {adminContext?.school} - {adminContext?.department}
               </p>
               <p className="text-xs text-green-600 mt-1">
                 {filteredFaculty.length} faculty members available (excluding {usedFacultyIds.length} already assigned by employee ID)
