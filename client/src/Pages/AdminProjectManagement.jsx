@@ -32,6 +32,7 @@ import {
   Trash2,
   Save,
   Plus,
+  Star,
 } from "lucide-react";
 
 const AdminProjectManagement = () => {
@@ -47,6 +48,7 @@ const AdminProjectManagement = () => {
   const [selectedSchool, setSelectedSchool] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [bestProjectFilter, setBestProjectFilter] = useState("");
+  
   // UI states
   const [expandedProjects, setExpandedProjects] = useState(new Set());
   const [showFilters, setShowFilters] = useState(false);
@@ -195,47 +197,62 @@ const AdminProjectManagement = () => {
   };
 
   // Filter projects based on search and filters
-// Filter projects based on search and filters
-const filteredProjects = useMemo(() => {
-  let filtered = [...projects];
+  const filteredProjects = useMemo(() => {
+    let filtered = [...projects];
 
-  // Search filter
-  if (searchQuery) {
-    const query = searchQuery.toLowerCase();
-    filtered = filtered.filter(project => 
-      project.name?.toLowerCase().includes(query) ||
-      project.guideFaculty?.name?.toLowerCase().includes(query) ||
-      project.school?.toLowerCase().includes(query) ||
-      project.department?.toLowerCase().includes(query) ||
-      project.students?.some(student => 
-        student.name?.toLowerCase().includes(query) ||
-        student.regNo?.toLowerCase().includes(query)
-      )
-    );
-  }
-
-  // School filter
-  if (selectedSchool) {
-    filtered = filtered.filter(project => project.school === selectedSchool);
-  }
-
-  // Department filter
-  if (selectedDepartment) {
-    filtered = filtered.filter(project => project.department === selectedDepartment);
-  }
-
-  // ✅ NEW: Best Project filter
-  if (bestProjectFilter) {
-    if (bestProjectFilter === "best") {
-      filtered = filtered.filter(project => project.bestProject === true);
-    } else if (bestProjectFilter === "normal") {
-      filtered = filtered.filter(project => !project.bestProject);
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(project => 
+        project.name?.toLowerCase().includes(query) ||
+        project.guideFaculty?.name?.toLowerCase().includes(query) ||
+        project.school?.toLowerCase().includes(query) ||
+        project.department?.toLowerCase().includes(query) ||
+        project.students?.some(student => 
+          student.name?.toLowerCase().includes(query) ||
+          student.regNo?.toLowerCase().includes(query)
+        )
+      );
     }
-  }
 
-  return filtered;
-}, [projects, searchQuery, selectedSchool, selectedDepartment, bestProjectFilter]); // ✅ Add bestProjectFilter
+    // School filter
+    if (selectedSchool) {
+      filtered = filtered.filter(project => project.school === selectedSchool);
+    }
 
+    // Department filter
+    if (selectedDepartment) {
+      filtered = filtered.filter(project => project.department === selectedDepartment);
+    }
+
+    // Best Project filter
+    if (bestProjectFilter) {
+      if (bestProjectFilter === "best") {
+        filtered = filtered.filter(project => project.bestProject === true);
+      } else if (bestProjectFilter === "normal") {
+        filtered = filtered.filter(project => !project.bestProject);
+      }
+    }
+
+    return filtered;
+  }, [projects, searchQuery, selectedSchool, selectedDepartment, bestProjectFilter]);
+
+  // Statistics
+  const stats = useMemo(() => {
+    const totalProjects = filteredProjects.length;
+    const totalStudents = filteredProjects.reduce((sum, project) => sum + (project.students?.length || 0), 0);
+    const projectsWithPanels = filteredProjects.filter(p => p.panel).length;
+    const projectsWithGuides = filteredProjects.filter(p => p.guideFaculty).length;
+    const bestProjects = filteredProjects.filter(p => p.bestProject).length;
+    
+    return {
+      totalProjects,
+      totalStudents,
+      projectsWithPanels,
+      projectsWithGuides,
+      bestProjects
+    };
+  }, [filteredProjects]);
 
   // Toggle project expansion
   const toggleProjectExpanded = useCallback((projectId) => {
@@ -356,7 +373,8 @@ const filteredProjects = useMemo(() => {
           'School': project.school || '',
           'Department': project.department || '',
           'Specialization': project.specialization || '',
-          'Type': displayType(project.type) || '', // Use display format
+          'Type': displayType(project.type) || '',
+          'Best Project': project.bestProject ? '🏆 YES' : 'No', // ✅ NEW: Best project column
           'Guide Faculty': project.guideFaculty?.name || '',
           'Guide Employee ID': project.guideFaculty?.employeeId || '',
           'Guide Email': project.guideFaculty?.emailId || '',
@@ -407,7 +425,7 @@ const filteredProjects = useMemo(() => {
       console.error("Excel download error:", error);
       showNotification("error", "Download Failed", "Failed to download Excel file. Please try again.");
     }
-  }, [filteredProjects, adminContext, showNotification]);
+  }, [filteredProjects, adminContext, showNotification, displayType]);
 
   if (loading) {
     return (
@@ -471,28 +489,84 @@ const filteredProjects = useMemo(() => {
         </div>
 
         {/* Statistics Dashboard */}
-      {/* Statistics Dashboard */}
-<div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6"> {/* ✅ Changed to lg:grid-cols-5 */}
-    {/* Existing statistics cards... */}
-    
-    {/* ✅ NEW: Best Projects Statistics */}
-    <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-yellow-100 text-xs sm:text-sm font-medium">Best Projects</p>
-          <p className="text-2xl sm:text-3xl font-bold mt-1">
-            {projects.filter(p => p.bestProject).length.toLocaleString()}
-          </p>
-        </div>
-        <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
-          <Award className="h-6 w-6 sm:h-8 sm:w-8" />
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+        <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+            {/* Total Projects */}
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-xs sm:text-sm font-medium">Total Projects</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-1">
+                    {stats.totalProjects.toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <BookOpen className="h-6 w-6 sm:h-8 sm:w-8" />
+                </div>
+              </div>
+            </div>
 
+            {/* Total Students */}
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-emerald-100 text-xs sm:text-sm font-medium">Total Students</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-1">
+                    {stats.totalStudents.toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <Users className="h-6 w-6 sm:h-8 sm:w-8" />
+                </div>
+              </div>
+            </div>
+
+            {/* Panel Assigned */}
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 text-xs sm:text-sm font-medium">Panel Assigned</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-1">
+                    {stats.projectsWithPanels.toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <Award className="h-6 w-6 sm:h-8 sm:w-8" />
+                </div>
+              </div>
+            </div>
+
+            {/* With Guides */}
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-100 text-xs sm:text-sm font-medium">With Guides</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-1">
+                    {stats.projectsWithGuides.toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <GraduationCap className="h-6 w-6 sm:h-8 sm:w-8" />
+                </div>
+              </div>
+            </div>
+
+            {/* Best Projects */}
+            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-yellow-100 text-xs sm:text-sm font-medium">Best Projects</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-1">
+                    {stats.bestProjects.toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+                  <Star className="h-6 w-6 sm:h-8 sm:w-8" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Search and Filters Panel */}
         <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
@@ -547,70 +621,68 @@ const filteredProjects = useMemo(() => {
             </div>
 
             {/* Advanced Filters */}
-      {/* Advanced Filters */}
-{showFilters && (
-  <div className="border-t border-slate-200 pt-4 sm:pt-6">
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
-      <div>
-        <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">School Filter</label>
-        <select
-          value={selectedSchool}
-          onChange={(e) => setSelectedSchool(e.target.value)}
-          className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-        >
-          <option value="">All Schools</option>
-          {availableSchools.map(school => (
-            <option key={school} value={school}>{school}</option>
-          ))}
-        </select>
-      </div>
-      
-      <div>
-        <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Department Filter</label>
-        <select
-          value={selectedDepartment}
-          onChange={(e) => setSelectedDepartment(e.target.value)}
-          className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-        >
-          <option value="">All Departments</option>
-          {availableDepartments.map(dept => (
-            <option key={dept} value={dept}>{dept}</option>
-          ))}
-        </select>
-      </div>
+            {showFilters && (
+              <div className="border-t border-slate-200 pt-4 sm:pt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">School Filter</label>
+                    <select
+                      value={selectedSchool}
+                      onChange={(e) => setSelectedSchool(e.target.value)}
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                    >
+                      <option value="">All Schools</option>
+                      {availableSchools.map(school => (
+                        <option key={school} value={school}>{school}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Department Filter</label>
+                    <select
+                      value={selectedDepartment}
+                      onChange={(e) => setSelectedDepartment(e.target.value)}
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                    >
+                      <option value="">All Departments</option>
+                      {availableDepartments.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
 
-      {/* ✅ NEW: Best Project Filter */}
-      <div>
-        <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Best Project Filter</label>
-        <select
-          value={bestProjectFilter}
-          onChange={(e) => setBestProjectFilter(e.target.value)}
-          className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all text-sm sm:text-base"
-        >
-          <option value="">All Projects</option>
-          <option value="best">🏆 Best Projects Only</option>
-          <option value="normal">Regular Projects Only</option>
-        </select>
-      </div>
-    </div>
+                  {/* Best Project Filter */}
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Best Project Filter</label>
+                    <select
+                      value={bestProjectFilter}
+                      onChange={(e) => setBestProjectFilter(e.target.value)}
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all text-sm sm:text-base"
+                    >
+                      <option value="">All Projects</option>
+                      <option value="best">🏆 Best Projects Only</option>
+                      <option value="normal">Regular Projects Only</option>
+                    </select>
+                  </div>
+                </div>
 
-    <div className="flex justify-start">
-      <button
-        onClick={() => {
-          setSearchQuery("");
-          setSelectedSchool("");
-          setSelectedDepartment("");
-          setBestProjectFilter(""); // ✅ Clear best project filter
-        }}
-        className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
-      >
-        <RefreshCw className="h-4 w-4" />
-        <span>Clear All Filters</span>
-      </button>
-    </div>
-  </div>
-)}
-
+                <div className="flex justify-start">
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSelectedSchool("");
+                      setSelectedDepartment("");
+                      setBestProjectFilter("");
+                    }}
+                    className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Clear All Filters</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -697,6 +769,14 @@ const filteredProjects = useMemo(() => {
                           </div>
                           
                           <div className="flex items-center space-x-3 mt-3 sm:mt-0">
+                            {/* Best Project Badge */}
+                            {project.bestProject && (
+                              <span className="bg-yellow-100 text-yellow-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold flex items-center space-x-1">
+                                <Star className="h-3 w-3 sm:h-4 sm:w-4 fill-current" />
+                                <span>🏆 BEST PROJECT</span>
+                              </span>
+                            )}
+                            
                             {project.panel && (
                               <span className="bg-emerald-100 text-emerald-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
                                 <Award className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -755,6 +835,22 @@ const filteredProjects = useMemo(() => {
                                     <div>
                                       <span className="text-xs sm:text-sm font-semibold text-slate-700">Type:</span>
                                       <p className="text-slate-600">{displayType(project.type) || 'Not specified'}</p>
+                                    </div>
+                                    {/* Best Project Status in Details */}
+                                    <div>
+                                      <span className="text-xs sm:text-sm font-semibold text-slate-700">Best Project:</span>
+                                      <div className="flex items-center space-x-2 mt-1">
+                                        {project.bestProject ? (
+                                          <>
+                                            <Star className="h-4 w-4 text-yellow-600 fill-current" />
+                                            <span className="text-yellow-600 font-bold">🏆 YES - Marked as Best Project</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <span className="text-slate-500">No</span>
+                                          </>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
