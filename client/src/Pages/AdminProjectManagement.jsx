@@ -46,7 +46,7 @@ const AdminProjectManagement = () => {
   // Filter states
   const [selectedSchool, setSelectedSchool] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
-  
+  const [bestProjectFilter, setBestProjectFilter] = useState("");
   // UI states
   const [expandedProjects, setExpandedProjects] = useState(new Set());
   const [showFilters, setShowFilters] = useState(false);
@@ -195,36 +195,47 @@ const AdminProjectManagement = () => {
   };
 
   // Filter projects based on search and filters
-  const filteredProjects = useMemo(() => {
-    let filtered = [...projects];
+// Filter projects based on search and filters
+const filteredProjects = useMemo(() => {
+  let filtered = [...projects];
 
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(project => 
-        project.name?.toLowerCase().includes(query) ||
-        project.guideFaculty?.name?.toLowerCase().includes(query) ||
-        project.school?.toLowerCase().includes(query) ||
-        project.department?.toLowerCase().includes(query) ||
-        project.students?.some(student => 
-          student.name?.toLowerCase().includes(query) ||
-          student.regNo?.toLowerCase().includes(query)
-        )
-      );
+  // Search filter
+  if (searchQuery) {
+    const query = searchQuery.toLowerCase();
+    filtered = filtered.filter(project => 
+      project.name?.toLowerCase().includes(query) ||
+      project.guideFaculty?.name?.toLowerCase().includes(query) ||
+      project.school?.toLowerCase().includes(query) ||
+      project.department?.toLowerCase().includes(query) ||
+      project.students?.some(student => 
+        student.name?.toLowerCase().includes(query) ||
+        student.regNo?.toLowerCase().includes(query)
+      )
+    );
+  }
+
+  // School filter
+  if (selectedSchool) {
+    filtered = filtered.filter(project => project.school === selectedSchool);
+  }
+
+  // Department filter
+  if (selectedDepartment) {
+    filtered = filtered.filter(project => project.department === selectedDepartment);
+  }
+
+  // ✅ NEW: Best Project filter
+  if (bestProjectFilter) {
+    if (bestProjectFilter === "best") {
+      filtered = filtered.filter(project => project.bestProject === true);
+    } else if (bestProjectFilter === "normal") {
+      filtered = filtered.filter(project => !project.bestProject);
     }
+  }
 
-    // School filter
-    if (selectedSchool) {
-      filtered = filtered.filter(project => project.school === selectedSchool);
-    }
+  return filtered;
+}, [projects, searchQuery, selectedSchool, selectedDepartment, bestProjectFilter]); // ✅ Add bestProjectFilter
 
-    // Department filter
-    if (selectedDepartment) {
-      filtered = filtered.filter(project => project.department === selectedDepartment);
-    }
-
-    return filtered;
-  }, [projects, searchQuery, selectedSchool, selectedDepartment]);
 
   // Toggle project expansion
   const toggleProjectExpanded = useCallback((projectId) => {
@@ -460,59 +471,28 @@ const AdminProjectManagement = () => {
         </div>
 
         {/* Statistics Dashboard */}
-        <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-xs sm:text-sm font-medium">Total Projects</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-1">{projects.length.toLocaleString()}</p>
-                </div>
-                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
-                  <FileSpreadsheet className="h-6 w-6 sm:h-8 sm:w-8" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-emerald-100 text-xs sm:text-sm font-medium">Filtered Results</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-1">{filteredProjects.length.toLocaleString()}</p>
-                </div>
-                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
-                  <Filter className="h-6 w-6 sm:h-8 sm:w-8" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100 text-xs sm:text-sm font-medium">Total Students</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-1">
-                    {projects.reduce((sum, project) => sum + (project.students?.length || 0), 0).toLocaleString()}
-                  </p>
-                </div>
-                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
-                  <Users className="h-6 w-6 sm:h-8 sm:w-8" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-orange-100 text-xs sm:text-sm font-medium">Schools</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-1">{availableSchools.length}</p>
-                </div>
-                <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
-                  <Building2 className="h-6 w-6 sm:h-8 sm:w-8" />
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* Statistics Dashboard */}
+<div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6"> {/* ✅ Changed to lg:grid-cols-5 */}
+    {/* Existing statistics cards... */}
+    
+    {/* ✅ NEW: Best Projects Statistics */}
+    <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-yellow-100 text-xs sm:text-sm font-medium">Best Projects</p>
+          <p className="text-2xl sm:text-3xl font-bold mt-1">
+            {projects.filter(p => p.bestProject).length.toLocaleString()}
+          </p>
         </div>
+        <div className="bg-white/20 p-2 sm:p-3 rounded-xl">
+          <Award className="h-6 w-6 sm:h-8 sm:w-8" />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 
         {/* Search and Filters Panel */}
         <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
@@ -567,53 +547,70 @@ const AdminProjectManagement = () => {
             </div>
 
             {/* Advanced Filters */}
-            {showFilters && (
-              <div className="border-t border-slate-200 pt-4 sm:pt-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">School Filter</label>
-                    <select
-                      value={selectedSchool}
-                      onChange={(e) => setSelectedSchool(e.target.value)}
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                    >
-                      <option value="">All Schools</option>
-                      {availableSchools.map(school => (
-                        <option key={school} value={school}>{school}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Department Filter</label>
-                    <select
-                      value={selectedDepartment}
-                      onChange={(e) => setSelectedDepartment(e.target.value)}
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                    >
-                      <option value="">All Departments</option>
-                      {availableDepartments.map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+      {/* Advanced Filters */}
+{showFilters && (
+  <div className="border-t border-slate-200 pt-4 sm:pt-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
+      <div>
+        <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">School Filter</label>
+        <select
+          value={selectedSchool}
+          onChange={(e) => setSelectedSchool(e.target.value)}
+          className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+        >
+          <option value="">All Schools</option>
+          {availableSchools.map(school => (
+            <option key={school} value={school}>{school}</option>
+          ))}
+        </select>
+      </div>
+      
+      <div>
+        <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Department Filter</label>
+        <select
+          value={selectedDepartment}
+          onChange={(e) => setSelectedDepartment(e.target.value)}
+          className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+        >
+          <option value="">All Departments</option>
+          {availableDepartments.map(dept => (
+            <option key={dept} value={dept}>{dept}</option>
+          ))}
+        </select>
+      </div>
 
-                <div className="flex justify-start">
-                  <button
-                    onClick={() => {
-                      setSearchQuery("");
-                      setSelectedSchool("");
-                      setSelectedDepartment("");
-                    }}
-                    className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    <span>Clear All Filters</span>
-                  </button>
-                </div>
-              </div>
-            )}
+      {/* ✅ NEW: Best Project Filter */}
+      <div>
+        <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Best Project Filter</label>
+        <select
+          value={bestProjectFilter}
+          onChange={(e) => setBestProjectFilter(e.target.value)}
+          className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all text-sm sm:text-base"
+        >
+          <option value="">All Projects</option>
+          <option value="best">🏆 Best Projects Only</option>
+          <option value="normal">Regular Projects Only</option>
+        </select>
+      </div>
+    </div>
+
+    <div className="flex justify-start">
+      <button
+        onClick={() => {
+          setSearchQuery("");
+          setSelectedSchool("");
+          setSelectedDepartment("");
+          setBestProjectFilter(""); // ✅ Clear best project filter
+        }}
+        className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
+      >
+        <RefreshCw className="h-4 w-4" />
+        <span>Clear All Filters</span>
+      </button>
+    </div>
+  </div>
+)}
+
           </div>
         </div>
 
