@@ -362,12 +362,28 @@ const AdminStudentManagement = () => {
         // Add review marks if available
         if (student.reviews) {
           Object.entries(student.reviews).forEach(([reviewType, reviewData]) => {
-            if (reviewData.marks) {
-              // Add individual mark components
-              Object.entries(reviewData.marks).forEach(([component, mark]) => {
-                row[`${reviewType}_${component}`] = mark;
-              });
-            }
+           if (
+  reviewData.marks && 
+  reviewType && 
+  schema?.reviews // where schema is your loaded markingSchema obj for this school/department
+) {
+  const reviewSchema = schema.reviews.find(r => r.reviewName === reviewType);
+  if (reviewSchema && Array.isArray(reviewSchema.components)) {
+    reviewSchema.components.forEach(component => {
+      const cName = component.name;
+      row[`${reviewType}_${cName}`] = reviewData.marks[cName] ?? ''; // Use mark if exists, else blank
+    });
+  } else {
+    // Fallback: existing unordered way
+    schema.reviews.find(r => r.reviewName === reviewType)?.components.forEach((component, idx) => (
+  <td key={component.name}>
+    {student.reviews[reviewType].marks[component.name] ?? ''}
+  </td>
+));
+
+  }
+}
+
             
             // Add review status info
             row[`${reviewType}_Status`] = reviewData.locked ? 'Locked' : 'Unlocked';

@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bell, X, Users, Mail, Phone, MapPin, Calendar, BookOpen, Eye, 
@@ -570,15 +573,84 @@ const DeleteConfirmationModal = ({ faculty, onClose, onConfirm }) => {
   );
 };
 
-// CSV Download Function
+// ✅ NEW: Excel Export Function
+const downloadExcel = (facultyList) => {
+  console.log('📊 Starting Excel export for', facultyList.length, 'faculty members');
+  
+  // Prepare data in the same format as your template
+  const excelData = facultyList.map(faculty => {
+    // Handle array fields properly
+    const schoolStr = Array.isArray(faculty.school) 
+      ? faculty.school.join(',') 
+      : (faculty.school || '');
+    
+    const departmentStr = Array.isArray(faculty.department) 
+      ? faculty.department.join(',') 
+      : (faculty.department || ''); // ✅ Can be empty as requested
+    
+    const specializationStr = Array.isArray(faculty.specialization) 
+      ? faculty.specialization.join(',') 
+      : (faculty.specialization || 'general');
+
+    return {
+      'name': faculty.name || '',
+      'employeeId': faculty.employeeId || '',
+      'emailId': faculty.emailId || '',
+      'phoneNumber': faculty.phoneNumber || '',
+      'password': '', // Empty for security - don't export passwords
+      'role': faculty.role || 'faculty',
+      'school': schoolStr,
+      'department': departmentStr, // ✅ Can be empty
+      'specializations': specializationStr,
+      'imageUrl': faculty.imageUrl || ''
+    };
+  });
+
+  console.log('📋 Excel data prepared:', excelData.slice(0, 2)); // Log first 2 records
+
+  // Create workbook and worksheet
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+  // Set column widths for better readability
+  const columnWidths = [
+    { wch: 25 }, // name
+    { wch: 15 }, // employeeId
+    { wch: 30 }, // emailId
+    { wch: 15 }, // phoneNumber
+    { wch: 15 }, // password
+    { wch: 10 }, // role
+    { wch: 20 }, // school
+    { wch: 25 }, // department
+    { wch: 30 }, // specializations
+    { wch: 40 }  // imageUrl
+  ];
+  worksheet['!cols'] = columnWidths;
+
+  // Add worksheet to workbook
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Faculty Template');
+
+  // Generate Excel file
+  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
+  
+  // Download file
+  const fileName = `faculty_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+  saveAs(data, fileName);
+  
+  console.log('✅ Excel file downloaded:', fileName);
+};
+
+// ✅ UPDATED: CSV Download Function (keep existing functionality)
 const downloadCSV = (facultyList) => {
   const headers = [
-    'Faculty Name', 'Employee ID', 'Email ID', 'Role', 'Schools', 'Departments', 'Specializations'
+    'Faculty Name', 'Employee ID', 'Email ID', 'Phone Number', 'Role', 'Schools', 'Departments', 'Specializations'
   ];
   const rows = facultyList.map(f => [
     f.name || 'N/A', 
     f.employeeId || 'N/A', 
-    f.emailId || 'N/A', 
+    f.emailId || 'N/A',
+    f.phoneNumber || 'N/A',
     f.role || 'faculty',
     Array.isArray(f.school) ? f.school.join('; ') : (f.school || 'N/A'),
     Array.isArray(f.department) ? f.department.join('; ') : (f.department || 'N/A'),
@@ -597,6 +669,8 @@ const downloadCSV = (facultyList) => {
   link.click();
   document.body.removeChild(link);
 };
+
+
 
 // Main Component
 const FacultyListView = () => {
@@ -1019,125 +1093,143 @@ const FacultyListView = () => {
         </div>
 
         {/* Search and Filters Panel */}
-        <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-8 gap-4">
-              <div className="flex items-center space-x-3">
-                <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
-                  <Search className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                </div>
-                <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Search & Filter Controls</h2>
-              </div>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-3 sm:space-x-4 w-full sm:w-auto">
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium text-sm sm:text-base w-full sm:w-auto"
-                >
-                  <Grid3X3 className="h-4 w-4" />
-                  <span>Advanced Filters</span>
-                  {showFilters ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </button>
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className="flex items-center space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium disabled:opacity-50 text-sm sm:text-base w-full sm:w-auto"
-                >
-                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                  <span>Refresh</span>
-                </button>
-                <button
-                  onClick={() => downloadCSV(filteredFacultyList)}
-                  disabled={filteredFacultyList.length === 0}
-                  className="flex items-center space-x-2 px-4 sm:px-6 py-1.5 sm:py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Export CSV ({filteredFacultyList.length})</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Search Bar */}
-            <div className="relative mb-4 sm:mb-6">
-              <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search by faculty name, employee ID, email, school, or department..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 sm:pl-12 pr-10 sm:pr-12 py-3 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-lg text-slate-700 placeholder-slate-400"
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center"
-                >
-                  <X className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 hover:text-slate-600 transition-colors" />
-                </button>
-              )}
-            </div>
-
-            {/* Advanced Filters */}
-            {showFilters && (
-              <div className="border-t border-slate-200 pt-4 sm:pt-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">School Filter</label>
-                    <select
-                      value={filters.school}
-                      onChange={(e) => handleFilterChange('school', e.target.value)}
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                    >
-                      <option value="all">All Schools</option>
-                      {schoolOptions.map(school => (
-                        <option key={school} value={school}>{school}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Department Filter</label>
-                    <select
-                      value={filters.department}
-                      onChange={(e) => handleFilterChange('department', e.target.value)}
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                    >
-                      <option value="all">All Departments</option>
-                      {departmentOptions.map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Specialization Filter</label>
-                    <select
-                      value={filters.specialization}
-                      onChange={(e) => handleFilterChange('specialization', e.target.value)}
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                    >
-                      <option value="all">All Specializations</option>
-                      {specializationOptions.map(spec => (
-                        <option key={spec} value={spec}>{spec}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex justify-start">
-                  <button
-                    onClick={clearFilters}
-                    className="flex items-center space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    <span>Clear All Filters</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+       {/* ✅ UPDATED: Enhanced Search and Control Panel */}
+<div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
+  <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-8">
+    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 lg:gap-8 mb-6">
+      {/* Search Section */}
+      <div className="flex-1 max-w-md">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, ID, or email..."
+            className="w-full pl-10 pr-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm sm:text-base"
+          />
         </div>
+      </div>
+
+      {/* Filter Toggle */}
+      <button
+        onClick={() => setShowFilters(!showFilters)}
+        className="flex items-center space-x-2 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all duration-300 font-medium text-sm"
+      >
+        <Filter className="h-4 w-4" />
+        <span>Filters</span>
+        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* ✅ NEW: Export Options */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => downloadExcel(filteredFacultyList)}
+          disabled={filteredFacultyList.length === 0}
+          className="flex items-center space-x-2 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg text-sm"
+          title={`Export ${filteredFacultyList.length} faculty records to Excel (Template Format)`}
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          <span className="hidden sm:inline">Excel ({filteredFacultyList.length})</span>
+          <span className="sm:hidden">XLS</span>
+        </button>
+        
+        <button
+          onClick={() => downloadCSV(filteredFacultyList)}
+          disabled={filteredFacultyList.length === 0}
+          className="flex items-center space-x-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg text-sm"
+          title={`Export ${filteredFacultyList.length} faculty records to CSV`}
+        >
+          <Download className="h-4 w-4" />
+          <span className="hidden sm:inline">CSV ({filteredFacultyList.length})</span>
+          <span className="sm:hidden">CSV</span>
+        </button>
+        
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center space-x-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-semibold disabled:opacity-50 transition-all duration-300 transform hover:scale-105 shadow-lg text-sm"
+          title="Refresh faculty data"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+          <span className="sm:hidden">↻</span>
+        </button>
+      </div>
+    </div>
+
+    {/* ✅ UPDATED: Filter Panel */}
+    <AnimatePresence>
+      {showFilters && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          className="overflow-hidden"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 pt-4 border-t border-slate-200">
+            {/* School Filter */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">School</label>
+              <select
+                value={filters.school}
+                onChange={(e) => handleFilterChange('school', e.target.value)}
+                className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="all">All Schools</option>
+                {schoolOptions.map(school => (
+                  <option key={school} value={school}>{school}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Department Filter */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Department</label>
+              <select
+                value={filters.department}
+                onChange={(e) => handleFilterChange('department', e.target.value)}
+                className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="all">All Departments</option>
+                {departmentOptions.map(dept => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Specialization Filter */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Specialization</label>
+              <select
+                value={filters.specialization}
+                onChange={(e) => handleFilterChange('specialization', e.target.value)}
+                className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="all">All Specializations</option>
+                {specializationOptions.map(spec => (
+                  <option key={spec} value={spec}>{spec}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Clear Filters */}
+            <div className="flex items-end">
+              <button
+                onClick={clearFilters}
+                className="w-full px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-all duration-200 text-sm"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </div>
+</div>
+
 
         {/* Faculty Data Display */}
         <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">

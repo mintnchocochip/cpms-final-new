@@ -10,8 +10,6 @@ import {
   assignPanelToProject,
   autoAssignPanelsToProjects,
   autoCreatePanelManual,
-  getAllPanelsWithProjects,
-  getAllProjects, // <-- make sure it's imported
 } from "../api";
 
 // ✅ Import extracted components
@@ -52,7 +50,7 @@ const AdminPanelManagement = () => {
     teamId: null,
   });
 
-  // ✅ SIMPLIFIED: Modal states
+  // ✅ SIMPLIFIED: Modal states (removed complex popup objects)
   const [showManualCreateModal, setShowManualCreateModal] = useState(false);
   const [showAutoCreateModal, setShowAutoCreateModal] = useState(false);
   const [showAutoAssignModal, setShowAutoAssignModal] = useState(false);
@@ -76,51 +74,43 @@ const AdminPanelManagement = () => {
   const [isAutoCreating, setIsAutoCreating] = useState(false);
 
   // Show notification function
-  const showNotification = useCallback(
-    (type, title, message, duration = 4000) => {
-      setNotification({
-        isVisible: true,
-        type,
-        title,
-        message,
-        icon:
-          type === "success" ? (
-            <CheckCircle className="h-6 w-6" />
-          ) : (
-            <XCircle className="h-6 w-6" />
-          ),
-      });
-      setTimeout(() => {
-        setNotification((prev) => ({ ...prev, isVisible: false }));
-      }, duration);
-    },
-    []
-  );
+  const showNotification = useCallback((type, title, message, duration = 4000) => {
+    setNotification({
+      isVisible: true,
+      type,
+      title,
+      message,
+      icon: type === "success" ? <CheckCircle className="h-6 w-6" /> : <XCircle className="h-6 w-6" />,
+    });
+
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, isVisible: false }));
+    }, duration);
+  }, []);
 
   // Hide notification function
   const hideNotification = useCallback(() => {
-    setNotification((prev) => ({ ...prev, isVisible: false }));
+    setNotification(prev => ({ ...prev, isVisible: false }));
   }, []);
 
-  // ===== UPDATED fetchData =====
+  // ✅ ENHANCED: Fetch data function with proper employee ID extraction
   const fetchData = useCallback(async () => {
     if (!adminContext) return;
+    
     try {
       setLoading(true);
       const { school, department, skipped } = adminContext;
+
       const apiSchool = skipped ? null : school;
       const apiDepartment = skipped ? null : department;
 
-      // Also fetch all projects for unassigned dropdown
-      const [panelRes, panelProjectsRes, guideProjectsRes, allProjectsRes] =
-        await Promise.all([
-          getAllPanels(apiSchool, apiDepartment),
-          getAllPanelsWithProjects(apiSchool, apiDepartment),
-          getAllGuideProjects(apiSchool, apiDepartment),
-          getAllProjects(),
-        ]);
+      const [panelRes, panelProjectsRes, guideProjectsRes] = await Promise.all([
+        getAllPanels(apiSchool, apiDepartment),
+        getAllPanelProjects(apiSchool, apiDepartment),
+        getAllGuideProjects(apiSchool, apiDepartment),
+      ]);
 
-      // Process panels
+      // Process panels data
       let allPanelsData = [];
       if (panelRes?.data?.success && panelRes.data.data) {
         allPanelsData = panelRes.data.data;
@@ -129,59 +119,57 @@ const AdminPanelManagement = () => {
       } else if (panelRes?.success && panelRes.data) {
         allPanelsData = panelRes.data;
       }
+
+      // Process panel projects data
       let panelProjectData = [];
-      if (panelProjectsRes?.success && panelProjectsRes.data) {
-        panelProjectData = panelProjectsRes.data;
-      } else if (
-        panelProjectsRes?.data?.success &&
-        panelProjectsRes.data.data
-      ) {
+      if (panelProjectsRes?.data?.success && panelProjectsRes.data.data) {
         panelProjectData = panelProjectsRes.data.data;
-      } else if (
-        panelProjectsRes?.data &&
-        Array.isArray(panelProjectsRes.data)
-      ) {
+      } else if (panelProjectsRes?.data && Array.isArray(panelProjectsRes.data)) {
+        panelProjectData = panelProjectsRes.data;
+      } else if (panelProjectsRes?.success && panelProjectsRes.data) {
         panelProjectData = panelProjectsRes.data;
       }
+
+      // Create panel teams map
       const panelTeamsMap = new Map();
-      panelProjectData.forEach((panelData) => {
-        const panelId = panelData.panelId;
-        const projects = panelData.projects || [];
-        const teams = projects.map((project) => ({
+      panelProjectData.forEach((p) => {
+        const teams = (p.projects || []).map((project) => ({
           id: project._id,
           name: project.name,
           domain: project.domain || "N/A",
           members: (project.students || []).map((s) => s.name || s.regNo),
           full: project,
         }));
-        panelTeamsMap.set(panelId.toString(), teams);
+        panelTeamsMap.set(p.panelId, teams);
       });
-      const formattedPanels = allPanelsData.map((panel) => ({
-        panelId: panel._id,
-        facultyIds: (panel.members || []).map((m) => m._id).filter(Boolean),
-        facultyNames: (panel.members || []).map((m) => m.name).filter(Boolean),
-        facultyEmployeeIds: (panel.members || [])
-          .map((m) => m.employeeId)
-          .filter(Boolean),
-        venue: panel.venue,
-        department: panel.department || "Unknown",
-        school: panel.school || "Unknown",
-        teams: panelTeamsMap.get(panel._id.toString()) || [],
-      }));
+
+      // ✅ ENHANCED: Format panels with faculty employee IDs directly from API response
+      // ✅ ENHANCED: Format panels with faculty employee IDs directly from API response
+const formattedPanels = allPanelsData.map((panel) => ({
+  panelId: panel._id,
+  facultyIds: (panel.members || []).map(m => m._id).filter(Boolean),
+  facultyNames: (panel.members || []).map(m => m.name).filter(Boolean),
+  facultyEmployeeIds: (panel.members || []).map(m => m.employeeId).filter(Boolean), // ✅ NEW: Direct from API
+  venue: panel.venue, // ✅ Include venue data
+  department: panel.department || "Unknown",
+  school: panel.school || "Unknown",
+  teams: panelTeamsMap.get(panel._id) || [],
+}));
+
+
+      console.log('✅ Formatted panels with employee IDs:', formattedPanels);
       setPanels(formattedPanels);
 
       // Process guide projects
       let guideProjectData = [];
       if (guideProjectsRes?.data?.success && guideProjectsRes.data.data) {
         guideProjectData = guideProjectsRes.data.data;
-      } else if (
-        guideProjectsRes?.data &&
-        Array.isArray(guideProjectsRes.data)
-      ) {
+      } else if (guideProjectsRes?.data && Array.isArray(guideProjectsRes.data)) {
         guideProjectData = guideProjectsRes.data;
       } else if (guideProjectsRes?.success && guideProjectsRes.data) {
         guideProjectData = guideProjectsRes.data;
       }
+
       const guideProjectRelationships = [];
       (guideProjectData || []).forEach((facultyObj) => {
         const facultyId = facultyObj.faculty?._id;
@@ -196,48 +184,23 @@ const AdminPanelManagement = () => {
       });
       setAllGuideProjects(guideProjectRelationships);
 
-      // NEW: Unassigned projects/teams (filtered from allProjects)
-      let allProjects = [];
-      if (
-        allProjectsRes?.data?.success &&
-        Array.isArray(allProjectsRes.data.data)
-      ) {
-        allProjects = allProjectsRes.data.data;
-      } else if (allProjectsRes?.data && Array.isArray(allProjectsRes.data)) {
-        allProjects = allProjectsRes.data;
-      } else if (
-        allProjectsRes?.success &&
-        Array.isArray(allProjectsRes.data)
-      ) {
-        allProjects = allProjectsRes.data;
-      }
-      let unassigned;
-      if (skipped) {
-        // Show all unassigned projects
-        unassigned = allProjects.filter((project) => project.panel === null);
-      } else {
-        // Only those with correct school and dept
-        unassigned = allProjects.filter(
-          (project) =>
-            project.panel === null &&
-            String(project.school).toLowerCase() ===
-              String(school).toLowerCase() &&
-            String(project.department).toLowerCase() ===
-              String(department).toLowerCase()
-        );
-      }
+      // Process unassigned teams
+      const allProjectsFromGuides = (guideProjectData || []).flatMap(
+        (facultyObj) => facultyObj.guidedProjects || []
+      );
+      const uniqueProjects = allProjectsFromGuides.filter(
+        (project, index, self) => index === self.findIndex((p) => p._id === project._id)
+      );
+      const unassigned = uniqueProjects.filter((project) => project.panel === null);
       setUnassignedTeams(unassigned);
+
     } catch (err) {
       console.error("Error fetching data:", err);
       setPanels([]);
       setFacultyList([]);
       setUnassignedTeams([]);
       setAllGuideProjects([]);
-      showNotification(
-        "error",
-        "Fetch Failed",
-        "Failed to load panel data. Please try again."
-      );
+      showNotification("error", "Fetch Failed", "Failed to load panel data. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -246,20 +209,20 @@ const AdminPanelManagement = () => {
   // ✅ FIXED: Get employee IDs directly from panel data (no complex mapping needed)
   const usedFacultyIds = useMemo(() => {
     const assignedEmployeeIds = new Set();
-
-    console.log("=== CALCULATING USED FACULTY EMPLOYEE IDS ===");
-    console.log("Panels:", panels.length);
-
+    
+    console.log('=== CALCULATING USED FACULTY EMPLOYEE IDS ===');
+    console.log('Panels:', panels.length);
+    
     panels.forEach((panel, index) => {
       console.log(`Panel ${index + 1}:`, {
         panelId: panel.panelId,
         facultyNames: panel.facultyNames,
-        facultyEmployeeIds: panel.facultyEmployeeIds,
+        facultyEmployeeIds: panel.facultyEmployeeIds
       });
-
+      
       // ✅ DIRECT: Use employee IDs from panel data (no mapping required)
       if (panel.facultyEmployeeIds && Array.isArray(panel.facultyEmployeeIds)) {
-        panel.facultyEmployeeIds.forEach((empId) => {
+        panel.facultyEmployeeIds.forEach(empId => {
           if (empId) {
             assignedEmployeeIds.add(empId.toString());
             console.log(`✅ Added employee ID: ${empId}`);
@@ -267,46 +230,39 @@ const AdminPanelManagement = () => {
         });
       }
     });
-
+    
     const result = Array.from(assignedEmployeeIds);
-    console.log("Final used employee IDs:", result);
-    console.log("=== END USED EMPLOYEE ID CALCULATION ===");
-
+    console.log('Final used employee IDs:', result);
+    console.log('=== END USED EMPLOYEE ID CALCULATION ===');
+    
     return result;
   }, [panels]);
 
   // ✅ SIMPLIFIED: Filter available faculty by employee ID
   const availableFaculty = useMemo(() => {
-    console.log("=== CALCULATING AVAILABLE FACULTY ===");
-    console.log("Total faculty list:", facultyList.length);
-    console.log("Used employee IDs:", usedFacultyIds);
-
-    const filtered = facultyList.filter((f) => {
+    console.log('=== CALCULATING AVAILABLE FACULTY ===');
+    console.log('Total faculty list:', facultyList.length);
+    console.log('Used employee IDs:', usedFacultyIds);
+    
+    const filtered = facultyList.filter(f => {
       if (!f || !f.employeeId) {
-        console.log(`❌ Faculty without employee ID: ${f?.name || "Unknown"}`);
+        console.log(`❌ Faculty without employee ID: ${f?.name || 'Unknown'}`);
         return false;
       }
-
+      
       const isAssigned = usedFacultyIds.includes(f.employeeId.toString());
       if (isAssigned) {
-        console.log(
-          `❌ Excluding assigned faculty: ${f.name} (${f.employeeId})`
-        );
+        console.log(`❌ Excluding assigned faculty: ${f.name} (${f.employeeId})`);
       } else {
-        console.log(
-          `✅ Including available faculty: ${f.name} (${f.employeeId})`
-        );
+        console.log(`✅ Including available faculty: ${f.name} (${f.employeeId})`);
       }
       return !isAssigned;
     });
-
-    console.log("Available faculty count:", filtered.length);
-    console.log(
-      "Available faculty names:",
-      filtered.map((f) => `${f.name} (${f.employeeId})`)
-    );
-    console.log("=== END AVAILABLE FACULTY CALCULATION ===");
-
+    
+    console.log('Available faculty count:', filtered.length);
+    console.log('Available faculty names:', filtered.map(f => `${f.name} (${f.employeeId})`));
+    console.log('=== END AVAILABLE FACULTY CALCULATION ===');
+    
     return filtered;
   }, [facultyList, usedFacultyIds]);
 
@@ -316,148 +272,114 @@ const AdminPanelManagement = () => {
   }, [usedFacultyIds]);
 
   // ✅ COMPLETE FIXED Excel upload handler
-  const handleExcelUpload = useCallback(
-    async (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
+  const handleExcelUpload = useCallback(async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
 
-      if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
-        showNotification(
-          "error",
-          "Invalid File",
-          "Please upload a valid Excel file (.xlsx or .xls)"
-        );
-        event.target.value = "";
-        return;
-      }
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      showNotification("error", "Invalid File", "Please upload a valid Excel file (.xlsx or .xls)");
+      event.target.value = "";
+      return;
+    }
 
-      try {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: "array" });
-          const sheetName = workbook.SheetNames[0];
-          const sheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-          // Validate headers
-          const headers = jsonData[0].map((h) => h.trim());
-          const requiredHeaders = [
-            "Faculty Name",
-            "Emp ID",
-            "Email ID",
-            "Department",
-          ];
-          const missingHeaders = requiredHeaders.filter(
-            (h) => !headers.includes(h)
-          );
-          if (missingHeaders.length > 0) {
-            showNotification(
-              "error",
-              "Invalid Format",
-              `Missing required columns: ${missingHeaders.join(", ")}`
-            );
-            event.target.value = "";
-            return;
-          }
-
-          // Process rows
-          const validDepartments = ["BTech", "MTech (integrated)", "MCS"];
-          const processedFacultyData = jsonData
-            .slice(1)
-            .map((row, index) => {
-              const rowObj = {};
-              headers.forEach((header, headerIndex) => {
-                rowObj[header] = row[headerIndex] || "";
-              });
-
-              return {
-                _id: `temp_${index}_${Date.now()}`,
-                name: rowObj["Faculty Name"],
-                employeeId: rowObj["Emp ID"].toString(),
-                emailId: rowObj["Email ID"],
-                department: [rowObj["Department"]],
-                school: ["SCOPE"],
-                specialization: ["General"],
-              };
-            })
-            .filter(
-              (faculty) =>
-                faculty.name &&
-                faculty.employeeId &&
-                faculty.emailId &&
-                validDepartments.includes(faculty.department[0])
-            );
-
-          if (processedFacultyData.length === 0) {
-            showNotification(
-              "error",
-              "No Valid Data",
-              "No valid faculty data found in the Excel file"
-            );
-            event.target.value = "";
-            return;
-          }
-
-          // ✅ ENHANCED: Better exclusion logic using direct employee ID comparison
-          const existingEmployeeIds = facultyList
-            .map((f) => f.employeeId?.toString())
-            .filter(Boolean);
-
-          console.log("Processing Excel upload:");
-          console.log("- Processed faculties:", processedFacultyData.length);
-          console.log("- Existing employee IDs:", existingEmployeeIds.length);
-          console.log("- Assigned employee IDs:", assignedEmployeeIds.size);
-
-          // Filter out existing AND assigned faculty
-          const newFaculty = processedFacultyData.filter((f) => {
-            const empId = f.employeeId.toString();
-            const isExisting = existingEmployeeIds.includes(empId);
-            const isAssigned = assignedEmployeeIds.has(empId);
-
-            if (isExisting || isAssigned) {
-              console.log(
-                `Excluding: ${f.name} (${empId}) - Existing: ${isExisting}, Assigned: ${isAssigned}`
-              );
-            }
-
-            return !isExisting && !isAssigned;
-          });
-
-          const duplicateCount = processedFacultyData.filter((f) =>
-            existingEmployeeIds.includes(f.employeeId.toString())
-          ).length;
-
-          const assignedCount = processedFacultyData.filter((f) =>
-            assignedEmployeeIds.has(f.employeeId.toString())
-          ).length;
-
-          setFacultyList((prev) => [...prev, ...newFaculty]);
-
-          let message = `Successfully processed ${newFaculty.length} faculty records`;
-          if (duplicateCount > 0) {
-            message += ` (${duplicateCount} duplicates skipped)`;
-          }
-          if (assignedCount > 0) {
-            message += ` (${assignedCount} already in panels skipped)`;
-          }
-
-          showNotification("success", "Upload Successful", message);
+        // Validate headers
+        const headers = jsonData[0].map(h => h.trim());
+        const requiredHeaders = ["Faculty Name", "Emp ID", "Email ID", "Department"];
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+        if (missingHeaders.length > 0) {
+          showNotification("error", "Invalid Format", `Missing required columns: ${missingHeaders.join(", ")}`);
           event.target.value = "";
-        };
-        reader.readAsArrayBuffer(file);
-      } catch (error) {
-        console.error("Excel processing error:", error);
-        showNotification(
-          "error",
-          "Processing Error",
-          "Failed to process Excel file. Please ensure it's valid."
+          return;
+        }
+
+        // Process rows
+        const validDepartments = ["BTech", "MTech (integrated)", "MCS"];
+        const processedFacultyData = jsonData.slice(1).map((row, index) => {
+          const rowObj = {};
+          headers.forEach((header, headerIndex) => {
+            rowObj[header] = row[headerIndex] || "";
+          });
+          
+          return {
+            _id: `temp_${index}_${Date.now()}`,
+            name: rowObj["Faculty Name"],
+            employeeId: rowObj["Emp ID"].toString(),
+            emailId: rowObj["Email ID"],
+            department: [rowObj["Department"]],
+            school: ["SCOPE"],
+            specialization: ["General"],
+          };
+        }).filter(faculty => 
+          faculty.name && 
+          faculty.employeeId && 
+          faculty.emailId && 
+          validDepartments.includes(faculty.department[0])
         );
+
+        if (processedFacultyData.length === 0) {
+          showNotification("error", "No Valid Data", "No valid faculty data found in the Excel file");
+          event.target.value = "";
+          return;
+        }
+
+        // ✅ ENHANCED: Better exclusion logic using direct employee ID comparison
+        const existingEmployeeIds = facultyList.map(f => f.employeeId?.toString()).filter(Boolean);
+        
+        console.log('Processing Excel upload:');
+        console.log('- Processed faculties:', processedFacultyData.length);
+        console.log('- Existing employee IDs:', existingEmployeeIds.length);
+        console.log('- Assigned employee IDs:', assignedEmployeeIds.size);
+
+        // Filter out existing AND assigned faculty
+        const newFaculty = processedFacultyData.filter(f => {
+          const empId = f.employeeId.toString();
+          const isExisting = existingEmployeeIds.includes(empId);
+          const isAssigned = assignedEmployeeIds.has(empId);
+          
+          if (isExisting || isAssigned) {
+            console.log(`Excluding: ${f.name} (${empId}) - Existing: ${isExisting}, Assigned: ${isAssigned}`);
+          }
+          
+          return !isExisting && !isAssigned;
+        });
+        
+        const duplicateCount = processedFacultyData.filter(f => 
+          existingEmployeeIds.includes(f.employeeId.toString())
+        ).length;
+        
+        const assignedCount = processedFacultyData.filter(f => 
+          assignedEmployeeIds.has(f.employeeId.toString())
+        ).length;
+
+        setFacultyList(prev => [...prev, ...newFaculty]);
+
+        let message = `Successfully processed ${newFaculty.length} faculty records`;
+        if (duplicateCount > 0) {
+          message += ` (${duplicateCount} duplicates skipped)`;
+        }
+        if (assignedCount > 0) {
+          message += ` (${assignedCount} already in panels skipped)`;
+        }
+
+        showNotification("success", "Upload Successful", message);
         event.target.value = "";
-      }
-    },
-    [showNotification, facultyList, assignedEmployeeIds]
-  );
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      console.error("Excel processing error:", error);
+      showNotification("error", "Processing Error", "Failed to process Excel file. Please ensure it's valid.");
+      event.target.value = "";
+    }
+  }, [showNotification, facultyList, assignedEmployeeIds]);
 
   // Demo Excel download
   const handleDemoExcelDownload = useCallback(() => {
@@ -481,10 +403,10 @@ const AdminPanelManagement = () => {
       navigate("/admin/school-selection");
       return;
     }
-
+    
     try {
       const parsedContext = JSON.parse(savedAdminContext);
-
+      
       if (parsedContext.skipped) {
         setAdminContext({ school: null, department: null, skipped: true });
       } else if (parsedContext.school && parsedContext.department) {
@@ -507,93 +429,63 @@ const AdminPanelManagement = () => {
   // Navigation handler
   const handleChangeSchoolDepartment = useCallback(() => {
     sessionStorage.removeItem("adminContext");
-    sessionStorage.setItem("adminReturnPath", "/admin/panel-management");
+    sessionStorage.setItem('adminReturnPath', '/admin/panel-management');
     navigate("/admin/school-selection");
   }, [navigate]);
 
   // Conflict checking functions
-  const canAssignProjectToPanel = useCallback(
-    (projectId, panelFacultyIds) => {
-      const projectGuide = allGuideProjects.find(
-        (rel) => rel.projectId === projectId
-      );
-      if (!projectGuide) return { canAssign: true, reason: "" };
+  const canAssignProjectToPanel = useCallback((projectId, panelFacultyIds) => {
+    const projectGuide = allGuideProjects.find((rel) => rel.projectId === projectId);
+    if (!projectGuide) return { canAssign: true, reason: "" };
 
-      const hasConflict = panelFacultyIds.includes(projectGuide.guideId);
-      if (hasConflict) {
-        return {
-          canAssign: false,
-          reason: `Cannot assign: ${projectGuide.guideName} is the guide for this project`,
-        };
-      }
+    const hasConflict = panelFacultyIds.includes(projectGuide.guideId);
+    if (hasConflict) {
+      return {
+        canAssign: false,
+        reason: `Cannot assign: ${projectGuide.guideName} is the guide for this project`,
+      };
+    }
 
-      return { canAssign: true, reason: "" };
-    },
-    [allGuideProjects]
-  );
+    return { canAssign: true, reason: "" };
+  }, [allGuideProjects]);
 
-  const getAvailableTeamsForPanel = useCallback(
-    (panelFacultyIds) => {
-      return unassignedTeams.filter((team) => {
-        const check = canAssignProjectToPanel(team._id, panelFacultyIds);
-        return check.canAssign;
-      });
-    },
-    [unassignedTeams, canAssignProjectToPanel]
-  );
+  const getAvailableTeamsForPanel = useCallback((panelFacultyIds) => {
+    return unassignedTeams.filter((team) => {
+      const check = canAssignProjectToPanel(team._id, panelFacultyIds);
+      return check.canAssign;
+    });
+  }, [unassignedTeams, canAssignProjectToPanel]);
 
   // ✅ SIMPLIFIED: Panel management handlers
-  const handleManualCreatePanel = useCallback(
-    async (payload) => {
-      try {
-        setLoading(true);
-        await createPanelManual(payload);
-        setShowManualCreateModal(false);
-        await fetchData();
-        showNotification(
-          "success",
-          "Panel Created!",
-          `New panel created successfully with ${payload.memberEmployeeIds.length} members`
-        );
-      } catch (error) {
-        console.error("Panel creation error:", error);
-        showNotification(
-          "error",
-          "Creation Failed",
-          error.response?.data?.message ||
-            "Failed to create panel. Please try again."
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [fetchData, showNotification]
-  );
+  const handleManualCreatePanel = useCallback(async (payload) => {
+    try {
+      setLoading(true);
+      await createPanelManual(payload);
+      setShowManualCreateModal(false);
+      await fetchData();
+      showNotification("success", "Panel Created!", `New panel created successfully with ${payload.memberEmployeeIds.length} members`);
+    } catch (error) {
+      console.error("Panel creation error:", error);
+      showNotification("error", "Creation Failed", error.response?.data?.message || "Failed to create panel. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchData, showNotification]);
 
   // ✅ SIMPLIFIED: Success/Error handlers for modals
-  const handleSuccess = useCallback(
-    (message) => {
-      fetchData(); // Refresh data
-      showNotification("success", "Success!", message);
-    },
-    [fetchData, showNotification]
-  );
+  const handleSuccess = useCallback((message) => {
+    fetchData(); // Refresh data
+    showNotification("success", "Success!", message);
+  }, [fetchData, showNotification]);
 
-  const handleError = useCallback(
-    (message) => {
-      showNotification("error", "Error", message);
-    },
-    [showNotification]
-  );
+  const handleError = useCallback((message) => {
+    showNotification("error", "Error", message);
+  }, [showNotification]);
 
   // ✅ SIMPLIFIED: Modal show handlers
   const handleAutoCreatePanel = useCallback(() => {
     if (isAutoAssigning) {
-      showNotification(
-        "error",
-        "Operation in Progress",
-        "Cannot start auto panel creation while auto assignment is running."
-      );
+      showNotification("error", "Operation in Progress", "Cannot start auto panel creation while auto assignment is running.");
       return;
     }
     setShowAutoCreateModal(true);
@@ -601,89 +493,54 @@ const AdminPanelManagement = () => {
 
   const handleAutoAssign = useCallback(() => {
     if (isAutoCreating) {
-      showNotification(
-        "error",
-        "Operation in Progress",
-        "Cannot start auto assignment while auto panel creation is running."
-      );
+      showNotification("error", "Operation in Progress", "Cannot start auto assignment while auto panel creation is running.");
       return;
     }
     setShowAutoAssignModal(true);
   }, [isAutoCreating, showNotification]);
 
-  const handleManualAssign = useCallback(
-    async (panelIndex, projectId) => {
-      try {
-        const panel = panels[panelIndex];
-        if (!panel) return;
+  const handleManualAssign = useCallback(async (panelIndex, projectId) => {
+    try {
+      const panel = panels[panelIndex];
+      if (!panel) return;
 
-        const conflictCheck = canAssignProjectToPanel(
-          projectId,
-          panel.facultyIds
-        );
-        if (!conflictCheck.canAssign) {
-          showNotification(
-            "error",
-            "Assignment Conflict",
-            conflictCheck.reason
-          );
-          return;
-        }
-
-        await assignPanelToProject({ panelId: panel.panelId, projectId });
-        await fetchData();
-        showNotification(
-          "success",
-          "Team Assigned!",
-          "Team has been successfully assigned to the panel"
-        );
-      } catch (error) {
-        console.error("Assignment error:", error);
-        showNotification(
-          "error",
-          "Assignment Failed",
-          "Failed to assign team. Please try again."
-        );
+      const conflictCheck = canAssignProjectToPanel(projectId, panel.facultyIds);
+      if (!conflictCheck.canAssign) {
+        showNotification("error", "Assignment Conflict", conflictCheck.reason);
+        return;
       }
-    },
-    [panels, canAssignProjectToPanel, fetchData, showNotification]
-  );
+
+      await assignPanelToProject({ panelId: panel.panelId, projectId });
+      await fetchData();
+      showNotification("success", "Team Assigned!", "Team has been successfully assigned to the panel");
+    } catch (error) {
+      console.error("Assignment error:", error);
+      showNotification("error", "Assignment Failed", "Failed to assign team. Please try again.");
+    }
+  }, [panels, canAssignProjectToPanel, fetchData, showNotification]);
 
   const handleConfirmRemove = useCallback(async () => {
     const { type, panelId, teamId } = confirmRemove;
     try {
       if (type === "panel") {
         await deletePanel(panelId);
-        showNotification(
-          "success",
-          "Panel Deleted!",
-          "Panel has been successfully removed"
-        );
+        showNotification("success", "Panel Deleted!", "Panel has been successfully removed");
       } else if (type === "team") {
         await assignPanelToProject({ panelId: null, projectId: teamId });
-        showNotification(
-          "success",
-          "Team Removed!",
-          "Team has been successfully unassigned"
-        );
+        showNotification("success", "Team Removed!", "Team has been successfully unassigned");
       }
       await fetchData();
     } catch (error) {
       console.error("Delete operation error:", error);
-      showNotification(
-        "error",
-        "Operation Failed",
-        "Failed to complete the operation. Please try again."
-      );
+      showNotification("error", "Operation Failed", "Failed to complete the operation. Please try again.");
     }
     setConfirmRemove({ type: "", panelId: null, teamId: null });
   }, [confirmRemove, fetchData, showNotification]);
 
-  const filterMatches = useCallback(
-    (str) =>
-      str &&
-      typeof str === "string" &&
-      str.toLowerCase().includes(searchQuery.toLowerCase()),
+  const filterMatches = useCallback((str) =>
+    str &&
+    typeof str === "string" &&
+    str.toLowerCase().includes(searchQuery.toLowerCase()),
     [searchQuery]
   );
 
@@ -699,12 +556,8 @@ const AdminPanelManagement = () => {
                 <Database className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 animate-pulse" />
               </div>
             </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-slate-800 mb-3">
-              Loading Panel Management
-            </h3>
-            <p className="text-slate-600">
-              Retrieving panel data and team assignments...
-            </p>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-800 mb-3">Loading Panel Management</h3>
+            <p className="text-slate-600">Retrieving panel data and team assignments...</p>
           </div>
         </div>
       </>
@@ -724,26 +577,18 @@ const AdminPanelManagement = () => {
                   <Database className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-white">
-                    Panel Management
-                  </h1>
-                  <p className="text-indigo-100 mt-1 text-sm sm:text-base">
-                    Manage evaluation panels and team assignments
-                  </p>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white">Panel Management</h1>
+                  <p className="text-indigo-100 mt-1 text-sm sm:text-base">Manage evaluation panels and team assignments</p>
                 </div>
               </div>
-
+              
               {adminContext && (
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 w-full sm:w-auto">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                     <div className="text-left sm:text-right w-full sm:w-auto">
-                      <div className="text-white/90 text-xs sm:text-sm">
-                        Current Programme
-                      </div>
+                      <div className="text-white/90 text-xs sm:text-sm">Current Programme</div>
                       <div className="text-white font-semibold text-sm sm:text-base">
-                        {adminContext.skipped
-                          ? "All Schools & Departments"
-                          : `${adminContext.school} - ${adminContext.department}`}
+                        {adminContext.skipped ? 'All Schools & Departments' : `${adminContext.school} - ${adminContext.department}`}
                       </div>
                     </div>
                     <button
@@ -770,11 +615,7 @@ const AdminPanelManagement = () => {
               iconBg="bg-white/20"
             />
             <PanelStatsCard
-              icon={() => (
-                <div className="h-6 w-6 sm:h-8 sm:w-8 bg-white/30 rounded-lg flex items-center justify-center text-white font-bold text-xs sm:text-sm">
-                  P
-                </div>
-              )}
+              icon={() => <div className="h-6 w-6 sm:h-8 sm:w-8 bg-white/30 rounded-lg flex items-center justify-center text-white font-bold text-xs sm:text-sm">P</div>}
               title="Total Panels"
               value={panels.length}
               bgColor="bg-gradient-to-br from-emerald-500 to-emerald-600"
@@ -805,9 +646,7 @@ const AdminPanelManagement = () => {
                 <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
                   <Search className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                 </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
-                  Panel Creation & Management
-                </h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Panel Creation & Management</h2>
               </div>
               <div className="flex items-center space-x-4 w-full sm:w-auto">
                 <button
@@ -815,9 +654,7 @@ const AdminPanelManagement = () => {
                   disabled={loading}
                   className="flex items-center space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium w-full sm:w-auto justify-center sm:justify-start"
                 >
-                  <RefreshCw
-                    className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                  />
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                   <span>Refresh</span>
                 </button>
               </div>
@@ -853,11 +690,7 @@ const AdminPanelManagement = () => {
                   onClick={() => setShowManualCreateModal(true)}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm sm:text-base"
                   disabled={availableFaculty.length < 2}
-                  title={
-                    availableFaculty.length < 2
-                      ? "Need at least 2 available faculty members"
-                      : "Create a panel manually by selecting faculty members"
-                  }
+                  title={availableFaculty.length < 2 ? "Need at least 2 available faculty members" : "Create a panel manually by selecting faculty members"}
                 >
                   <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                   Manual Create
@@ -936,11 +769,9 @@ const AdminPanelManagement = () => {
                 <div className="mx-auto w-24 h-24 sm:w-32 sm:h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-6 sm:mb-8">
                   <Users className="h-12 w-12 sm:h-16 sm:w-16 text-slate-400" />
                 </div>
-                <h3 className="text-xl sm:text-2xl font-bold text-slate-600 mb-3">
-                  No Panels Found
-                </h3>
+                <h3 className="text-xl sm:text-2xl font-bold text-slate-600 mb-3">No Panels Found</h3>
                 <p className="text-slate-500 max-w-md mx-auto text-sm sm:text-base">
-                  {availableFaculty.length < 2
+                  {availableFaculty.length < 2 
                     ? "Upload faculty data first, then create panels to get started with team assignments"
                     : "Create panels to get started with team assignments"}
                 </p>
@@ -959,19 +790,17 @@ const AdminPanelManagement = () => {
                 <div className="space-y-4">
                   {panels.map((panel, idx) => {
                     const shouldShow =
-                      !searchQuery ||
-                      panel.facultyNames.some((name) => filterMatches(name)) ||
-                      panel.teams.some(
-                        (team) =>
-                          filterMatches(team.name) || filterMatches(team.domain)
-                      ) ||
-                      (panel.venue && filterMatches(panel.venue)); // ✅ Include venue in search
+  !searchQuery ||
+  panel.facultyNames.some((name) => filterMatches(name)) ||
+  panel.teams.some(
+    (team) => filterMatches(team.name) || filterMatches(team.domain)
+  ) ||
+  (panel.venue && filterMatches(panel.venue)); // ✅ Include venue in search
+
 
                     if (!shouldShow) return null;
 
-                    const availableTeamsForPanel = getAvailableTeamsForPanel(
-                      panel.facultyIds
-                    );
+                    const availableTeamsForPanel = getAvailableTeamsForPanel(panel.facultyIds);
                     const isExpanded = expandedPanel === idx;
 
                     return (
@@ -980,19 +809,13 @@ const AdminPanelManagement = () => {
                         panel={panel}
                         index={idx}
                         isExpanded={isExpanded}
-                        onToggleExpand={() =>
-                          setExpandedPanel(expandedPanel === idx ? null : idx)
-                        }
-                        onRemovePanel={(panelId) =>
-                          setConfirmRemove({ type: "panel", panelId })
-                        }
+                        onToggleExpand={() => setExpandedPanel(expandedPanel === idx ? null : idx)}
+                        onRemovePanel={(panelId) => setConfirmRemove({ type: "panel", panelId })}
                         availableTeams={availableTeamsForPanel}
                         onManualAssign={handleManualAssign}
                         unassignedTeams={unassignedTeams}
                         allGuideProjects={allGuideProjects}
-                        onRemoveTeam={(teamId) =>
-                          setConfirmRemove({ type: "team", teamId })
-                        }
+                        onRemoveTeam={(teamId) => setConfirmRemove({ type: "team", teamId })}
                       />
                     );
                   })}
@@ -1039,28 +862,18 @@ const AdminPanelManagement = () => {
         {/* Notification */}
         {notification.isVisible && (
           <div className="fixed top-20 sm:top-24 right-4 sm:right-8 z-50 max-w-md w-full px-4 sm:px-0">
-            <div
-              className={`transform transition-all duration-500 ease-out ${
-                notification.isVisible
-                  ? "translate-x-0 opacity-100"
-                  : "translate-x-full opacity-0"
-              }`}
-            >
-              <div
-                className={`rounded-xl shadow-2xl border-l-4 p-4 sm:p-6 ${
-                  notification.type === "success"
-                    ? "bg-emerald-50 border-emerald-400"
-                    : "bg-red-50 border-red-400"
-                }`}
-              >
+            <div className={`transform transition-all duration-500 ease-out ${
+              notification.isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+            }`}>
+              <div className={`rounded-xl shadow-2xl border-l-4 p-4 sm:p-6 ${
+                notification.type === "success" 
+                  ? "bg-emerald-50 border-emerald-400" 
+                  : "bg-red-50 border-red-400"
+              }`}>
                 <div className="flex items-start">
-                  <div
-                    className={`flex-shrink-0 ${
-                      notification.type === "success"
-                        ? "text-emerald-500"
-                        : "text-red-500"
-                    }`}
-                  >
+                  <div className={`flex-shrink-0 ${
+                    notification.type === "success" ? "text-emerald-500" : "text-red-500"
+                  }`}>
                     {notification.type === "success" ? (
                       <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6" />
                     ) : (
@@ -1068,30 +881,22 @@ const AdminPanelManagement = () => {
                     )}
                   </div>
                   <div className="ml-3 sm:ml-4 flex-1">
-                    <h3
-                      className={`text-xs sm:text-sm font-bold ${
-                        notification.type === "success"
-                          ? "text-emerald-800"
-                          : "text-red-800"
-                      }`}
-                    >
+                    <h3 className={`text-xs sm:text-sm font-bold ${
+                      notification.type === "success" ? "text-emerald-800" : "text-red-800"
+                    }`}>
                       {notification.title}
                     </h3>
-                    <p
-                      className={`mt-1 text-xs sm:text-sm ${
-                        notification.type === "success"
-                          ? "text-emerald-700"
-                          : "text-red-700"
-                      }`}
-                    >
+                    <p className={`mt-1 text-xs sm:text-sm ${
+                      notification.type === "success" ? "text-emerald-700" : "text-red-700"
+                    }`}>
                       {notification.message}
                     </p>
                   </div>
                   <button
                     onClick={hideNotification}
                     className={`flex-shrink-0 ml-2 sm:ml-3 ${
-                      notification.type === "success"
-                        ? "text-emerald-400 hover:text-emerald-600"
+                      notification.type === "success" 
+                        ? "text-emerald-400 hover:text-emerald-600" 
                         : "text-red-400 hover:text-red-600"
                     } transition-colors`}
                   >
@@ -1107,9 +912,7 @@ const AdminPanelManagement = () => {
         <TeamPopup team={modalTeam} onClose={() => setModalTeam(null)} />
         <ConfirmPopup
           isOpen={!!confirmRemove.type}
-          onClose={() =>
-            setConfirmRemove({ type: "", panelId: null, teamId: null })
-          }
+          onClose={() => setConfirmRemove({ type: "", panelId: null, teamId: null })}
           onConfirm={handleConfirmRemove}
           type={confirmRemove.type}
         />
