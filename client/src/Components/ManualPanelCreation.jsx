@@ -5,24 +5,27 @@ const ManualPanelCreation = ({
   isOpen, 
   onClose, 
   onSubmit, 
-  facultyList, // ✅ This is now pre-filtered in parent to exclude assigned faculty
+  facultyList, 
   loading, 
   adminContext,
-  usedFacultyIds = [] // ✅ Now contains employee IDs instead of MongoDB _ids
+  usedFacultyIds = []
 }) => {
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [selectedSchool, setSelectedSchool] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [venue, setVenue] = useState(''); // Renamed from setvenue to setVenue
+  const [error, setError] = useState(''); // Added for error feedback
 
   useEffect(() => {
     if (!isOpen) {
       setSelectedMembers([]);
       setSelectedSchool('');
       setSelectedDepartment('');
+      setVenue('');
+      setError('');
     }
   }, [isOpen]);
 
-  // ✅ UPDATED: Compare using employee IDs instead of MongoDB _ids
   const filteredFaculty = useMemo(() => {
     console.log('=== FILTERING FACULTY IN MANUAL CREATION ===');
     console.log('Original facultyList:', facultyList?.length || 0);
@@ -35,20 +38,20 @@ const ManualPanelCreation = ({
 
     let filtered = facultyList;
 
-    // Apply admin context filtering if not skipped
     if (adminContext && !adminContext.skipped) {
       const { school, department } = adminContext;
       filtered = facultyList.filter(faculty => {
         const facultySchools = Array.isArray(faculty.school) ? faculty.school : [faculty.school];
         const facultyDepts = Array.isArray(faculty.department) ? faculty.department : [faculty.department];
+
         const schoolMatch = school ? facultySchools.includes(school) : true;
         const deptMatch = department ? facultyDepts.includes(department) : true;
+
         return schoolMatch && deptMatch;
       });
       console.log('After admin context filtering:', filtered.length);
     }
 
-    // ✅ UPDATED: Exclude used faculty by employeeId instead of _id
     const beforeExclusion = filtered.length;
     filtered = filtered.filter(faculty => {
       if (!faculty.employeeId) {
@@ -68,10 +71,10 @@ const ManualPanelCreation = ({
     console.log(`After excluding used faculty: ${filtered.length} (excluded ${beforeExclusion - filtered.length})`);
     console.log('Final filtered faculty:', filtered.map(f => `${f.name} (${f.employeeId})`));
     console.log('=== END FILTERING ===');
+
     return filtered;
   }, [facultyList, adminContext, usedFacultyIds]);
 
-  // Get available schools from filtered faculty
   const availableSchools = useMemo(() => {
     const schools = new Set();
     filteredFaculty.forEach(faculty => {
@@ -84,7 +87,6 @@ const ManualPanelCreation = ({
     return Array.from(schools);
   }, [filteredFaculty]);
 
-  // Get available departments from filtered faculty
   const availableDepartments = useMemo(() => {
     const departments = new Set();
     filteredFaculty.forEach(faculty => {
@@ -112,31 +114,30 @@ const ManualPanelCreation = ({
 
   const clearAll = () => setSelectedMembers([]);
 
-  // ✅ FIXED: Handle both context mode and all mode properly
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    // Client-side validation
     if (selectedMembers.length < 2) {
-      alert("Please select at least two distinct faculty members.");
+      setError("Please select at least two distinct faculty members.");
       return;
     }
-    
-    // ✅ FIXED: Create payload based on context mode
-    let payload = {
-      memberEmployeeIds: selectedMembers
-    };
-
-    // ✅ FIXED: Add school and department based on mode
-    if (adminContext?.skipped) {
-      // ✅ ALL MODE: Use manually selected school/department from dropdowns
-      if (selectedSchool) payload.school = selectedSchool;
-      if (selectedDepartment) payload.department = selectedDepartment;
-    } else {
-      // ✅ CONTEXT MODE: Use the admin context school/department
-      if (adminContext?.school) payload.school = adminContext.school;
-      if (adminContext?.department) payload.department = adminContext.department;
+    if (venue && venue.trim().length < 3) {
+      setError("Venue, if provided, must be at least 3 characters long.");
+      return;
     }
 
-    console.log('✅ Submitting payload:', payload);
-    onSubmit(payload);
+    setError('');
+    const payload = {
+      memberEmployeeIds: selectedMembers,
+      ...(selectedSchool && { school: selectedSchool }),
+      ...(selectedDepartment && { department: selectedDepartment }),
+      ...(venue && { venue: venue.trim() })
+    };
+
+    try {
+      await onSubmit(payload);
+    } catch (err) {
+      setError(err.message || "Failed to create panel. Please try again.");
+    }
   };
 
   if (!isOpen) return null;
@@ -165,6 +166,13 @@ const ManualPanelCreation = ({
               <X className="h-6 w-6" />
             </button>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 rounded-xl border border-red-200 text-red-800">
+              {error}
+            </div>
+          )}
 
           {/* School and Department Selection - Only show if admin skipped context */}
           {adminContext?.skipped && (
@@ -204,11 +212,11 @@ const ManualPanelCreation = ({
             </div>
           )}
 
-          {/* ✅ UPDATED: Show current context info with school/department that will be used */}
+          {/* Context Info with Venue */}
           {!adminContext?.skipped && (
             <div className="mb-6 p-4 bg-green-50 rounded-xl border border-green-200">
               <p className="text-sm text-green-800">
-                <strong>Panel will be created for:</strong> {adminContext?.school} - {adminContext?.department}
+                <strong>Showing faculty for:</strong> {adminContext?.school} - {adminContext?.department}
               </p>
               <p className="text-xs text-green-600 mt-1">
                 {filteredFaculty.length} faculty members available (excluding {usedFacultyIds.length} already assigned by employee ID)
@@ -216,7 +224,7 @@ const ManualPanelCreation = ({
             </div>
           )}
 
-          {/* ✅ UPDATED: Faculty Selection with employee ID exclusion info */}
+          {/* Faculty Selection */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-lg font-semibold text-slate-800">
@@ -280,6 +288,30 @@ const ManualPanelCreation = ({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Venue Input */}
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Venue (Optional)
+            </label>
+            <input
+              type="text"
+              value={venue}
+              onChange={(e) => setVenue(e.target.value)}
+              placeholder="Enter venue (e.g., Room 101, Building A)"
+              className={`w-full p-3 border-2 ${
+                error && venue && venue.trim().length < 3
+                  ? 'border-red-500'
+                  : 'border-slate-200'
+              } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+              disabled={loading}
+            />
+            {error && venue && venue.trim().length < 3 && (
+              <p className="text-xs text-red-600 mt-1">
+                Venue must be at least 3 characters long if provided.
+              </p>
+            )}
           </div>
 
           {/* Action Buttons */}

@@ -197,13 +197,12 @@ export async function batchCheckRequestStatus(req, res) {
   }
 }
 
-
 export const updateStudentDetails = async (req, res) => {
   try {
-    const { regNo } = req.params; // or you can use _id, adapt as needed
+    const { regNo } = req.params;
     const updateFields = req.body;
 
-    // Only allow updating certain fields for security (edit as required)
+    // Whitelist for general fields
     const allowedFields = [
       "name",
       "emailId",
@@ -219,9 +218,61 @@ export const updateStudentDetails = async (req, res) => {
       }
     }
 
+    // Batch marks update section: supports updating several reviews and components at once
+    // Expected format:
+    // marksUpdate: [
+    //   { reviewName: "draftReview", marks: { "Zero": 46, "D1": 44 }, comments: "", attendance: { value: true, locked: false } },
+    //   { reviewName: "review0", marks: { } }
+    // ]
+    let marksUpdateOps = {};
+    if (Array.isArray(updateFields.marksUpdate)) {
+      for (const reviewUpdate of updateFields.marksUpdate) {
+        const { reviewName, marks, comments, attendance } = reviewUpdate;
+
+        // Add marks updates
+        for (const [componentName, markValue] of Object.entries(marks || {})) {
+          marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] =
+            markValue;
+        }
+
+        // Add comments if present
+        if (comments !== undefined) {
+          marksUpdateOps[`reviews.${reviewName}.comments`] = comments;
+        }
+
+        // Add attendance if present
+        if (attendance !== undefined) {
+          marksUpdateOps[`reviews.${reviewName}.attendance`] = attendance;
+        }
+      }
+    } else if (updateFields.marksUpdate) {
+      // For backward compatibility (single review update)
+      const { reviewName, marks, comments, attendance } =
+        updateFields.marksUpdate;
+
+      for (const [componentName, markValue] of Object.entries(marks || {})) {
+        marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] =
+          markValue;
+      }
+
+      if (comments !== undefined) {
+        marksUpdateOps[`reviews.${reviewName}.comments`] = comments;
+      }
+
+      if (attendance !== undefined) {
+        marksUpdateOps[`reviews.${reviewName}.attendance`] = attendance;
+      }
+    }
+
+    // Apply general and marks updates in $set
+    const updateOps = Object.keys(updates).length > 0 ? { ...updates } : {};
+    if (Object.keys(marksUpdateOps).length > 0) {
+      Object.assign(updateOps, marksUpdateOps);
+    }
+
     const updatedStudent = await Student.findOneAndUpdate(
       { regNo },
-      { $set: updates },
+      { $set: updateOps },
       { new: true }
     );
 
@@ -243,6 +294,10 @@ export const updateStudentDetails = async (req, res) => {
       .json({ success: false, message: "Server error", error: error.message });
   }
 };
+
+
+
+
 export const deleteStudent = async (req, res) => {
   try {
     const { regNo } = req.params;
