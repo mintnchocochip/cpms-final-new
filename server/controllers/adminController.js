@@ -1060,6 +1060,7 @@ export async function createPanelManually(req, res) {
       ...(venue ? { venue } : {}),
     };
 
+    const panel = new Panel(panelData);
     await panel.save();
 
     return res.status(201).json({
