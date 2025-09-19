@@ -10,6 +10,7 @@ import {
   assignPanelToProject,
   autoAssignPanelsToProjects,
   autoCreatePanelManual,
+  getAllPanelsWithProjects,
 } from "../api";
 
 // ✅ Import extracted components
@@ -94,117 +95,125 @@ const AdminPanelManagement = () => {
   }, []);
 
   // ✅ ENHANCED: Fetch data function with proper employee ID extraction
-  const fetchData = useCallback(async () => {
-    if (!adminContext) return;
-    
-    try {
-      setLoading(true);
-      const { school, department, skipped } = adminContext;
+// ✅ UPDATED: Fetch data function using new endpoint
+// ✅ CORRECTED: Fetch data function using new endpoint with proper mapping
+const fetchData = useCallback(async () => {
+  if (!adminContext) return;
+  
+  try {
+    setLoading(true);
+    const { school, department, skipped } = adminContext;
 
-      const apiSchool = skipped ? null : school;
-      const apiDepartment = skipped ? null : department;
+    const apiSchool = skipped ? null : school;
+    const apiDepartment = skipped ? null : department;
 
-      const [panelRes, panelProjectsRes, guideProjectsRes] = await Promise.all([
-        getAllPanels(apiSchool, apiDepartment),
-        getAllPanelProjects(apiSchool, apiDepartment),
-        getAllGuideProjects(apiSchool, apiDepartment),
-      ]);
+    const [panelRes, panelProjectsRes, guideProjectsRes] = await Promise.all([
+      getAllPanels(apiSchool, apiDepartment),
+      getAllPanelsWithProjects(apiSchool, apiDepartment), // ✅ NEW: Using new endpoint
+      getAllGuideProjects(apiSchool, apiDepartment),
+    ]);
 
-      // Process panels data
-      let allPanelsData = [];
-      if (panelRes?.data?.success && panelRes.data.data) {
-        allPanelsData = panelRes.data.data;
-      } else if (panelRes?.data && Array.isArray(panelRes.data)) {
-        allPanelsData = panelRes.data;
-      } else if (panelRes?.success && panelRes.data) {
-        allPanelsData = panelRes.data;
-      }
+    // Process panels data
+    let allPanelsData = [];
+    if (panelRes?.data?.success && panelRes.data.data) {
+      allPanelsData = panelRes.data.data;
+    } else if (panelRes?.data && Array.isArray(panelRes.data)) {
+      allPanelsData = panelRes.data;
+    } else if (panelRes?.success && panelRes.data) {
+      allPanelsData = panelRes.data;
+    }
 
-      // Process panel projects data
-      let panelProjectData = [];
-      if (panelProjectsRes?.data?.success && panelProjectsRes.data.data) {
-        panelProjectData = panelProjectsRes.data.data;
-      } else if (panelProjectsRes?.data && Array.isArray(panelProjectsRes.data)) {
-        panelProjectData = panelProjectsRes.data;
-      } else if (panelProjectsRes?.success && panelProjectsRes.data) {
-        panelProjectData = panelProjectsRes.data;
-      }
+    // ✅ CORRECTED: Process panel projects data from new endpoint structure
+    let panelProjectData = [];
+    if (panelProjectsRes?.success && panelProjectsRes.data) {
+      panelProjectData = panelProjectsRes.data;
+    } else if (panelProjectsRes?.data?.success && panelProjectsRes.data.data) {
+      panelProjectData = panelProjectsRes.data.data;
+    } else if (panelProjectsRes?.data && Array.isArray(panelProjectsRes.data)) {
+      panelProjectData = panelProjectsRes.data;
+    }
 
-      // Create panel teams map
-      const panelTeamsMap = new Map();
-      panelProjectData.forEach((p) => {
-        const teams = (p.projects || []).map((project) => ({
-          id: project._id,
-          name: project.name,
-          domain: project.domain || "N/A",
-          members: (project.students || []).map((s) => s.name || s.regNo),
-          full: project,
-        }));
-        panelTeamsMap.set(p.panelId, teams);
-      });
+    // ✅ CORRECTED: Create panel teams map from new endpoint structure
+    // The new endpoint returns: { panelId, members, projects }
+    const panelTeamsMap = new Map();
+    panelProjectData.forEach((panelData) => {
+      const panelId = panelData.panelId;
+      const projects = panelData.projects || [];
+      
+      const teams = projects.map((project) => ({
+        id: project._id,
+        name: project.name,
+        domain: project.domain || "N/A",
+        members: (project.students || []).map((s) => s.name || s.regNo),
+        full: project,
+      }));
+      
+      panelTeamsMap.set(panelId.toString(), teams);
+    });
 
-      // ✅ ENHANCED: Format panels with faculty employee IDs directly from API response
-      // ✅ ENHANCED: Format panels with faculty employee IDs directly from API response
-const formattedPanels = allPanelsData.map((panel) => ({
-  panelId: panel._id,
-  facultyIds: (panel.members || []).map(m => m._id).filter(Boolean),
-  facultyNames: (panel.members || []).map(m => m.name).filter(Boolean),
-  facultyEmployeeIds: (panel.members || []).map(m => m.employeeId).filter(Boolean), // ✅ NEW: Direct from API
-  venue: panel.venue, // ✅ Include venue data
-  department: panel.department || "Unknown",
-  school: panel.school || "Unknown",
-  teams: panelTeamsMap.get(panel._id) || [],
-}));
+    console.log('✅ Panel teams map:', panelTeamsMap);
 
+    // ✅ ENHANCED: Format panels with faculty employee IDs directly from API response
+    const formattedPanels = allPanelsData.map((panel) => ({
+      panelId: panel._id,
+      facultyIds: (panel.members || []).map(m => m._id).filter(Boolean),
+      facultyNames: (panel.members || []).map(m => m.name).filter(Boolean),
+      facultyEmployeeIds: (panel.members || []).map(m => m.employeeId).filter(Boolean),
+      venue: panel.venue,
+      department: panel.department || "Unknown",
+      school: panel.school || "Unknown",
+      teams: panelTeamsMap.get(panel._id.toString()) || [],
+    }));
 
-      console.log('✅ Formatted panels with employee IDs:', formattedPanels);
-      setPanels(formattedPanels);
+    console.log('✅ Formatted panels with teams:', formattedPanels);
+    setPanels(formattedPanels);
 
-      // Process guide projects
-      let guideProjectData = [];
-      if (guideProjectsRes?.data?.success && guideProjectsRes.data.data) {
-        guideProjectData = guideProjectsRes.data.data;
-      } else if (guideProjectsRes?.data && Array.isArray(guideProjectsRes.data)) {
-        guideProjectData = guideProjectsRes.data;
-      } else if (guideProjectsRes?.success && guideProjectsRes.data) {
-        guideProjectData = guideProjectsRes.data;
-      }
+    // Process guide projects
+    let guideProjectData = [];
+    if (guideProjectsRes?.data?.success && guideProjectsRes.data.data) {
+      guideProjectData = guideProjectsRes.data.data;
+    } else if (guideProjectsRes?.data && Array.isArray(guideProjectsRes.data)) {
+      guideProjectData = guideProjectsRes.data;
+    } else if (guideProjectsRes?.success && guideProjectsRes.data) {
+      guideProjectData = guideProjectsRes.data;
+    }
 
-      const guideProjectRelationships = [];
-      (guideProjectData || []).forEach((facultyObj) => {
-        const facultyId = facultyObj.faculty?._id;
-        (facultyObj.guidedProjects || []).forEach((project) => {
-          guideProjectRelationships.push({
-            projectId: project._id,
-            guideId: facultyId,
-            guideName: facultyObj.faculty?.name,
-            department: project.department,
-          });
+    const guideProjectRelationships = [];
+    (guideProjectData || []).forEach((facultyObj) => {
+      const facultyId = facultyObj.faculty?._id;
+      (facultyObj.guidedProjects || []).forEach((project) => {
+        guideProjectRelationships.push({
+          projectId: project._id,
+          guideId: facultyId,
+          guideName: facultyObj.faculty?.name,
+          department: project.department,
         });
       });
-      setAllGuideProjects(guideProjectRelationships);
+    });
+    setAllGuideProjects(guideProjectRelationships);
 
-      // Process unassigned teams
-      const allProjectsFromGuides = (guideProjectData || []).flatMap(
-        (facultyObj) => facultyObj.guidedProjects || []
-      );
-      const uniqueProjects = allProjectsFromGuides.filter(
-        (project, index, self) => index === self.findIndex((p) => p._id === project._id)
-      );
-      const unassigned = uniqueProjects.filter((project) => project.panel === null);
-      setUnassignedTeams(unassigned);
+    // ✅ CORRECTED: Process unassigned teams from guide projects
+    const allProjectsFromGuides = (guideProjectData || []).flatMap(
+      (facultyObj) => facultyObj.guidedProjects || []
+    );
+    const uniqueProjects = allProjectsFromGuides.filter(
+      (project, index, self) => index === self.findIndex((p) => p._id === project._id)
+    );
+    const unassigned = uniqueProjects.filter((project) => project.panel === null);
+    setUnassignedTeams(unassigned);
 
-    } catch (err) {
-      console.error("Error fetching data:", err);
-      setPanels([]);
-      setFacultyList([]);
-      setUnassignedTeams([]);
-      setAllGuideProjects([]);
-      showNotification("error", "Fetch Failed", "Failed to load panel data. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [adminContext, showNotification]);
+  } catch (err) {
+    console.error("Error fetching data:", err);
+    setPanels([]);
+    setFacultyList([]);
+    setUnassignedTeams([]);
+    setAllGuideProjects([]);
+    showNotification("error", "Fetch Failed", "Failed to load panel data. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+}, [adminContext, showNotification]);
+
 
   // ✅ FIXED: Get employee IDs directly from panel data (no complex mapping needed)
   const usedFacultyIds = useMemo(() => {
