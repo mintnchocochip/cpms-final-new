@@ -8,7 +8,7 @@ import Panel from "../models/panelSchema.js";
 import MarkingSchema from "../models/markingSchema.js";
 
 // for updating the structure of the marks
-// Updated createOrUpdateMarkingSchema function
+
 export async function createOrUpdateMarkingSchema(req, res) {
   const { school, department, reviews } = req.body;
 
