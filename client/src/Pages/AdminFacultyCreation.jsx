@@ -314,7 +314,7 @@ const FacultyManagement = () => {
             }
             
             if (!school) rowErrors.push('Missing school');
-            if (!department) rowErrors.push('Missing department');
+            // if (!department) rowErrors.push('Missing department');
             if (specializations.length === 0) rowErrors.push('Missing specializations');
             
             const cleanRole = role.toLowerCase();
@@ -840,15 +840,14 @@ const FacultyManagement = () => {
 
                       <div>
                         <label htmlFor="department" className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
-                          Department <span className="text-red-500">*</span>
-                        </label>
+Department <span className="text-slate-400">(Optional)</span>                        </label>
                         <select
                           id="department"
                           name="department"
                           className="block w-full px-3 sm:px-4 py-2 sm:py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-sm sm:text-base text-slate-700"
                           value={formData.department}
                           onChange={handleInputChange}
-                          required
+                          
                         >
                           <option value="">Select Department</option>
                           {departmentOptions.map(option => (
