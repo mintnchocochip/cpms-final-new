@@ -596,56 +596,53 @@ export async function getAllGuideWithProjects(req, res) {
 export async function getAllPanelsWithProjects(req, res) {
   try {
     const { school, department } = req.query;
+    console.log("getAllPanelsWithProjects called with:", { school, department });
 
-    // Find all panels with populated members array
-    const panels = await Panel.find()
+    // ✅ FIXED: Build panel filter query based on panel fields, not faculty fields
+    let panelQuery = {};
+    if (school) {
+      panelQuery.school = school;
+    }
+    if (department) {
+      panelQuery.department = department;
+    }
+
+    console.log("Panel query:", panelQuery);
+
+    // ✅ FIXED: Find panels directly by panel school/department fields
+    const panels = await Panel.find(panelQuery)
       .populate("members", "employeeId name emailId school department")
       .lean();
 
-    // Filter panels based on school and department if provided
-    const filteredPanels = panels.filter((panel) => {
-      if (!panel.members || panel.members.length === 0) return false;
+    console.log("Found panels with direct filtering:", panels.length);
 
-      let schoolMatch = true;
-      let departmentMatch = true;
-
-      if (school) {
-        // Each faculty's school is an array - ensure all panel members include the school
-        schoolMatch = panel.members.every(
-          (faculty) =>
-            Array.isArray(faculty.school) && faculty.school.includes(school)
-        );
-      }
-      if (department) {
-        // Each faculty's department is an array - ensure all panel members include the department
-        departmentMatch = panel.members.every(
-          (faculty) =>
-            Array.isArray(faculty.department) &&
-            faculty.department.includes(department)
-        );
-      }
-
-      return schoolMatch && departmentMatch;
-    });
-
-    // For each filtered panel, find projects linked to it, optionally filtered by school and department
+    // ✅ SIMPLIFIED: No additional filtering needed since we already filtered at database level
     const result = await Promise.all(
-      filteredPanels.map(async (panel) => {
+      panels.map(async (panel) => {
+        // Get ALL teams assigned to this panel
         const projectQuery = { panel: panel._id };
-        if (school) projectQuery.school = school;
-        if (department) projectQuery.department = department;
+
+        console.log(`Searching projects for panel ${panel._id}`);
 
         const projects = await Project.find(projectQuery)
-          .populate("students", "regNo name")
+          .populate("students", "regNo name emailId school department")
+          .populate("guideFaculty", "name emailId employeeId")
           .lean();
+
+        console.log(`Found ${projects.length} projects for panel ${panel._id}`);
 
         return {
           panelId: panel._id,
           members: panel.members,
+          venue: panel.venue,
+          school: panel.school,
+          department: panel.department,
           projects,
         };
       })
     );
+
+    console.log("Final result:", result.map(r => ({ panelId: r.panelId, projectCount: r.projects.length })));
 
     res.status(200).json({ success: true, data: result });
   } catch (error) {
@@ -653,6 +650,8 @@ export async function getAllPanelsWithProjects(req, res) {
     res.status(500).json({ success: false, message: error.message });
   }
 }
+
+
 
 export async function deleteFacultyByEmployeeId(req, res) {
   const { employeeId } = req.params;

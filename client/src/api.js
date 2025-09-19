@@ -111,6 +111,21 @@ export const getAllGuideProjects = (school = null, department = null) => {
 export const getGuideTeams = () => API.get("/project/guide");
 export const getPanelTeams = () => API.get("/project/panel");
 
+export const getAllPanelsWithProjects = async (school = null, department = null) => {
+  try {
+    const params = new URLSearchParams();
+    if (school) params.append('school', school);
+    if (department) params.append('department', department);
+    
+    const response = await axios.get(`/api/admin/getAllPanelProjects?${params.toString()}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching panels with projects:', error);
+    throw error;
+  }
+};
+
+
 export const getAllPanels = (school = null, department = null) => {
   const queryString = buildAdminContextParams(school, department);
   return API.get(`/admin/getAllPanels${queryString ? `?${queryString}` : ''}`);

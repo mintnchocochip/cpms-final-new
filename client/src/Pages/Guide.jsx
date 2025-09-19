@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNotification } from '../Components/NotificationProvider';
 import PopupReview from '../Components/PopupReview';
+import EditRequestModal from '../Components/EditRequestModal';
 import ReviewTable from '../Components/ReviewTable';
 import Navbar from '../Components/UniversalNavbar';
 import { Database, ChevronRight, RefreshCw, BookOpen, Users, AlertCircle, Calendar } from 'lucide-react';
@@ -193,6 +195,16 @@ const Guide = () => {
   const [requestStatuses, setRequestStatuses] = useState({});
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0); // Key to force GuideContent re-render
+  
+  // ✅ NEW: Edit request modal state
+  const [editRequestModal, setEditRequestModal] = useState({ 
+    isOpen: false, 
+    teamId: null, 
+    reviewType: null 
+  });
+
+  // ✅ NEW: Use your existing notification hook
+  const { showNotification, hideNotification } = useNotification();
 
   const getReviewTypes = useCallback((markingSchema) => {
     console.log('🔍 [Guide] Getting review types from schema:', markingSchema);
@@ -337,10 +349,11 @@ const Guide = () => {
     } catch (error) {
       console.error('❌ [fetchData] Error fetching guide data:', error);
       setError('Failed to load guide data. Please try again.');
+      showNotification('error', 'Data Load Error', 'Failed to load guide data. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [getReviewTypes, normalizeStudentData]);
+  }, [getReviewTypes, normalizeStudentData, showNotification]);
 
   useEffect(() => {
     fetchData();
@@ -358,10 +371,11 @@ const Guide = () => {
       console.log('✅ [Guide] Partial refresh completed');
     } catch (error) {
       console.error('❌ [handleRefresh] Error refreshing guide data:', error);
+      showNotification('error', 'Refresh Error', 'Error refreshing data. Please try again.');
     } finally {
       setRefreshing(false);
     }
-  }, [fetchData]);
+  }, [fetchData, showNotification]);
 
   const getTeamRequestStatus = useCallback((team, reviewType) => {
     if (!team) return 'none';
@@ -405,30 +419,30 @@ const Guide = () => {
     return false;
   }, [teams, getDeadlines]);
 
- const isReviewLocked = useCallback((student, reviewType, teamId) => {
-  // ✅ FIXED: Check if review is explicitly locked first
-  const reviewData = student.reviews?.get ? student.reviews.get(reviewType) : student.reviews?.[reviewType];
-  if (reviewData?.locked) {
-    return true;
-  }
-  
-  // ✅ FIXED: Check if deadline extension is approved
-  const team = teams.find(t => t.id === teamId);
-  if (team) {
-    const requestStatus = getTeamRequestStatus(team, reviewType);
-    if (requestStatus === 'approved') {
-      console.log(`🔓 [isReviewLocked] Extension approved for ${reviewType} - UNLOCKING`);
-      return false; // Extension approved = unlocked
+  const isReviewLocked = useCallback((student, reviewType, teamId) => {
+    // ✅ FIXED: Check if review is explicitly locked first
+    const reviewData = student.reviews?.get ? student.reviews.get(reviewType) : student.reviews?.[reviewType];
+    if (reviewData?.locked) {
+      return true;
     }
-  }
-  
-  // Only check deadline if no extension is approved
-  const deadlinePassed = isTeamDeadlinePassed(reviewType, teamId);
-  console.log(`🔒 [isReviewLocked] Deadline passed: ${deadlinePassed}, Review type: ${reviewType}`);
-  return deadlinePassed;
-}, [isTeamDeadlinePassed, teams, getTeamRequestStatus]);
+    
+    // ✅ FIXED: Check if deadline extension is approved
+    const team = teams.find(t => t.id === teamId);
+    if (team) {
+      const requestStatus = getTeamRequestStatus(team, reviewType);
+      if (requestStatus === 'approved') {
+        console.log(`🔓 [isReviewLocked] Extension approved for ${reviewType} - UNLOCKING`);
+        return false; // Extension approved = unlocked
+      }
+    }
+    
+    // Only check deadline if no extension is approved
+    const deadlinePassed = isTeamDeadlinePassed(reviewType, teamId);
+    console.log(`🔒 [isReviewLocked] Deadline passed: ${deadlinePassed}, Review type: ${reviewType}`);
+    return deadlinePassed;
+  }, [isTeamDeadlinePassed, teams, getTeamRequestStatus]);
 
-
+  // ✅ UPDATED: Handle review submission with notifications
   const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pptObj) => {
     try {
       console.log('=== [FRONTEND] GUIDE REVIEW SUBMIT STARTED ===');
@@ -436,7 +450,7 @@ const Guide = () => {
       const team = teams.find(t => t.id === teamId);
       if (!team) {
         console.error('❌ [FRONTEND] Team not found for ID:', teamId);
-        alert('Team not found! Please refresh and try again.');
+        showNotification('error', 'Team Not Found', 'Team not found! Please refresh and try again.');
         return;
       }
 
@@ -449,7 +463,7 @@ const Guide = () => {
       
       if (!reviewConfig) {
         console.error('❌ [FRONTEND] Review config not found for type:', reviewType);
-        alert('Review configuration not found! Please refresh and try again.');
+        showNotification('error', 'Configuration Error', 'Review configuration not found! Please refresh and try again.');
         return;
       }
 
@@ -499,61 +513,131 @@ const Guide = () => {
 
       console.log('📤 [FRONTEND] Final update payload:', JSON.stringify(updatePayload, null, 2));
       
+      // Show loading notification
+      const loadingId = showNotification('info', 'Submitting...', 'Please wait while we save your review data...', 10000);
+      
       const response = await updateProject(updatePayload);
       console.log('📨 [FRONTEND] Backend response received:', response);
+      
+      // Hide loading notification
+      hideNotification(loadingId);
       
       if (response.data?.success || response.data?.updates) {
         setActivePopup(null);
         
         setTimeout(async () => {
-          await handleRefresh(); // This will only refresh the inner content
-          alert('Guide review submitted and saved successfully!');
+          await handleRefresh();
+          showNotification(
+            'success', 
+            'Review Saved', 
+            'Guide review submitted and saved successfully!'
+          );
         }, 300);
         
       } else {
         console.error('❌ [FRONTEND] Backend response indicates failure:', response.data);
-        alert('Review submission failed. Please try again.');
+        showNotification(
+          'error', 
+          'Submission Failed', 
+          'Review submission failed. Please try again.'
+        );
       }
     } catch (error) {
       console.error('❌ [FRONTEND] Critical error during submission:', error);
-      alert(`Error submitting review: ${error.message}`);
+      showNotification(
+        'error', 
+        'Submission Error', 
+        `Error submitting review: ${error.message}`
+      );
     }
-  }, [teams, getReviewTypes, handleRefresh]);
+  }, [teams, getReviewTypes, handleRefresh, showNotification, hideNotification]);
 
+  // ✅ UPDATED: Use notification system instead of alert
   const handleRequestEdit = useCallback(async (teamId, reviewType) => {
     try {
       const team = teams.find(t => t.id === teamId);
-      if (!team) return;
+      if (!team) {
+        showNotification('error', 'Team Not Found', 'Team not found. Please refresh and try again.');
+        return;
+      }
 
       const currentRequestStatus = getTeamRequestStatus(team, reviewType);
       
       if (currentRequestStatus === 'pending') {
-        alert('There is already a pending request for this review. Please wait for approval.');
+        showNotification(
+          'warning', 
+          'Request Already Pending', 
+          'There is already a pending request for this review. Please wait for approval.'
+        );
         return;
       }
       
-      const reason = prompt('Please enter the reason for requesting edit access:', 'Need to correct marks after deadline');
-      if (!reason?.trim()) return;
+      // Open the modal instead of using prompt
+      setEditRequestModal({ 
+        isOpen: true, 
+        teamId, 
+        reviewType 
+      });
       
+    } catch (error) {
+      console.error('❌ Error preparing guide request:', error);
+      showNotification(
+        'error', 
+        'Request Error', 
+        'Error preparing request. Please try again.'
+      );
+    }
+  }, [teams, getTeamRequestStatus, showNotification]);
+
+  // ✅ NEW: Handle edit request submission from modal
+  const handleEditRequestSubmit = useCallback(async (reason) => {
+    try {
+      const { teamId, reviewType } = editRequestModal;
+      const team = teams.find(t => t.id === teamId);
+      
+      if (!team) {
+        throw new Error('Team not found');
+      }
+
       const requestData = {
         regNo: team.students[0].regNo,
         reviewType: reviewType,
-        reason: reason.trim()
+        reason: reason
       };
+      
+      // Show loading notification
+      const loadingId = showNotification('info', 'Submitting Request...', 'Please wait while we process your request...', 10000);
       
       const response = await createReviewRequest('guide', requestData);
       
+      // Hide loading notification
+      hideNotification(loadingId);
+      
       if (response.success) {
-        alert('Edit request submitted successfully!');
+        showNotification(
+          'success', 
+          'Request Submitted', 
+          'Edit request submitted successfully!'
+        );
         await handleRefresh();
+        setEditRequestModal(prev => ({ ...prev, isOpen: false }));
       } else {
-        alert(response.message || 'Error submitting request');
+        throw new Error(response.message || 'Error submitting request');
       }
     } catch (error) {
       console.error('❌ Error submitting guide request:', error);
-      alert('Error submitting guide request. Please try again.');
+      showNotification(
+        'error', 
+        'Request Failed', 
+        error.message || 'Error submitting guide request. Please try again.'
+      );
     }
-  }, [teams, getTeamRequestStatus, handleRefresh]);
+  }, [teams, editRequestModal, handleRefresh, showNotification, hideNotification]);
+
+  // ✅ NEW: Close modal handler
+  const closeEditRequestModal = useCallback(() => {
+    setEditRequestModal(prev => ({ ...prev, isOpen: false }));
+  }, []);
 
   const getButtonColor = useCallback((reviewType) => {
     return 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700';
@@ -655,36 +739,43 @@ const Guide = () => {
               refreshKey={refreshKey}
             />
 
-            {/* Popup Review Modal */}
-{/* Popup Review Modal */}
-{activePopup && (() => {
-  const team = teams.find(t => t.id === activePopup.teamId);
-  const reviewTypes = getReviewTypes(team.markingSchema);
-  const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
-  const requestStatus = getTeamRequestStatus(team, activePopup.type);
-  
-  const showRequestEdit = isLocked && (requestStatus === 'none' || requestStatus === 'rejected');
-  
-  return (
-    <PopupReview
-      title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
-      teamMembers={activePopup.students}
-      reviewType={activePopup.type}
-      isOpen={true}
-      locked={isLocked}
-      markingSchema={activePopup.markingSchema}
-      requestStatus={requestStatus} // ✅ NEW: Pass request status
-      onClose={() => setActivePopup(null)}
-      onSubmit={(data, pptObj) => {
-        handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj);
-      }}
-      onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
-      requestEditVisible={showRequestEdit}
-      requestPending={requestStatus === 'pending'}
-      requiresPPT={reviewTypes.find(r => r.key === activePopup.type)?.requiresPPT || false}
-    />
-  );
-})()} 
+            {/* ✅ NEW: Edit Request Modal */}
+            <EditRequestModal
+              isOpen={editRequestModal.isOpen}
+              onClose={closeEditRequestModal}
+              onSubmit={handleEditRequestSubmit}
+              defaultReason="Need to correct marks after deadline"
+            />
+
+            {/* ✅ Popup Review Modal */}
+            {activePopup && (() => {
+              const team = teams.find(t => t.id === activePopup.teamId);
+              const reviewTypes = getReviewTypes(team.markingSchema);
+              const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
+              const requestStatus = getTeamRequestStatus(team, activePopup.type);
+              
+              const showRequestEdit = isLocked && (requestStatus === 'none' || requestStatus === 'rejected');
+              
+              return (
+                <PopupReview
+                  title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
+                  teamMembers={activePopup.students}
+                  reviewType={activePopup.type}
+                  isOpen={true}
+                  locked={isLocked}
+                  markingSchema={activePopup.markingSchema}
+                  requestStatus={requestStatus}
+                  onClose={() => setActivePopup(null)}
+                  onSubmit={(data, pptObj) => {
+                    handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj);
+                  }}
+                  onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
+                  requestEditVisible={showRequestEdit}
+                  requestPending={requestStatus === 'pending'}
+                  requiresPPT={reviewTypes.find(r => r.key === activePopup.type)?.requiresPPT || false}
+                />
+              );
+            })()} 
 
           </div>
         </div>

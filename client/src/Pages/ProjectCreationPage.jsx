@@ -4,13 +4,13 @@ import { Database, Settings, Building2 } from "lucide-react";
 
 import Navbar from "../Components/UniversalNavbar";
 import { useAdminContext } from '../hooks/useAdminContext';
-import ProjectHeader from '../components/ProjectHeader';
-import ProjectTabs from '../components/ProjectTabs';
-import SingleProjectForm from '../components/SingleProjectForm';
-import BulkProjectForm from '../components/BulkProjectForm';
-import NotificationProvider from '../components/NotificationProvider';  // ✅ Fixed path
-import LoadingScreen from '../components/LoadingScreen';
-import ContextSelection from '../components/ContextSelection';
+import ProjectHeader from '../Components/ProjectHeader';
+import ProjectTabs from '../Components/ProjectTabs';
+import SingleProjectForm from '../Components/SingleProjectForm';
+import BulkProjectForm from '../Components/BulkProjectForm';
+import NotificationProvider from '../Components/NotificationProvider';  // ✅ Fixed path
+import LoadingScreen from '../Components/LoadingScreen';
+import ContextSelection from '../Components/ContextSelection';
 
 const ProjectCreationPage = () => {
   const navigate = useNavigate();
