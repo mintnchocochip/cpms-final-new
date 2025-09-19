@@ -16,6 +16,7 @@ import ForgotPassword from "./Pages/ForgotPassword";
 import ProjectCreationPage from "./Pages/ProjectCreationPage";
 import AdminFacultyCreate from "./Pages/AdminFacultyCreation";
 import AdminSchoolSelection from "./Pages/AdminSchoolSelection";
+import NotificationProvider from './Components/NotificationProvider';
 
 // Import the new AdminStudentManagement component
 import AdminStudentManagement from './Pages/AdminStudentManagement';
@@ -324,6 +325,7 @@ const App = () => {
   return (
     <AuthProvider>
       <BrowserRouter>
+      <NotificationProvider>
         <Routes>
           <Route path="/admin/project-management" element={<AdminProjectManagement />} />
           <Route path="/Home" element={<Home />} />
@@ -380,6 +382,7 @@ const App = () => {
           } />
 
         </Routes>
+        </NotificationProvider>
       </BrowserRouter>
     </AuthProvider>
   );
