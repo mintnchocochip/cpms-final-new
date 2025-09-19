@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Award, Star } from 'lucide-react'; // ✅ Added Star icon
+import { X, Award, Star, Clock, Calendar } from 'lucide-react'; // ✅ Added Clock and Calendar icons
 
 const PopupReview = ({
   title,
@@ -15,40 +15,133 @@ const PopupReview = ({
   requiresPPT = false,
   markingSchema = null,
   requestStatus = 'none',
-  panelMode = false, // ✅ NEW: Add panel mode prop
-  currentBestProject = false, // ✅ NEW: Current best project status
+  panelMode = false,
+  currentBestProject = false,
+  teamId = null, // ✅ NEW: Team ID for deadline checking
 }) => {
   const [marks, setMarks] = useState({});
   const [comments, setComments] = useState({});
   const [attendance, setAttendance] = useState({});
   const [teamPptApproved, setTeamPptApproved] = useState(false);
-  const [bestProject, setBestProject] = useState(false); // ✅ NEW: Best project state
+  const [bestProject, setBestProject] = useState(false);
   const [componentLabels, setComponentLabels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [hasAttendance, setHasAttendance] = useState(true);
   const [sub, setSub] = useState('Locked');
+  
+  // ✅ NEW: Deadline states
+  const [deadlineInfo, setDeadlineInfo] = useState({
+    hasDeadline: false,
+    fromDate: null,
+    toDate: null,
+    isBeforeStart: false,
+    isAfterEnd: false,
+    timeUntilStart: '',
+    timeUntilEnd: '',
+  });
 
-  // ✅ FIXED: Calculate if form should be locked considering extension status
+  // ✅ FIXED: Calculate if form should be locked considering ALL conditions
   const isFormLocked = locked && requestStatus !== 'approved';
+  const isDeadlineLocked = (deadlineInfo.isBeforeStart || deadlineInfo.isAfterEnd) && requestStatus !== 'approved';
+  const finalFormLocked = isFormLocked || isDeadlineLocked;
 
-  // ✅ Load schema and initialize components
+  // ✅ NEW: Function to calculate deadline status
+  const calculateDeadlineStatus = (reviewConfig) => {
+    if (!reviewConfig?.deadline) {
+      return {
+        hasDeadline: false,
+        fromDate: null,
+        toDate: null,
+        isBeforeStart: false,
+        isAfterEnd: false,
+        timeUntilStart: '',
+        timeUntilEnd: '',
+      };
+    }
+
+    const now = new Date();
+    const currentIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const deadline = reviewConfig.deadline;
+    
+    let fromDate = null;
+    let toDate = null;
+    
+    try {
+      if (deadline.from && deadline.to) {
+        fromDate = new Date(deadline.from);
+        toDate = new Date(deadline.to);
+      } else if (typeof deadline === 'string' || deadline instanceof Date) {
+        // If only single deadline provided, assume it's the end date and review opens immediately
+        toDate = new Date(deadline);
+        fromDate = new Date(0); // Beginning of time - always open from start
+      }
+
+      const fromIST = fromDate ? new Date(fromDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })) : null;
+      const toIST = toDate ? new Date(toDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })) : null;
+
+      const isBeforeStart = fromIST && currentIST < fromIST;
+      const isAfterEnd = toIST && currentIST > toIST;
+
+      // Calculate time until events
+      const timeUntilStart = isBeforeStart ? getTimeDifference(currentIST, fromIST) : '';
+      const timeUntilEnd = (!isAfterEnd && toIST) ? getTimeDifference(currentIST, toIST) : '';
+
+      return {
+        hasDeadline: !!(fromDate || toDate),
+        fromDate: fromIST,
+        toDate: toIST,
+        isBeforeStart,
+        isAfterEnd,
+        timeUntilStart,
+        timeUntilEnd,
+      };
+    } catch (error) {
+      console.error('Error calculating deadline status:', error);
+      return {
+        hasDeadline: false,
+        fromDate: null,
+        toDate: null,
+        isBeforeStart: false,
+        isAfterEnd: false,
+        timeUntilStart: '',
+        timeUntilEnd: '',
+      };
+    }
+  };
+
+  // ✅ NEW: Function to get human-readable time difference
+  const getTimeDifference = (from, to) => {
+    const diffMs = to - from;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (diffDays > 0) {
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+    } else if (diffHours > 0) {
+      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ${diffMinutes} minute${diffMinutes > 1 ? 's' : ''}`;
+    } else {
+      return `${Math.max(0, diffMinutes)} minute${diffMinutes > 1 ? 's' : ''}`;
+    }
+  };
+
+  // ✅ ENHANCED: Load schema and initialize components with deadline checking
   useEffect(() => {
     if (!isOpen) return;
     
     setLoading(true);
     try {
-      console.log('=== [PopupReview] LOADING MARKING SCHEMA ===');
+      console.log('=== [PopupReview] LOADING MARKING SCHEMA WITH DEADLINE CHECK ===');
       console.log('📋 [PopupReview] Review type:', reviewType);
       console.log('📋 [PopupReview] Request status:', requestStatus);
-      console.log('📋 [PopupReview] Form locked:', isFormLocked);
-      console.log('🏆 [PopupReview] Panel mode:', panelMode);
       
       let components = [];
       let hasValidSchema = false;
+      let reviewConfig = null;
       
       if (markingSchema?.reviews) {
-        const reviewConfig = markingSchema.reviews.find(review => 
+        reviewConfig = markingSchema.reviews.find(review => 
           review.reviewName === reviewType
         );
         
@@ -63,6 +156,13 @@ const PopupReview = ({
           console.log('✅ [PopupReview] Schema components loaded:', components);
         }
       }
+      
+      // ✅ NEW: Calculate deadline status
+      const deadlineStatus = calculateDeadlineStatus(reviewConfig);
+      setDeadlineInfo(deadlineStatus);
+      
+      console.log('📅 [PopupReview] Deadline status:', deadlineStatus);
+      console.log('🔒 [PopupReview] Final form locked status:', finalFormLocked);
       
       if (!hasValidSchema) {
         console.log('❌ [PopupReview] No valid schema or components found');
@@ -81,7 +181,7 @@ const PopupReview = ({
     } finally {
       setLoading(false);
     }
-  }, [isOpen, reviewType, markingSchema, requestStatus, isFormLocked, panelMode]);
+  }, [isOpen, reviewType, markingSchema, requestStatus, finalFormLocked, panelMode]);
 
   // ✅ Initialize form data from existing student data
   useEffect(() => {
@@ -150,7 +250,7 @@ const PopupReview = ({
   }, [isOpen, teamMembers, reviewType, loading, componentLabels, hasAttendance, requiresPPT, currentBestProject]);
 
   const handleMarksChange = (memberId, value, componentKey) => {
-    if (isFormLocked) return;
+    if (finalFormLocked) return;
     if (hasAttendance && attendance[memberId] === false) return;
 
     const componentInfo = componentLabels.find(comp => comp.key === componentKey);
@@ -177,7 +277,7 @@ const PopupReview = ({
   };
 
   const handleAttendanceChange = (memberId, isPresent) => {
-    if (isFormLocked) return;
+    if (finalFormLocked) return;
     
     setAttendance(prev => ({ ...prev, [memberId]: isPresent }));
     
@@ -197,7 +297,7 @@ const PopupReview = ({
   };
 
   const handleCommentsChange = (memberId, value) => {
-    if (isFormLocked) return;
+    if (finalFormLocked) return;
     
     setComments(prev => ({ ...prev, [memberId]: value }));
     
@@ -208,7 +308,7 @@ const PopupReview = ({
   };
 
   const handleSubmit = () => {
-    if (isFormLocked || sub === 'Locked') return;
+    if (finalFormLocked || sub === 'Locked') return;
     
     console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
     console.log('🏆 [PopupReview] Best project status:', bestProject);
@@ -321,7 +421,18 @@ const PopupReview = ({
                     🔓 Extension Approved
                   </span>
                 )}
-                {isFormLocked && (
+                {/* ✅ NEW: Deadline status indicators */}
+                {deadlineInfo.isBeforeStart && (
+                  <span className="bg-orange-400/30 px-3 py-1 rounded-full">
+                    🕒 Not Yet Open
+                  </span>
+                )}
+                {deadlineInfo.isAfterEnd && (
+                  <span className="bg-red-400/30 px-3 py-1 rounded-full">
+                    ⏰ Deadline Passed
+                  </span>
+                )}
+                {finalFormLocked && (
                   <span className="bg-red-400/30 px-3 py-1 rounded-full">
                     🔒 Locked
                   </span>
@@ -345,6 +456,97 @@ const PopupReview = ({
             </div>
           )}
 
+          {/* ✅ NEW: Deadline Information Banner */}
+          {deadlineInfo.hasDeadline && (
+            <div className={`mb-6 p-4 rounded-xl border-2 ${
+              deadlineInfo.isBeforeStart 
+                ? 'bg-orange-50 border-orange-200' 
+                : deadlineInfo.isAfterEnd
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-green-50 border-green-200'
+            }`}>
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0">
+                  {deadlineInfo.isBeforeStart ? (
+                    <Clock className="w-6 h-6 text-orange-600" />
+                  ) : deadlineInfo.isAfterEnd ? (
+                    <Calendar className="w-6 h-6 text-red-600" />
+                  ) : (
+                    <Calendar className="w-6 h-6 text-green-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h3 className={`font-bold text-lg ${
+                    deadlineInfo.isBeforeStart 
+                      ? 'text-orange-800' 
+                      : deadlineInfo.isAfterEnd
+                        ? 'text-red-800'
+                        : 'text-green-800'
+                  }`}>
+                    {deadlineInfo.isBeforeStart 
+                      ? '⏳ Review Not Yet Open' 
+                      : deadlineInfo.isAfterEnd
+                        ? '⌛ Review Deadline Has Passed'
+                        : '✅ Review Is Currently Open'
+                    }
+                  </h3>
+                  
+                  <div className="mt-2 space-y-1 text-sm">
+                    {deadlineInfo.fromDate && (
+                      <p className={
+                        deadlineInfo.isBeforeStart 
+                          ? 'text-orange-700' 
+                          : deadlineInfo.isAfterEnd
+                            ? 'text-red-700'
+                            : 'text-green-700'
+                      }>
+                        <strong>Opens:</strong> {deadlineInfo.fromDate.toLocaleString('en-IN', { 
+                          timeZone: 'Asia/Kolkata',
+                          dateStyle: 'full',
+                          timeStyle: 'short'
+                        })}
+                      </p>
+                    )}
+                    {deadlineInfo.toDate && (
+                      <p className={
+                        deadlineInfo.isBeforeStart 
+                          ? 'text-orange-700' 
+                          : deadlineInfo.isAfterEnd
+                            ? 'text-red-700'
+                            : 'text-green-700'
+                      }>
+                        <strong>Closes:</strong> {deadlineInfo.toDate.toLocaleString('en-IN', { 
+                          timeZone: 'Asia/Kolkata',
+                          dateStyle: 'full',
+                          timeStyle: 'short'
+                        })}
+                      </p>
+                    )}
+                    
+                    {deadlineInfo.timeUntilStart && (
+                      <p className="text-orange-600 font-medium">
+                        ⏰ Opens in: {deadlineInfo.timeUntilStart}
+                      </p>
+                    )}
+                    {deadlineInfo.timeUntilEnd && !deadlineInfo.isAfterEnd && (
+                      <p className="text-green-600 font-medium">
+                        ⏰ Closes in: {deadlineInfo.timeUntilEnd}
+                      </p>
+                    )}
+                  </div>
+                  
+                  {requestStatus === 'approved' && (deadlineInfo.isBeforeStart || deadlineInfo.isAfterEnd) && (
+                    <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded">
+                      <p className="text-green-800 font-medium text-sm">
+                        🔓 Extension Approved - You can still submit this review
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ✅ PANEL ONLY: Best Project Selection */}
           {panelMode && (
             <div className="mb-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl">
@@ -353,7 +555,7 @@ const PopupReview = ({
                   type="checkbox"
                   checked={bestProject}
                   onChange={(e) => setBestProject(e.target.checked)}
-                  disabled={isFormLocked}
+                  disabled={finalFormLocked}
                   className="w-5 h-5 text-yellow-600 bg-yellow-50 border-yellow-300 rounded focus:ring-2 focus:ring-yellow-500"
                 />
                 <Star className="w-5 h-5 text-yellow-600" />
@@ -377,7 +579,7 @@ const PopupReview = ({
                   type="checkbox"
                   checked={teamPptApproved}
                   onChange={(e) => setTeamPptApproved(e.target.checked)}
-                  disabled={isFormLocked}
+                  disabled={finalFormLocked}
                   className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="font-semibold text-blue-800">
@@ -409,12 +611,12 @@ const PopupReview = ({
                       <select
                         value={attendance[member._id] ? 'present' : 'absent'}
                         onChange={(e) => handleAttendanceChange(member._id, e.target.value === 'present')}
-                        disabled={isFormLocked}
+                        disabled={finalFormLocked}
                         className={`px-3 py-2 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 ${
                           attendance[member._id] 
                             ? 'bg-green-50 border-green-300 text-green-800' 
                             : 'bg-red-50 border-red-300 text-red-800'
-                        }`}
+                        } ${finalFormLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <option value="present">✓ Present</option>
                         <option value="absent">✗ Absent</option>
@@ -437,8 +639,12 @@ const PopupReview = ({
                           max={comp.points}
                           value={marks[member._id]?.[comp.key] || ''}
                           onChange={(e) => handleMarksChange(member._id, e.target.value, comp.key)}
-                          disabled={isFormLocked || (hasAttendance && attendance[member._id] === false)}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                          disabled={finalFormLocked || (hasAttendance && attendance[member._id] === false)}
+                          className={`w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-blue-500 ${
+                            (finalFormLocked || (hasAttendance && attendance[member._id] === false))
+                              ? 'bg-gray-100 cursor-not-allowed' 
+                              : ''
+                          }`}
                           placeholder="0"
                         />
                         <span className="text-xs text-gray-500 min-w-fit">
@@ -453,11 +659,15 @@ const PopupReview = ({
                 <textarea
                   value={comments[member._id] || ''}
                   onChange={(e) => handleCommentsChange(member._id, e.target.value)}
-                  disabled={isFormLocked || (hasAttendance && attendance[member._id] === false)}
+                  disabled={finalFormLocked || (hasAttendance && attendance[member._id] === false)}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
+                    (finalFormLocked || (hasAttendance && attendance[member._id] === false))
+                      ? 'bg-gray-100 cursor-not-allowed' 
+                      : ''
+                  }`}
                   rows="3"
-                  placeholder="Add comments..."
+                  placeholder={finalFormLocked ? "Comments locked" : "Add comments..."}
                 />
               </div>
             ))}
@@ -491,25 +701,31 @@ const PopupReview = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={isFormLocked || sub === 'Locked'}
+              disabled={finalFormLocked || sub === 'Locked'}
               className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                isFormLocked || sub === 'Locked'
+                finalFormLocked || sub === 'Locked'
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : panelMode && bestProject
                     ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
               }`}
             >
-              {/* ✅ Updated button text */}
-              {requestStatus === 'approved' && !isFormLocked 
-                ? `Submit ${panelMode ? 'Panel ' : ''}Review (Extended)` 
-                : isFormLocked 
-                  ? 'Locked' 
-                  : sub === 'Locked' 
-                    ? 'Comments Required' 
-                    : panelMode && bestProject
-                      ? '⭐ Submit Best Project Review'
-                      : `Submit ${panelMode ? 'Panel ' : ''}Review`}
+              {/* ✅ Updated button text with deadline context */}
+              {deadlineInfo.isBeforeStart && requestStatus !== 'approved'
+                ? '⏳ Not Yet Open'
+                : deadlineInfo.isAfterEnd && requestStatus !== 'approved'
+                  ? '⌛ Deadline Passed'
+                  : requestStatus === 'approved' && (deadlineInfo.isBeforeStart || deadlineInfo.isAfterEnd)
+                    ? `Submit ${panelMode ? 'Panel ' : ''}Review (Extended)`
+                    : requestStatus === 'approved' && !finalFormLocked
+                      ? `Submit ${panelMode ? 'Panel ' : ''}Review (Extended)` 
+                      : finalFormLocked 
+                        ? 'Locked' 
+                        : sub === 'Locked' 
+                          ? 'Comments Required' 
+                          : panelMode && bestProject
+                            ? '⭐ Submit Best Project Review'
+                            : `Submit ${panelMode ? 'Panel ' : ''}Review`}
             </button>
           </div>
         </div>

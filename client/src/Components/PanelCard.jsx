@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, ChevronDown, Users, Building2, Trash2, MapPin } from 'lucide-react';
+import { ChevronRight, ChevronDown, Users, Building2, Trash2, MapPin, BookOpen } from 'lucide-react';
 
 const PanelCard = ({ 
   panel, 
@@ -13,6 +13,10 @@ const PanelCard = ({
   allGuideProjects,
   onRemoveTeam
 }) => {
+  // ✅ FIXED: Handle array fields from new schema
+  const displaySchool = Array.isArray(panel.school) ? panel.school.join(', ') : (panel.school || 'Unknown');
+  const displayDepartment = Array.isArray(panel.department) ? panel.department.join(', ') : (panel.department || 'Unknown');
+
   return (
     <div className="border border-slate-200 rounded-xl bg-gradient-to-r from-white to-slate-50 hover:shadow-lg transition-all duration-300">
       {/* Panel Header */}
@@ -46,10 +50,18 @@ const PanelCard = ({
                 <Users className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span>{panel.teams.length} teams assigned</span>
               </span>
+              {/* ✅ FIXED: Handle array departments */}
               <span className="flex items-center space-x-1">
                 <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span>{panel.department}</span>
+                <span>{displayDepartment}</span>
               </span>
+              {/* ✅ FIXED: Show school if different from department */}
+              {displaySchool && displaySchool !== displayDepartment && (
+                <span className="flex items-center space-x-1">
+                  <BookOpen className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span>{displaySchool}</span>
+                </span>
+              )}
               {panel.teams.length > 0 && (
                 <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs font-semibold">
                   Active
@@ -77,14 +89,54 @@ const PanelCard = ({
       {isExpanded && (
         <div className="border-t border-slate-200 p-4 sm:p-6 bg-slate-50">
           {/* Panel Information */}
-          {panel.venue && (
-            <div className="mb-6 bg-white rounded-xl p-4 border border-slate-200">
-              <div className="flex items-center gap-2 text-emerald-600">
-                <MapPin className="w-5 h-5" />
-                <span className="font-medium">Venue: {panel.venue}</span>
+          <div className="mb-6 bg-white rounded-xl p-4 border border-slate-200">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* ✅ FIXED: Display arrays properly */}
+              <div className="flex items-center gap-2 text-blue-600">
+                <Building2 className="w-5 h-5" />
+                <div>
+                  <span className="font-medium block">Department:</span>
+                  <span className="text-sm text-slate-600">{displayDepartment}</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 text-purple-600">
+                <BookOpen className="w-5 h-5" />
+                <div>
+                  <span className="font-medium block">School:</span>
+                  <span className="text-sm text-slate-600">{displaySchool}</span>
+                </div>
+              </div>
+
+              {panel.venue && (
+                <div className="flex items-center gap-2 text-emerald-600">
+                  <MapPin className="w-5 h-5" />
+                  <div>
+                    <span className="font-medium block">Venue:</span>
+                    <span className="text-sm text-slate-600">{panel.venue}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ✅ FIXED: Faculty Member Details */}
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <span className="font-medium text-slate-700 block mb-2">Panel Members:</span>
+              <div className="flex flex-wrap gap-2">
+                {panel.facultyNames.map((name, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1.5 rounded-lg">
+                    <Users className="w-4 h-4" />
+                    <span className="font-medium">{name}</span>
+                    {panel.facultyEmployeeIds && panel.facultyEmployeeIds[idx] && (
+                      <span className="text-xs bg-blue-200 px-1.5 py-0.5 rounded">
+                        ID: {panel.facultyEmployeeIds[idx]}
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
-          )}
+          </div>
           
           {/* Assigned Teams Section */}
           <div className="mb-8">
@@ -108,10 +160,37 @@ const PanelCard = ({
                 {panel.teams.map((team) => (
                   <div key={team.id} className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 shadow-sm">
                     <div className="flex justify-between items-start mb-4">
-                      <h6 className="font-bold text-base sm:text-lg text-slate-800">{team.name}</h6>
+                      <div className="flex-1 min-w-0">
+                        <h6 className="font-bold text-base sm:text-lg text-slate-800 mb-1">{team.name}</h6>
+                        {/* ✅ FIXED: Display project domain/type if available */}
+                        {team.full && (
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {team.full.domain && (
+                              <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium">
+                                {team.full.domain}
+                              </span>
+                            )}
+                            {team.full.type && (
+                              <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-xs font-medium">
+                                {team.full.type}
+                              </span>
+                            )}
+                            {team.full.school && (
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                                {team.full.school}
+                              </span>
+                            )}
+                            {team.full.department && (
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                                {team.full.department}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       <button
                         onClick={() => onRemoveTeam(team.id)}
-                        className="text-red-600 hover:text-red-800 p-1.5 sm:p-2 rounded-lg hover:bg-red-50 transition-all duration-200 flex items-center gap-1 text-xs sm:text-sm font-medium"
+                        className="text-red-600 hover:text-red-800 p-1.5 sm:p-2 rounded-lg hover:bg-red-50 transition-all duration-200 flex items-center gap-1 text-xs sm:text-sm font-medium ml-2"
                       >
                         <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                         Remove
@@ -133,6 +212,18 @@ const PanelCard = ({
                             ))}
                           </div>
                         </div>
+
+                        {/* ✅ FIXED: Display guide faculty info if available */}
+                        {team.full?.guideFaculty && (
+                          <div className="p-2 sm:p-3 bg-green-50 rounded-lg">
+                            <span className="font-semibold text-green-700 text-sm">Guide: </span>
+                            <span className="text-green-800 text-sm">
+                              {typeof team.full.guideFaculty === 'object' 
+                                ? team.full.guideFaculty.name 
+                                : team.full.guideFaculty}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -159,25 +250,46 @@ const PanelCard = ({
                 </span>
               </div>
             ) : (
-              <select
-                onChange={(e) => {
-                  if (e.target.value) {
-                    onManualAssign(index, e.target.value);
-                    e.target.value = "";
-                  }
-                }}
-                className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                defaultValue=""
-              >
-                <option value="" disabled>
-                  Select team to assign to this panel
-                </option>
-                {availableTeams.map((team) => (
-                  <option key={team._id} value={team._id}>
-                    {team.name}
+              <div className="space-y-4">
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      onManualAssign(index, e.target.value);
+                      e.target.value = "";
+                    }
+                  }}
+                  className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    Select team to assign to this panel
                   </option>
-                ))}
-              </select>
+                  {availableTeams.map((team) => (
+                    <option key={team._id} value={team._id}>
+                      {team.name} 
+                      {team.domain && ` - ${team.domain}`}
+                      {team.school && ` (${team.school})`}
+                    </option>
+                  ))}
+                </select>
+
+                {/* ✅ FIXED: Show preview of available teams */}
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <span className="text-xs font-semibold text-blue-800 block mb-2">Available Teams Preview:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {availableTeams.slice(0, 5).map((team) => (
+                      <span key={team._id} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">
+                        {team.name}
+                      </span>
+                    ))}
+                    {availableTeams.length > 5 && (
+                      <span className="text-blue-600 text-xs font-medium">
+                        +{availableTeams.length - 5} more...
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>
