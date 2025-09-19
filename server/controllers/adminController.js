@@ -375,7 +375,6 @@ export async function createFacultyBulk(req, res) {
   }
 }
 
-
 export async function updateFaculty(req, res) {
   try {
     const { employeeId } = req.params;
@@ -488,7 +487,6 @@ export async function updateFaculty(req, res) {
     });
   }
 }
-
 
 export async function getAllFaculty(req, res) {
   const { school, department, specialization, sortBy, sortOrder } = req.query;
@@ -650,8 +648,6 @@ export async function getAllPanelsWithProjects(req, res) {
     res.status(500).json({ success: false, message: error.message });
   }
 }
-
-
 
 export async function deleteFacultyByEmployeeId(req, res) {
   const { employeeId } = req.params;
