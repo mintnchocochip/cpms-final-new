@@ -678,59 +678,73 @@ export async function deleteFacultyByEmployeeId(req, res) {
   }
 }
 
+
+
 export async function createAdmin(req, res) {
-  const { name, emailId, password, employeeId, school, department } = req.body;
+  try {
+    const { name, emailId, password, employeeId, phoneNumber, school, department } = req.body;
 
-  if (!emailId.endsWith("@vit.ac.in")) {
-    return res.status(400).json({
+    if (!emailId.endsWith("@vit.ac.in")) {
+      return res.status(400).json({
+        success: false,
+        message: "Only college emails allowed!",
+      });
+    }
+
+    // Password validation
+    if (
+      password.length < 8 ||
+      !/[A-Z]/.test(password) ||
+      !/[a-z]/.test(password) ||
+      !/[0-9]/.test(password) ||
+      !/[^A-Za-z0-9]/.test(password)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be at least 8 characters and include uppercase, lowercase, number, and special character",
+      });
+    }
+
+    const existingFaculty = await Faculty.findOne({ emailId });
+    if (existingFaculty) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin already registered!",
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // ✅ FIXED: Handle arrays for school and department
+    const newFaculty = new Faculty({
+      name,
+      emailId,
+      password: hashedPassword,
+      employeeId,
+      phoneNumber, // ✅ Add missing phoneNumber
+      role: "admin",
+      school: Array.isArray(school) ? school : [school], // ✅ Ensure array
+      department: Array.isArray(department) ? department : (department ? [department] : []), // ✅ Ensure array
+      specialization: [], // ✅ Empty array for admin
+    });
+
+    await newFaculty.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Admin created successfully!",
+    });
+  } catch (error) {
+    console.error("Error creating admin:", error);
+    return res.status(500).json({
       success: false,
-      message: "Only college emails allowed!",
+      message: error.message || "Failed to create admin",
     });
   }
-
-  // Password validation
-  if (
-    password.length < 8 ||
-    !/[A-Z]/.test(password) ||
-    !/[a-z]/.test(password) ||
-    !/[0-9]/.test(password) ||
-    !/[^A-Za-z0-9]/.test(password)
-  ) {
-    return res.status(400).json({
-      success: false,
-      message:
-        "Password must be at least 8 characters and include uppercase, lowercase, number, and special character",
-    });
-  }
-
-  const existingFaculty = await Faculty.findOne({ emailId });
-  if (existingFaculty) {
-    return res.status(400).json({
-      success: false,
-      message: "Admin already registered!",
-    });
-  }
-
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(password, salt);
-
-  const newFaculty = new Faculty({
-    name,
-    emailId,
-    password: hashedPassword,
-    employeeId,
-    role: "admin",
-    school,
-    department,
-  });
-
-  await newFaculty.save();
-
-  return res.status(201).json({
-    success: true,
-    message: "Admin created successfully!",
-  });
 }
+
 
 export async function setDefaultDeadline(req, res) {
   try {
@@ -915,21 +929,41 @@ export async function getAllRequests(req, res) {
       });
     }
 
+    console.log("Fetching requests with filters:", { facultyType, school, department });
+
+    // ✅ FIXED: Build match condition for array fields
+    const facultyMatch = {};
+    if (school) {
+      facultyMatch.school = { $in: [school] }; // ✅ Use $in for array field
+    }
+    if (department) {
+      facultyMatch.department = { $in: [department] }; // ✅ Use $in for array field
+    }
+
+    console.log("Faculty match condition:", facultyMatch);
+
     // Fetch requests and populate faculty and student with necessary fields
     const requests = await Request.find({ facultyType })
       .populate({
         path: "faculty",
         select: "name employeeId school department",
-        match: {
-          ...(school ? { school } : {}),
-          ...(department ? { department } : {}),
-        },
+        match: facultyMatch, // ✅ Use the corrected match condition
       })
       .populate("student", "name regNo")
       .lean();
 
-    // Filter out requests whose faculty is null (due to mismatch in school/department)
-    const filteredRequests = requests.filter((req) => req.faculty !== null);
+    console.log(`Found ${requests.length} requests, filtering out null faculty...`);
+
+    // ✅ ENHANCED: Filter out requests whose faculty is null and add logging
+    const filteredRequests = requests.filter((req, index) => {
+      if (req.faculty === null) {
+        console.log(`Request ${index} has null faculty (filtered out by match condition)`);
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`After filtering: ${filteredRequests.length} requests with valid faculty`);
 
     if (!filteredRequests.length) {
       return res.status(404).json({
@@ -941,7 +975,18 @@ export async function getAllRequests(req, res) {
     // Group by faculty
     const grouped = {};
 
-    filteredRequests.forEach((req) => {
+    filteredRequests.forEach((req, index) => {
+      // ✅ ENHANCED: Add null checks and error logging
+      if (!req.faculty) {
+        console.error(`Request ${index} has null faculty, skipping...`);
+        return;
+      }
+
+      if (!req.student) {
+        console.error(`Request ${index} has null student, skipping...`);
+        return;
+      }
+
       const faculty = req.faculty;
       const facultyId = faculty._id.toString();
 
@@ -972,6 +1017,8 @@ export async function getAllRequests(req, res) {
     });
 
     const result = Object.values(grouped);
+
+    console.log(`Final result: ${result.length} faculty groups`);
 
     return res.status(200).json({
       success: true,
@@ -1060,7 +1107,6 @@ export async function createPanelManually(req, res) {
       ...(venue ? { venue } : {}),
     };
 
-    const panel = new Panel(panelData);
     await panel.save();
 
     return res.status(201).json({
