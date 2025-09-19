@@ -522,22 +522,22 @@ export async function getAllFaculty(req, res) {
       .sort(sortOption)
       .select("-password");
 
-res.status(200).json({
-  success: true,
-  data: faculty.map((f) => ({
-    _id: f._id,
-    imageUrl: f.imageUrl,
-    name: f.name,
-    employeeId: f.employeeId,
-    emailId: f.emailId,
-    phoneNumber: f.phoneNumber, 
-    role: f.role,
-    school: f.school, 
-    department: f.department,
-    specialization: f.specialization,
-  })),
-  count: faculty.length,
-});
+    res.status(200).json({
+      success: true,
+      data: faculty.map((f) => ({
+        _id: f._id,
+        imageUrl: f.imageUrl,
+        name: f.name,
+        employeeId: f.employeeId,
+        emailId: f.emailId,
+        phoneNumber: f.phoneNumber,
+        role: f.role,
+        school: f.school,
+        department: f.department,
+        specialization: f.specialization,
+      })),
+      count: faculty.length,
+    });
   } catch (error) {
     console.error("Error in getAllFaculty:", error);
     res.status(500).json({
@@ -594,7 +594,10 @@ export async function getAllGuideWithProjects(req, res) {
 export async function getAllPanelsWithProjects(req, res) {
   try {
     const { school, department } = req.query;
-    console.log("getAllPanelsWithProjects called with:", { school, department });
+    console.log("getAllPanelsWithProjects called with:", {
+      school,
+      department,
+    });
 
     // ✅ FIXED: Build panel filter query based on panel fields, not faculty fields
     let panelQuery = {};
@@ -640,7 +643,13 @@ export async function getAllPanelsWithProjects(req, res) {
       })
     );
 
-    console.log("Final result:", result.map(r => ({ panelId: r.panelId, projectCount: r.projects.length })));
+    console.log(
+      "Final result:",
+      result.map((r) => ({
+        panelId: r.panelId,
+        projectCount: r.projects.length,
+      }))
+    );
 
     res.status(200).json({ success: true, data: result });
   } catch (error) {
@@ -678,11 +687,17 @@ export async function deleteFacultyByEmployeeId(req, res) {
   }
 }
 
-
-
 export async function createAdmin(req, res) {
   try {
-    const { name, emailId, password, employeeId, phoneNumber, school, department } = req.body;
+    const {
+      name,
+      emailId,
+      password,
+      employeeId,
+      phoneNumber,
+      school,
+      department,
+    } = req.body;
 
     if (!emailId.endsWith("@vit.ac.in")) {
       return res.status(400).json({
@@ -726,7 +741,11 @@ export async function createAdmin(req, res) {
       phoneNumber, // ✅ Add missing phoneNumber
       role: "admin",
       school: Array.isArray(school) ? school : [school], // ✅ Ensure array
-      department: Array.isArray(department) ? department : (department ? [department] : []), // ✅ Ensure array
+      department: Array.isArray(department)
+        ? department
+        : department
+        ? [department]
+        : [], // ✅ Ensure array
       specialization: [], // ✅ Empty array for admin
     });
 
@@ -744,7 +763,6 @@ export async function createAdmin(req, res) {
     });
   }
 }
-
 
 export async function setDefaultDeadline(req, res) {
   try {
@@ -929,7 +947,11 @@ export async function getAllRequests(req, res) {
       });
     }
 
-    console.log("Fetching requests with filters:", { facultyType, school, department });
+    console.log("Fetching requests with filters:", {
+      facultyType,
+      school,
+      department,
+    });
 
     // ✅ FIXED: Build match condition for array fields
     const facultyMatch = {};
@@ -952,18 +974,24 @@ export async function getAllRequests(req, res) {
       .populate("student", "name regNo")
       .lean();
 
-    console.log(`Found ${requests.length} requests, filtering out null faculty...`);
+    console.log(
+      `Found ${requests.length} requests, filtering out null faculty...`
+    );
 
     // ✅ ENHANCED: Filter out requests whose faculty is null and add logging
     const filteredRequests = requests.filter((req, index) => {
       if (req.faculty === null) {
-        console.log(`Request ${index} has null faculty (filtered out by match condition)`);
+        console.log(
+          `Request ${index} has null faculty (filtered out by match condition)`
+        );
         return false;
       }
       return true;
     });
 
-    console.log(`After filtering: ${filteredRequests.length} requests with valid faculty`);
+    console.log(
+      `After filtering: ${filteredRequests.length} requests with valid faculty`
+    );
 
     if (!filteredRequests.length) {
       return res.status(404).json({
@@ -1107,6 +1135,7 @@ export async function createPanelManually(req, res) {
       ...(venue ? { venue } : {}),
     };
 
+    const panel = new Panel(panelData);
     await panel.save();
 
     return res.status(201).json({
@@ -1726,4 +1755,3 @@ export async function autoAssignPanelsToProjects(req, res) {
     });
   }
 }
-
