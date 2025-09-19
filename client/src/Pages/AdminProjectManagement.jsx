@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAllProjects, updateProject, deleteProject } from "../api.js";
 import Navbar from "../Components/UniversalNavbar";
-import * as XLSX from 'xlsx';
+
 import {
   Users,
   Download,
@@ -34,6 +34,9 @@ import {
   Plus,
   Star,
 } from "lucide-react";
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+
 
 const AdminProjectManagement = () => {
   const navigate = useNavigate();
@@ -63,6 +66,95 @@ const AdminProjectManagement = () => {
     title: "",
     message: "",
   });
+
+const exportToBulkTemplate = (projects) => {
+  if (!projects || projects.length === 0) {
+    alert("No projects data available to export.");
+    return;
+  }
+
+  // Excel columns matching your desired format + panel column as a single string
+  const columns = [
+    'Project Name',
+    'Guide Faculty Employee ID', 
+    'School',
+    'Department',
+    'Specialization',
+    'Type',
+    'Student Name 1',
+    'Student RegNo 1', 
+    'Student Email 1',
+    'Student Name 2',
+    'Student RegNo 2',
+    'Student Email 2', 
+    'Student Name 3',
+    'Student RegNo 3',
+    'Student Email 3',
+    'Panel' // Single string, e.g. 50392 Dr. Syed Ibrahim S P & 52343 Dr. Dinakaran M
+  ];
+
+  const rows = projects.map(project => {
+    // Get guide faculty employee ID
+    const guideEmployeeId = project.guideFaculty?.employeeId || 
+                           project.guide?.employeeId || 
+                           '';
+
+    // Get project specialization/domain
+    const specialization = project.specialization || 
+                          project.domain || 
+                          project.guideFaculty?.specialization?.[0] || 
+                          '';
+
+    // Prepare student data (up to 3 students horizontally)
+    const students = project.students || [];
+
+    // Panel example: 50392 Dr. Syed Ibrahim S P & 52343 Dr. Dinakaran M
+    const panel = project.panel || {};
+    let panelString = '';
+    if (Array.isArray(panel.members) && panel.members.length > 0) {
+      panelString = panel.members
+        .map(m => `${m.employeeId ? m.employeeId : ''} ${m.name ? m.name : ''}`.trim())
+        .filter(s => s)
+        .join(' & ');
+    }
+
+    const row = {
+      'Project Name': project.name || '',
+      'Guide Faculty Employee ID': guideEmployeeId,
+      'School': project.school || '',
+      'Department': project.department || '', // allow to be empty
+      'Specialization': specialization,
+      'Type': project.type || '',
+      'Student Name 1': students[0]?.name || '',
+      'Student RegNo 1': students[0]?.regNo || '', 
+      'Student Email 1': students[0]?.emailId || students[0]?.email || '',
+      'Student Name 2': students[1]?.name || '',
+      'Student RegNo 2': students[1]?.regNo || '',
+      'Student Email 2': students[1]?.emailId || students[1]?.email || '',
+      'Student Name 3': students[2]?.name || '',
+      'Student RegNo 3': students[2]?.regNo || '',
+      'Student Email 3': students[2]?.emailId || students[2]?.email || '',
+      'Panel': panelString // the key new field!
+    };
+
+    return row;
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(rows, { header: columns });
+  worksheet['!cols'] = Array(columns.length).fill({ wch: 25 });
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'ProjectsTemplate');
+
+  const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], { type: "application/octet-stream" });
+  
+  const fileName = `Projects_Bulk_Template_PanelStrings_${new Date().toISOString().slice(0,10)}.xlsx`;
+  saveAs(blob, fileName);
+};
+
+
+
 
   // Show notification function
   const showNotification = useCallback((type, title, message, duration = 4000) => {
@@ -587,14 +679,50 @@ const AdminProjectManagement = () => {
                   <span>Advanced Filters</span>
                   {showFilters ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </button>
-                <button
-                  onClick={downloadExcel}
-                  disabled={filteredProjects.length === 0}
-                  className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Export Excel ({filteredProjects.length})</span>
-                </button>
+       {/* ✅ UPDATED: Export Buttons Section */}
+<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-8 gap-4">
+  <div className="flex items-center space-x-3">
+    <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
+      <Search className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+    </div>
+    <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Search & Filter Controls</h2>
+  </div>
+  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 space-x-0 sm:space-x-4 w-full sm:w-auto">
+    <button
+      onClick={() => setShowFilters(!showFilters)}
+      className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium text-sm sm:text-base w-full sm:w-auto"
+    >
+      <Grid3X3 className="h-4 w-4" />
+      <span>Advanced Filters</span>
+      {showFilters ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+    </button>
+    
+    {/* ✅ UPDATED: Enhanced Export Buttons */}
+    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+      <button
+        onClick={downloadExcel}
+        disabled={filteredProjects.length === 0}
+        className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
+        title={`Export ${filteredProjects.length} projects as detailed Excel report`}
+      >
+        <Download className="h-4 w-4" />
+        <span>Export Excel ({filteredProjects.length})</span>
+      </button>
+
+      {/* ✅ NEW: Bulk Template Export Button */}
+      <button
+        onClick={() => exportToBulkTemplate(filteredProjects)}
+        disabled={filteredProjects.length === 0}
+        className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
+        title={`Export ${filteredProjects.length} projects in bulk template format with all student details and panel data`}
+      >
+        <FileSpreadsheet className="h-4 w-4" />
+        <span>Bulk Template ({filteredProjects.length})</span>
+      </button>
+    </div>
+  </div>
+</div>
+
               </div>
             </div>
 
