@@ -53,7 +53,7 @@ const FacultyLogin = () => {
       setLoading(true);
       setMessage('');
 
-      const API_BASE_URL = 'https://cpms-latest.onerender.com/api';
+      const API_BASE_URL = 'http://localhost:5000/api';
       const endpoint = "/auth/login";
 
       const response = await adminLogin({
