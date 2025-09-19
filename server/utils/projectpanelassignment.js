@@ -5,13 +5,16 @@ import mongoose from "mongoose";
 import connectDB from "./db.js";
 import Panel from "../models/panelSchema.js";
 import Project from "../models/projectSchema.js";
+import Faculty from "../models/facultySchema.js";
 
 dotenv.config();
 
-const EXCEL_PATH = "E:/Desktop/CPMS/projects_with_panel.xlsx";
+const EXCEL_PATH = "E:/Desktop/CPMS/projects_with_panel_CORRECT_FIXED_692.xlsx";
 const API_BASE_URL =
   process.env.API_BASE_URL || "http://localhost:3000/api/admin";
-const AUTH_TOKEN = process.env.ADMIN_JWT_TOKEN; // Admin JWT
+const AUTH_TOKEN =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4Y2JmOGU3ZDg4NzdkMDEzODVjZDY3YSIsImVtYWlsSWQiOiJhZG1pbkB2aXQuYWMuaW4iLCJlbXBsb3llZUlkIjoiQURNSU4wMDEiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTgyMDY3NDEsImV4cCI6MTc1ODI5MzE0MX0.udp-Gjv3TdpbAWuYponH2kUf-l9N6BJbewNKoE1o3zs";
+
 
 async function main() {
   await connectDB();
@@ -21,43 +24,65 @@ async function main() {
   const data = xlsx.utils.sheet_to_json(sheet);
 
   for (const row of data) {
-    // Adjust field names if needed
-    const projectTitle = row["project"] || row["Project"];
+    const projectTitle = row["project"] ? String(row["project"]).trim() : "";
     const panelString = row["panel"];
     if (!projectTitle || !panelString) {
       console.warn("Missing project/panel:", row);
       continue;
     }
-    // Extract the employee ids from the panel field (5 digits)
-    const panelEmpIds = panelString.match(/\b\d{5}\b/g);
-    if (!panelEmpIds || panelEmpIds.length < 2) {
+
+    // Extract 5-digit employee IDs from panel field
+    const employeeIds = (panelString.match(/\b\d{5}\b/g) || []).map((eid) =>
+      eid.trim()
+    );
+    if (employeeIds.length < 2) {
       console.warn(
         "Could not extract panel employee IDs for project:",
         projectTitle
       );
       continue;
     }
-    // Find the panel in DB by the pair of members
+
+    // Map employee IDs to faculty ObjectIds
+    const memberObjects = await Faculty.find({
+      employeeId: { $in: employeeIds },
+    });
+    if (memberObjects.length !== employeeIds.length) {
+      console.error(
+        "Some faculty not found for panel:",
+        employeeIds,
+        memberObjects.map((f) => f.employeeId)
+      );
+      continue;
+    }
+    const memberObjectIds = memberObjects.map((f) => f._id);
+
+    // Find the panel by members (ObjectId array)
     const panel = await Panel.findOne({
-      memberEmployeeIds: { $all: panelEmpIds.map(String) },
+      members: { $all: memberObjectIds },
     });
     if (!panel) {
       console.error(
-        "Panel not found for:",
-        panelEmpIds,
+        "Panel not found for faculty IDs/objectIds:",
+        employeeIds,
+        memberObjectIds,
         "for project:",
         projectTitle
       );
       continue;
     }
-    // Find the project in DB (by title, adjust if you have a better unique column)
-    const project = await Project.findOne({ title: projectTitle });
+
+    // Find project by name, robust to whitespace/casing
+    const cleanedProjectTitle = projectTitle.trim();
+    const project = await Project.findOne({
+      name: { $regex: new RegExp(`^${cleanedProjectTitle}$`, "i") },
+    });
     if (!project) {
-      console.error("Project not found:", projectTitle);
+      console.error("Project not found:", cleanedProjectTitle);
       continue;
     }
 
-    // Assign via API
+    // Assign panel via API
     try {
       const response = await axios.post(
         `${API_BASE_URL}/assignPanel`,
@@ -65,12 +90,12 @@ async function main() {
         { headers: { Authorization: `Bearer ${AUTH_TOKEN}` } }
       );
       console.log(
-        `Assigned panel to project "${projectTitle}":`,
+        `Assigned panel to project "${cleanedProjectTitle}":`,
         response.data.success
       );
     } catch (error) {
       console.error(
-        `Failed to assign panel to project "${projectTitle}":`,
+        `Failed to assign panel to project "${cleanedProjectTitle}":`,
         error.response?.data || error.message
       );
     }
