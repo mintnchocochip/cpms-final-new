@@ -460,21 +460,20 @@ export async function createProjectsBulk(req, res) {
     );
     const guideFacultyDoc = await Faculty.findOne({
       employeeId: guideFacultyEmpId,
-      school,
-      department,
     }).session(session);
 
     if (!guideFacultyDoc) {
       console.log(
-        `❌ [DB ERROR] Guide faculty not found: ${guideFacultyEmpId} in ${school}-${department}`
+        `❌ [DB ERROR] Guide faculty not found: ${guideFacultyEmpId} in ${school}`
       );
       await session.abortTransaction();
       await session.endSession();
       return res.status(400).json({
         success: false,
-        message: `Guide faculty with employee ID ${guideFacultyEmpId} not found in ${school}-${department}`,
+        message: `Guide faculty with employee ID ${guideFacultyEmpId} not found in school: ${school}`,
       });
     }
+
     console.log(
       "✅ [DB SUCCESS] Guide faculty found:",
       guideFacultyDoc._id,
@@ -1148,63 +1147,62 @@ export async function getAllPanelProjects(req, res) {
     console.log("Found panel projects:", panelProjects.length);
 
     // ✅ Process each project to ensure all data is properly formatted
-  // ✅ Process each project to ensure all data is properly formatted
-const processedProjects = panelProjects.map((project) => {
-  console.log(`🔄 Processing panel project: ${project.name}`);
-  // ✅ Ensure students array is properly formatted with all nested data
-  const processedStudents = project.students.map((student) => {
-    console.log(
-      `👤 Processing panel student: ${student.name} (${student.regNo})`
-    );
-    // ✅ Convert MongoDB Map to plain object for reviews
-    let processedReviews = {};
-    if (student.reviews) {
-      if (student.reviews instanceof Map) {
-        // Convert Map to plain object
-        processedReviews = Object.fromEntries(student.reviews);
-      } else if (typeof student.reviews === "object") {
-        processedReviews = { ...student.reviews };
-      }
-    }
-    // ✅ Convert deadline Map to plain object
-    let processedDeadlines = {};
-    if (student.deadline) {
-      if (student.deadline instanceof Map) {
-        processedDeadlines = Object.fromEntries(student.deadline);
-      } else if (typeof student.deadline === "object") {
-        processedDeadlines = { ...student.deadline };
-      }
-    }
-    console.log(
-      `📊 Panel student ${student.name} reviews:`,
-      Object.keys(processedReviews)
-    );
-    console.log(
-      `📅 Panel student ${student.name} deadlines:`,
-      Object.keys(processedDeadlines)
-    );
-    return {
-      _id: student._id,
-      regNo: student.regNo,
-      name: student.name,
-      emailId: student.emailId,
-      reviews: processedReviews, // ✅ Plain object instead of Map
-      pptApproved: student.pptApproved || {
-        approved: false,
-        locked: false,
-      },
-      deadline: processedDeadlines, // ✅ Plain object instead of Map
-      school: student.school,
-      department: student.department,
-    };
-  });
-  return {
-    ...project,
-    students: processedStudents, // ✅ Use processed students with converted Maps
-    bestProject: !!project.bestProject, // ✅ NEW LINE: Include bestProject field
-  };
-});
-
+    // ✅ Process each project to ensure all data is properly formatted
+    const processedProjects = panelProjects.map((project) => {
+      console.log(`🔄 Processing panel project: ${project.name}`);
+      // ✅ Ensure students array is properly formatted with all nested data
+      const processedStudents = project.students.map((student) => {
+        console.log(
+          `👤 Processing panel student: ${student.name} (${student.regNo})`
+        );
+        // ✅ Convert MongoDB Map to plain object for reviews
+        let processedReviews = {};
+        if (student.reviews) {
+          if (student.reviews instanceof Map) {
+            // Convert Map to plain object
+            processedReviews = Object.fromEntries(student.reviews);
+          } else if (typeof student.reviews === "object") {
+            processedReviews = { ...student.reviews };
+          }
+        }
+        // ✅ Convert deadline Map to plain object
+        let processedDeadlines = {};
+        if (student.deadline) {
+          if (student.deadline instanceof Map) {
+            processedDeadlines = Object.fromEntries(student.deadline);
+          } else if (typeof student.deadline === "object") {
+            processedDeadlines = { ...student.deadline };
+          }
+        }
+        console.log(
+          `📊 Panel student ${student.name} reviews:`,
+          Object.keys(processedReviews)
+        );
+        console.log(
+          `📅 Panel student ${student.name} deadlines:`,
+          Object.keys(processedDeadlines)
+        );
+        return {
+          _id: student._id,
+          regNo: student.regNo,
+          name: student.name,
+          emailId: student.emailId,
+          reviews: processedReviews, // ✅ Plain object instead of Map
+          pptApproved: student.pptApproved || {
+            approved: false,
+            locked: false,
+          },
+          deadline: processedDeadlines, // ✅ Plain object instead of Map
+          school: student.school,
+          department: student.department,
+        };
+      });
+      return {
+        ...project,
+        students: processedStudents, // ✅ Use processed students with converted Maps
+        bestProject: !!project.bestProject, // ✅ NEW LINE: Include bestProject field
+      };
+    });
 
     console.log("✅ All panel projects processed with full population");
 
