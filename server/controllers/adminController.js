@@ -255,16 +255,15 @@ export async function createFacultyBulk(req, res) {
           !faculty.emailId ||
           !faculty.password ||
           !faculty.employeeId ||
-          !faculty.phoneNumber || // phoneNumber required
+          !faculty.phoneNumber ||
           !faculty.schools ||
-          !faculty.departments ||
           !faculty.specialization
         ) {
           results.errors++;
           results.details.push({
             row: i + 1,
             error:
-              "Missing required fields including phoneNumber, schools, departments, or specialization",
+              "Missing required fields including phoneNumber, schools, or specialization",
           });
           continue;
         }
@@ -272,16 +271,13 @@ export async function createFacultyBulk(req, res) {
         if (
           !Array.isArray(faculty.schools) ||
           faculty.schools.length === 0 ||
-          !Array.isArray(faculty.departments) ||
-          faculty.departments.length === 0 ||
           !Array.isArray(faculty.specialization) ||
           faculty.specialization.length === 0
         ) {
           results.errors++;
           results.details.push({
             row: i + 1,
-            error:
-              "Schools, departments, and specialization must be non-empty arrays",
+            error: "Schools and specialization must be non-empty arrays",
           });
           continue;
         }
@@ -329,6 +325,15 @@ export async function createFacultyBulk(req, res) {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(faculty.password, salt);
 
+        // Departments: assign empty array if not provided or not a valid array
+        let departments = [];
+        if (
+          Array.isArray(faculty.departments) &&
+          faculty.departments.length > 0
+        ) {
+          departments = faculty.departments.map((d) => d.trim());
+        }
+
         // Create new faculty record with array fields and phone number
         const newFaculty = new Faculty({
           imageUrl: faculty.imageUrl || "",
@@ -339,7 +344,7 @@ export async function createFacultyBulk(req, res) {
           phoneNumber: faculty.phoneNumber.trim(),
           role: faculty.role || "faculty",
           school: faculty.schools.map((s) => s.trim()),
-          department: faculty.departments.map((d) => d.trim()),
+          department: departments,
           specialization: faculty.specialization.map((sp) => sp.trim()),
         });
 
@@ -369,6 +374,7 @@ export async function createFacultyBulk(req, res) {
     });
   }
 }
+
 
 export async function updateFaculty(req, res) {
   try {
