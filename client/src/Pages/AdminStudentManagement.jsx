@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { getFilteredStudents, updateStudent, deleteStudent } from "../api";
+import { getFilteredStudents, updateStudent, deleteStudent, getMarkingSchema } from "../api";
 import Navbar from "../Components/UniversalNavbar";
 import * as XLSX from 'xlsx';
 import {
@@ -40,6 +40,9 @@ const AdminStudentManagement = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [adminContext, setAdminContext] = useState(null);
+const [studentSchemas, setStudentSchemas] = useState({}); // Store schemas by student regNo
+const [loadingSchemas, setLoadingSchemas] = useState(new Set()); // Track which schemas are loading
+
   
   // Filter states
   const [selectedSchool, setSelectedSchool] = useState("");
@@ -250,19 +253,57 @@ const AdminStudentManagement = () => {
 
     return filtered;
   }, [students, searchQuery, selectedSchool, selectedDepartment, selectedReviewFilter, reviewStatusFilter]);
+const fetchSchemaForStudent = useCallback(async (student) => {
+  const key = `${student.school}_${student.department}`;
+  
+  // Don't fetch if already loading or already have schema for this school/dept combination
+  if (loadingSchemas.has(key) || studentSchemas[key]) {
+    return;
+  }
 
-  // Toggle student expansion
-  const toggleStudentExpanded = useCallback((regNo) => {
-    setExpandedStudents(prev => {
+  try {
+    setLoadingSchemas(prev => new Set(prev).add(key));
+    
+    const response = await getMarkingSchema(student.school, student.department);
+    
+    setStudentSchemas(prev => ({
+      ...prev,
+      [key]: response.schema
+    }));
+  } catch (error) {
+    console.error('Error fetching schema for student:', error);
+    // Set empty schema to avoid repeated requests
+    setStudentSchemas(prev => ({
+      ...prev,
+      [key]: null
+    }));
+  } finally {
+    setLoadingSchemas(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(regNo)) {
-        newSet.delete(regNo);
-      } else {
-        newSet.add(regNo);
-      }
+      newSet.delete(key);
       return newSet;
     });
-  }, []);
+  }
+}, [studentSchemas, loadingSchemas]);
+
+const toggleStudentExpanded = useCallback(async (regNo) => {
+  const student = students.find(s => s.regNo === regNo);
+  
+  setExpandedStudents(prev => {
+    const newSet = new Set(prev);
+    if (newSet.has(regNo)) {
+      newSet.delete(regNo);
+    } else {
+      newSet.add(regNo);
+      // Fetch schema when expanding
+      if (student) {
+        fetchSchemaForStudent(student);
+      }
+    }
+    return newSet;
+  });
+}, [students, fetchSchemaForStudent]);
+
 
   // Calculate review status for a student
   const getReviewStatus = useCallback((student, reviewType) => {
@@ -284,6 +325,8 @@ const AdminStudentManagement = () => {
       return { status: "locked", color: "red" };
     }
   }, []);
+  // Add this function after your existing functions
+
 
   // Handle edit student (only basic fields)
   const handleEdit = useCallback((student) => {
@@ -343,11 +386,65 @@ const AdminStudentManagement = () => {
     }
   }, [deleteConfirm, showNotification, fetchStudents]);
 
-  // Enhanced Download Excel function with complete student data
-  const downloadExcel = useCallback(() => {
-    try {
-      // Prepare detailed data for Excel including marks from reviews
-      const excelData = filteredStudents.map(student => {
+// Enhanced Download Excel function - Multi-sheet for all mode, single sheet for filtered mode
+const downloadExcel = useCallback(async () => {
+  try {
+    // Show loading notification with proper icon
+    showNotification('info', '📋 Preparing Excel', 'Fetching schemas and organizing data...');
+    
+    // Group students by school and department
+    const studentGroups = {};
+    filteredStudents.forEach(student => {
+      const key = `${student.school}_${student.department}`;
+      if (!studentGroups[key]) {
+        studentGroups[key] = [];
+      }
+      studentGroups[key].push(student);
+    });
+    
+    // Collect all unique school/department combinations
+    const uniqueCombinations = Object.keys(studentGroups);
+    
+    // Fetch schemas for all combinations that we don't already have
+    const schemasToFetch = uniqueCombinations.filter(combo => !studentSchemas[combo]);
+    
+    // Create a temporary schemas object that includes both existing and new schemas
+    let allSchemas = { ...studentSchemas };
+    
+    // Fetch missing schemas and store them temporarily
+    for (const combo of schemasToFetch) {
+      const [school, department] = combo.split('_');
+      try {
+        const response = await getMarkingSchema(school, department);
+        allSchemas[combo] = response.schema;
+        // Also update the state for future use
+        setStudentSchemas(prev => ({
+          ...prev,
+          [combo]: response.schema
+        }));
+      } catch (error) {
+        console.error(`Error fetching schema for ${combo}:`, error);
+        allSchemas[combo] = null;
+        setStudentSchemas(prev => ({
+          ...prev,
+          [combo]: null
+        }));
+      }
+    }
+    
+    // Update progress notification
+    showNotification('info', '📊 Processing Data', 'Creating Excel sheets with display names...');
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    
+    // Process each school/department group
+    Object.entries(studentGroups).forEach(([groupKey, groupStudents]) => {
+      const [school, department] = groupKey.split('_');
+      const schema = allSchemas[groupKey]; // Use the local schemas object
+      
+      // Prepare data for this group
+      const excelData = groupStudents.map(student => {
         const row = {
           'Semester': 'CH20242505',
           'Class Number': 'CH2024250502680', 
@@ -362,42 +459,41 @@ const AdminStudentManagement = () => {
         // Add review marks if available
         if (student.reviews) {
           Object.entries(student.reviews).forEach(([reviewType, reviewData]) => {
-           if (
-  reviewData.marks && 
-  reviewType && 
-  schema?.reviews // where schema is your loaded markingSchema obj for this school/department
-) {
-  const reviewSchema = schema.reviews.find(r => r.reviewName === reviewType);
-  if (reviewSchema && Array.isArray(reviewSchema.components)) {
-    reviewSchema.components.forEach(component => {
-      const cName = component.name;
-      row[`${reviewType}_${cName}`] = reviewData.marks[cName] ?? ''; // Use mark if exists, else blank
-    });
-  } else {
-    // Fallback: existing unordered way
-    schema.reviews.find(r => r.reviewName === reviewType)?.components.forEach((component, idx) => (
-  <td key={component.name}>
-    {student.reviews[reviewType].marks[component.name] ?? ''}
-  </td>
-));
-
-  }
-}
-
-            
-            // Add review status info
-            row[`${reviewType}_Status`] = reviewData.locked ? 'Locked' : 'Unlocked';
-            row[`${reviewType}_Attendance`] = reviewData.attendance?.value ? 'Present' : 'Absent';
-            
-            if (reviewData.comments) {
-              row[`${reviewType}_Comments`] = reviewData.comments;
+            if (reviewData.marks && reviewType) {
+              // Get the review schema for display names
+              const reviewSchema = schema?.reviews?.find(r => r.reviewName === reviewType);
+              const reviewDisplayName = reviewSchema?.displayName || reviewType;
+              
+              if (reviewSchema && Array.isArray(reviewSchema.components)) {
+                // Use displayName from schema components
+                reviewSchema.components.forEach(component => {
+                  const displayName = component.displayName || component.name;
+                  const componentName = component.name;
+                  row[`${reviewDisplayName}_${displayName}`] = reviewData.marks[componentName] ?? '';
+                });
+              } else {
+                // Fallback: use existing marks structure
+                if (reviewData.marks && typeof reviewData.marks === 'object') {
+                  Object.entries(reviewData.marks).forEach(([markKey, markValue]) => {
+                    row[`${reviewDisplayName}_${markKey}`] = markValue ?? '';
+                  });
+                }
+              }
+              
+              // Add review status info using displayName
+              row[`${reviewDisplayName}_Status`] = reviewData.locked ? 'Locked' : 'Unlocked';
+              row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? 'Present' : 'Absent';
+              
+              if (reviewData.comments) {
+                row[`${reviewDisplayName}_Comments`] = reviewData.comments;
+              }
             }
           });
         }
 
         // Add PPT approval status
-        row['PPT_Approved'] = student.pptApproved?.approved ? 'Yes' : 'No';
-        row['PPT_Locked'] = student.pptApproved?.locked ? 'Yes' : 'No';
+        row['PPTApproved'] = student.pptApproved?.approved ? 'Yes' : 'No';
+        row['PPTLocked'] = student.pptApproved?.locked ? 'Yes' : 'No';
 
         // Add deadlines
         if (student.deadline) {
@@ -410,8 +506,7 @@ const AdminStudentManagement = () => {
         return row;
       });
 
-      // Create workbook and worksheet
-      const wb = XLSX.utils.book_new();
+      // Create worksheet for this group
       const ws = XLSX.utils.json_to_sheet(excelData);
 
       // Auto-size columns
@@ -426,25 +521,44 @@ const AdminStudentManagement = () => {
       });
       ws['!cols'] = colWidths;
 
-      // Add worksheet to workbook
-      XLSX.utils.book_append_sheet(wb, ws, "Student_Management_Export");
-
-      // Generate filename with timestamp and context
-      const timestamp = new Date().toISOString().split('T')[0];
-      const contextStr = adminContext.skipped 
-        ? 'All_Schools_Departments' 
-        : `${adminContext.school}_${adminContext.department}`.replace(/\s+/g, '_');
-      const filename = `Student_Management_${contextStr}_${timestamp}.xlsx`;
-
-      // Save file
-      XLSX.writeFile(wb, filename);
+      // Create sheet name - truncate if too long (Excel limit is 31 chars)
+      let sheetName = `${school}_${department}`.replace(/[\/\\?*:[\]]/g, ''); // Remove invalid characters
+      if (sheetName.length > 31) {
+        sheetName = sheetName.substring(0, 28) + '...';
+      }
       
-      showNotification("success", "Download Complete", `Excel file downloaded: ${filename} (${filteredStudents.length} students)`);
-    } catch (error) {
-      console.error("Excel download error:", error);
-      showNotification("error", "Download Failed", "Failed to download Excel file. Please try again.");
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    });
+
+    // Generate filename with timestamp and context
+    const timestamp = new Date().toISOString().split('T')[0];
+    let filename;
+    
+    if (adminContext.skipped || Object.keys(studentGroups).length > 1) {
+      // All mode or multiple groups - multi-sheet file
+      filename = `StudentManagement_AllPrograms_${timestamp}.xlsx`;
+      showNotification('success', '✅ Download Complete', 
+        `Excel file downloaded: ${filename} (${Object.keys(studentGroups).length} sheets, ${filteredStudents.length} students)`);
+    } else {
+      // Single program mode
+      const contextStr = `${adminContext.school}_${adminContext.department}`.replace(/\s+/g, '');
+      filename = `StudentManagement_${contextStr}_${timestamp}.xlsx`;
+      showNotification('success', '✅ Download Complete', 
+        `Excel file downloaded: ${filename} (${filteredStudents.length} students)`);
     }
-  }, [filteredStudents, adminContext, showNotification]);
+
+    // Save file
+    XLSX.writeFile(wb, filename);
+
+  } catch (error) {
+    console.error('Excel download error:', error);
+    showNotification('error', '❌ Download Failed', 'Failed to download Excel file. Please try again.');
+  }
+}, [filteredStudents, adminContext, showNotification, studentSchemas, getMarkingSchema, setStudentSchemas]);
+
+
+
 
   if (loading) {
     return (
@@ -820,98 +934,149 @@ const AdminStudentManagement = () => {
                         {isExpanded && (
                           <div className="border-t border-slate-200 p-4 sm:p-6 bg-slate-50">
                             {/* Reviews Section */}
-                            {student.reviews && Object.keys(student.reviews).length > 0 ? (
-                              <div className="mb-6 sm:mb-8">
-                                <h5 className="font-bold text-base sm:text-xl mb-4 sm:mb-6 text-slate-800 flex items-center space-x-2">
-                                  <FileSpreadsheet className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                                  <span>Academic Review History</span>
-                                </h5>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                                  {Object.entries(student.reviews).map(([reviewType, review]) => {
-                                    const status = getReviewStatus(student, reviewType);
-                                    
-                                    return (
-                                      <div key={reviewType} className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 shadow-sm">
-                                        <div className="flex justify-between items-start mb-3 sm:mb-4">
-                                          <h6 className="font-bold text-base sm:text-lg text-slate-800">{reviewType}</h6>
-                                          <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${
-                                            status.color === 'green' ? 'bg-emerald-100 text-emerald-800' :
-                                            status.color === 'yellow' ? 'bg-amber-100 text-amber-800' :
-                                            status.color === 'blue' ? 'bg-blue-100 text-blue-800' :
-                                            status.color === 'red' ? 'bg-red-100 text-red-800' :
-                                            'bg-slate-100 text-slate-800'
-                                          }`}>
-                                            {status.status}
-                                          </span>
-                                        </div>
-                                        
-                                        <div className="space-y-3">
-                                          <div className="flex items-center space-x-3 p-2 sm:p-3 bg-slate-50 rounded-lg">
-                                            <span className="font-semibold text-slate-700 text-xs sm:text-sm">Status:</span>
-                                            {review.locked ? (
-                                              <span className="flex items-center space-x-2 text-red-600 text-xs sm:text-sm">
-                                                <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                                                <span>Locked</span>
-                                              </span>
-                                            ) : (
-                                              <span className="flex items-center space-x-2 text-emerald-600 text-xs sm:text-sm">
-                                                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                                                <span>Unlocked</span>
-                                              </span>
-                                            )}
-                                          </div>
-                                          
-                                          <div className="flex items-center space-x-3 p-2 sm:p-3 bg-slate-50 rounded-lg">
-                                            <span className="font-semibold text-slate-700 text-xs sm:text-sm">Grading:</span>
-                                            <span className="text-slate-600 text-xs sm:text-sm">
-                                              {review.marks && Object.keys(review.marks).length > 0 
-                                                ? `${Object.keys(review.marks).length} components graded` 
-                                                : 'Not yet graded'}
-                                            </span>
-                                          </div>
-                                          
-                                          <div className="flex items-center space-x-3 p-2 sm:p-3 bg-slate-50 rounded-lg">
-                                            <span className="font-semibold text-slate-700 text-xs sm:text-sm">Attendance:</span>
-                                            {review.attendance?.value ? (
-                                              <span className="flex items-center space-x-2 text-emerald-600 text-xs sm:text-sm">
-                                                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                                                <span>Present</span>
-                                              </span>
-                                            ) : (
-                                              <span className="flex items-center space-x-2 text-red-600 text-xs sm:text-sm">
-                                                <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                                                <span>Absent</span>
-                                              </span>
-                                            )}
-                                          </div>
-                                          
-                                          {review.comments && (
-                                            <div className="p-2 sm:p-3 bg-blue-50 rounded-lg">
-                                              <span className="font-semibold text-slate-700 block mb-2 text-xs sm:text-sm">Faculty Comments:</span>
-                                              <p className="text-slate-700 text-xs sm:text-sm leading-relaxed">
-                                                {review.comments}
-                                              </p>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="mb-6 sm:mb-8">
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-6">
-                                  <div className="flex items-center space-x-3 text-amber-800">
-                                    <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
-                                    <div>
-                                      <span className="font-bold block text-sm sm:text-base">No Academic Reviews</span>
-                                      <span className="text-xs sm:text-sm text-amber-700">This student has not undergone any academic reviews yet.</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+ {/* Reviews Section - WITH DYNAMIC SCHEMA LOADING */}
+{student.reviews && Object.keys(student.reviews).length > 0 ? (
+  <div className="mb-6 sm:mb-8">
+    <h5 className="font-bold text-base sm:text-xl mb-4 sm:mb-6 text-slate-800 flex items-center space-x-2">
+      <FileSpreadsheet className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+      <span>Academic Review History</span>
+    </h5>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+      {Object.entries(student.reviews).map(([reviewType, review]) => {
+        const status = getReviewStatus(student, reviewType);
+        
+        // Get schema for this student's school/department
+        const schemaKey = `${student.school}_${student.department}`;
+        const schema = studentSchemas[schemaKey];
+        const isLoadingSchema = loadingSchemas.has(schemaKey);
+        
+        // Get display name from schema
+        const reviewSchema = schema?.reviews?.find(r => r.reviewName === reviewType);
+        const reviewDisplayName = reviewSchema?.displayName || reviewType;
+        
+        return (
+          <div key={reviewType} className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 shadow-sm">
+            <div className="flex justify-between items-start mb-3 sm:mb-4">
+              <h6 className="font-bold text-base sm:text-lg text-slate-800">
+                {isLoadingSchema ? (
+                  <span className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+                    <span>{reviewType}</span>
+                  </span>
+                ) : (
+                  reviewDisplayName
+                )}
+              </h6>
+              <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${
+                status.color === 'green' ? 'bg-emerald-100 text-emerald-800' :
+                status.color === 'yellow' ? 'bg-amber-100 text-amber-800' :
+                status.color === 'blue' ? 'bg-blue-100 text-blue-800' :
+                status.color === 'red' ? 'bg-red-100 text-red-800' :
+                'bg-slate-100 text-slate-800'
+              }`}>
+                {status.status}
+              </span>
+            </div>
+            
+            {/* Display marks with component display names */}
+            {review.marks && reviewSchema?.components && !isLoadingSchema && (
+              <div className="mb-3">
+                <span className="font-semibold text-slate-700 block mb-2 text-xs sm:text-sm">Marks:</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {reviewSchema.components.map((component) => (
+                    <div key={component.name} className="p-2 bg-slate-50 rounded text-xs">
+                      <span className="font-medium">{component.displayName || component.name}:</span>
+                      <span className="ml-1">{review.marks[component.name] ?? 'N/A'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Loading state for marks */}
+            {review.marks && isLoadingSchema && (
+              <div className="mb-3">
+                <span className="font-semibold text-slate-700 block mb-2 text-xs sm:text-sm">Marks:</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(review.marks).map(([markKey, markValue]) => (
+                    <div key={markKey} className="p-2 bg-slate-50 rounded text-xs">
+                      <span className="font-medium">{markKey}:</span>
+                      <span className="ml-1">{markValue ?? 'N/A'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <div className="space-y-3">
+              <div className="flex items-center space-x-3 p-2 sm:p-3 bg-slate-50 rounded-lg">
+                <span className="font-semibold text-slate-700 text-xs sm:text-sm">Status:</span>
+                {review.locked ? (
+                  <span className="flex items-center space-x-2 text-red-600 text-xs sm:text-sm">
+                    <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Locked</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center space-x-2 text-emerald-600 text-xs sm:text-sm">
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Unlocked</span>
+                  </span>
+                )}
+              </div>
+              
+              <div className="flex items-center space-x-3 p-2 sm:p-3 bg-slate-50 rounded-lg">
+                <span className="font-semibold text-slate-700 text-xs sm:text-sm">Grading:</span>
+                <span className="text-slate-600 text-xs sm:text-sm">
+                  {review.marks && Object.keys(review.marks).length > 0 ? 
+                    `${Object.keys(review.marks).length} components graded` : 
+                    'Not yet graded'
+                  }
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-3 p-2 sm:p-3 bg-slate-50 rounded-lg">
+                <span className="font-semibold text-slate-700 text-xs sm:text-sm">Attendance:</span>
+                {review.attendance?.value ? (
+                  <span className="flex items-center space-x-2 text-emerald-600 text-xs sm:text-sm">
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Present</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center space-x-2 text-red-600 text-xs sm:text-sm">
+                    <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Absent</span>
+                  </span>
+                )}
+              </div>
+              
+              {review.comments && (
+                <div className="p-2 sm:p-3 bg-blue-50 rounded-lg">
+                  <span className="font-semibold text-slate-700 block mb-2 text-xs sm:text-sm">Faculty Comments:</span>
+                  <p className="text-slate-700 text-xs sm:text-sm leading-relaxed">
+                    {review.comments}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+) : (
+  <div className="mb-6 sm:mb-8">
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-6">
+      <div className="flex items-center space-x-3 text-amber-800">
+        <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
+        <div>
+          <span className="font-bold block text-sm sm:text-base">No Academic Reviews</span>
+          <span className="text-xs sm:text-sm text-amber-700">This student has not undergone any academic reviews yet.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
 
                             {/* PPT Approval Section */}
                             <div className="mb-6 sm:mb-8">

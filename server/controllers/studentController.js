@@ -1,7 +1,41 @@
 import Faculty from "../models/facultySchema.js";
 import Student from "../models/studentSchema.js";
 import Request from "../models/requestSchema.js";
-
+import MarkingSchema from "../models/markingSchema.js";
+export const getMarkingSchema = async (req, res) => {
+  try {
+    const { school, department } = req.query;
+    
+    if (!school || !department) {
+      return res.status(400).json({ 
+        message: 'School and department parameters are required' 
+      });
+    }
+    
+    // Query your marking schema collection - adjust the model name and fields as needed
+    const markingSchema = await MarkingSchema.findOne({ 
+      school: school, 
+      department: department 
+    });
+    
+    if (!markingSchema) {
+      return res.status(404).json({ 
+        message: 'Marking schema not found for this school and department' 
+      });
+    }
+    
+    res.status(200).json({ 
+      success: true, 
+      schema: markingSchema 
+    });
+  } catch (error) {
+    console.error('Error fetching marking schema:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch marking schema', 
+      error: error.message 
+    });
+  }
+};
 // Fetch students based on optional school, department, specialization filters
 export async function getFilteredStudents(req, res) {
   try {
@@ -239,3 +273,7 @@ export const deleteStudent = async (req, res) => {
     });
   }
 };
+// Add this to your existing student controller/routes file
+
+
+

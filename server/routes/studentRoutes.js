@@ -5,7 +5,8 @@ import {
   batchCheckRequestStatus,
   getFilteredStudents,
   updateStudentDetails,
-  deleteStudent, // Add this import
+  deleteStudent,
+  getMarkingSchema, // Add this import
 } from "../controllers/studentController.js";
 
 import authMiddleware from "../middlewares/authMiddleware.js";
@@ -26,5 +27,7 @@ studentRouter.put("/:regNo", jwtAuthMiddleware, updateStudentDetails);
 
 // Delete student - Add this route
 studentRouter.delete("/:regNo", jwtAuthMiddleware, deleteStudent);
+// for showing display names
+studentRouter.get('/marking-schema', getMarkingSchema);
 
 export default studentRouter;

@@ -23,6 +23,30 @@ export const updateStudent = async (regNo, studentData) => {
   return API.put(`/student/${regNo}`, allowedData);
 };
 
+// Add this to your existing api.js file
+export const getMarkingSchema = async (school, department) => {
+  try {
+    const params = new URLSearchParams({ school, department });
+    const response = await fetch(`${API_BASE_URL}/student/marking-schema?${params}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        // Add your existing auth headers here if needed
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching marking schema:', error);
+    throw error;
+  }
+};
+
+
 // Delete student (using axios like other endpoints)
 export const deleteStudent = async (regNo) => {
   return API.delete(`/student/${regNo}`);
