@@ -200,52 +200,88 @@ const exportToBulkTemplate = (projects) => {
   }, [navigate]);
 
   // Fetch projects data
-  const fetchProjects = useCallback(async () => {
-    if (!adminContext) return;
+// Fetch projects data
+const fetchProjects = useCallback(async () => {
+  if (!adminContext) return;
+  
+  try {
+    setLoading(true);
     
-    try {
-      setLoading(true);
-      
-      const params = new URLSearchParams();
-      
-      // Add filters based on context and current selections
-      if (!adminContext.skipped) {
-        if (adminContext.school) params.append('school', adminContext.school);
-        if (adminContext.department) params.append('department', adminContext.department);
-      }
-      
-      // Add additional filters if different from context
-      if (selectedSchool && selectedSchool !== adminContext.school) {
-        params.set('school', selectedSchool);
-      }
-      if (selectedDepartment && selectedDepartment !== adminContext.department) {
-        params.set('department', selectedDepartment);
-      }
-      
-      const response = await getAllProjects(params);
-      
-      if (response?.data?.data) {
-        setProjects(response.data.data);
-        showNotification("success", "Data Loaded", `Successfully loaded ${response.data.data.length} projects`);
-      } else {
-        setProjects([]);
-        showNotification("error", "No Data", "No projects found matching the criteria");
-      }
-      
-    } catch (error) {
-      console.error("Error fetching projects:", error);
+    const params = new URLSearchParams();
+    
+    // Add filters based on context only (no auto-filtering on selections)
+    if (!adminContext.skipped) {
+      if (adminContext.school) params.append('school', adminContext.school);
+      if (adminContext.department) params.append('department', adminContext.department);
+    }
+    
+    const response = await getAllProjects(params);
+    
+    if (response?.data?.data) {
+      setProjects(response.data.data);
+      showNotification("success", "Data Loaded", `Successfully loaded ${response.data.data.length} projects`);
+    } else {
       setProjects([]);
-      showNotification("error", "Fetch Failed", "Failed to load project data. Please try again.");
-    } finally {
-      setLoading(false);
+      showNotification("error", "No Data", "No projects found matching the criteria");
     }
-  }, [adminContext, selectedSchool, selectedDepartment, showNotification]);
+    
+  } catch (error) {
+    console.error("Error fetching projects:", error);
+    setProjects([]);
+    showNotification("error", "Fetch Failed", "Failed to load project data. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+}, [adminContext, showNotification]); // Removed selectedSchool, selectedDepartment dependencies
 
-  useEffect(() => {
-    if (adminContext) {
-      fetchProjects();
+
+useEffect(() => {
+  if (adminContext) {
+    fetchProjects();
+  }
+}, [adminContext, fetchProjects]); // Removed selectedSchool, selectedDepartment
+
+// Apply filters manually
+const applyFilters = useCallback(async () => {
+  if (!adminContext) return;
+  
+  try {
+    setLoading(true);
+    
+    const params = new URLSearchParams();
+    
+    // Add filters based on context
+    if (!adminContext.skipped) {
+      if (adminContext.school) params.append('school', adminContext.school);
+      if (adminContext.department) params.append('department', adminContext.department);
     }
-  }, [adminContext, fetchProjects]);
+    
+    // Add manual filter selections only when applying
+    if (selectedSchool && selectedSchool !== adminContext.school) {
+      params.set('school', selectedSchool);
+    }
+    if (selectedDepartment && selectedDepartment !== adminContext.department) {
+      params.set('department', selectedDepartment);
+    }
+    
+    const response = await getAllProjects(params);
+    
+    if (response?.data?.data) {
+      setProjects(response.data.data);
+      showNotification("success", "Filters Applied", `Successfully loaded ${response.data.data.length} projects with filters`);
+    } else {
+      setProjects([]);
+      showNotification("error", "No Data", "No projects found matching the criteria");
+    }
+    
+  } catch (error) {
+    console.error("Error applying filters:", error);
+    setProjects([]);
+    showNotification("error", "Filter Failed", "Failed to apply filters. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+}, [adminContext, selectedSchool, selectedDepartment, showNotification]);
 
   // Handle context change - redirect to school selection
   const handleChangeSchoolDepartment = useCallback(() => {
@@ -681,21 +717,9 @@ const exportToBulkTemplate = (projects) => {
                 </button>
        {/* ✅ UPDATED: Export Buttons Section */}
 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-8 gap-4">
-  <div className="flex items-center space-x-3">
-    <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
-      <Search className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-    </div>
-    <h2 className="text-lg sm:text-2xl font-bold text-slate-800">Search & Filter Controls</h2>
-  </div>
+ 
   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 space-x-0 sm:space-x-4 w-full sm:w-auto">
-    <button
-      onClick={() => setShowFilters(!showFilters)}
-      className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium text-sm sm:text-base w-full sm:w-auto"
-    >
-      <Grid3X3 className="h-4 w-4" />
-      <span>Advanced Filters</span>
-      {showFilters ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-    </button>
+  
     
     {/* ✅ UPDATED: Enhanced Export Buttons */}
     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -748,69 +772,50 @@ const exportToBulkTemplate = (projects) => {
               )}
             </div>
 
-            {/* Advanced Filters */}
-            {showFilters && (
-              <div className="border-t border-slate-200 pt-4 sm:pt-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">School Filter</label>
-                    <select
-                      value={selectedSchool}
-                      onChange={(e) => setSelectedSchool(e.target.value)}
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                    >
-                      <option value="">All Schools</option>
-                      {availableSchools.map(school => (
-                        <option key={school} value={school}>{school}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Department Filter</label>
-                    <select
-                      value={selectedDepartment}
-                      onChange={(e) => setSelectedDepartment(e.target.value)}
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
-                    >
-                      <option value="">All Departments</option>
-                      {availableDepartments.map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
-                    </select>
-                  </div>
+{/* Advanced Filters */}
+{showFilters && (
+  <div className="border-t border-slate-200 pt-4 sm:pt-6">
+    <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-4 sm:mb-6">
+      
+      <div>
+        <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Best Project Filter</label>
+        <select
+          value={bestProjectFilter}
+          onChange={(e) => setBestProjectFilter(e.target.value)}
+          className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all text-sm sm:text-base"
+        >
+          <option value="">All Projects</option>
+          <option value="best">🏆 Best Projects Only</option>
+          <option value="normal">Regular Projects Only</option>
+        </select>
+      </div>
+    </div>
 
-                  {/* Best Project Filter */}
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Best Project Filter</label>
-                    <select
-                      value={bestProjectFilter}
-                      onChange={(e) => setBestProjectFilter(e.target.value)}
-                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all text-sm sm:text-base"
-                    >
-                      <option value="">All Projects</option>
-                      <option value="best">🏆 Best Projects Only</option>
-                      <option value="normal">Regular Projects Only</option>
-                    </select>
-                  </div>
-                </div>
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 space-x-0 sm:space-x-4">
+      <button
+        onClick={() => {
+          setSearchQuery("");
+          setSelectedSchool("");
+          setSelectedDepartment("");
+          setBestProjectFilter("");
+        }}
+        className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200 text-sm sm:text-base w-full sm:w-auto"
+      >
+        <RefreshCw className="h-4 w-4" />
+        <span>Clear All Filters</span>
+      </button>
+      
+      <button
+        onClick={applyFilters}
+        className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-medium transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
+      >
+        <Filter className="h-4 w-4" />
+        <span>Apply Filters</span>
+      </button>
+    </div>
+  </div>
+)}
 
-                <div className="flex justify-start">
-                  <button
-                    onClick={() => {
-                      setSearchQuery("");
-                      setSelectedSchool("");
-                      setSelectedDepartment("");
-                      setBestProjectFilter("");
-                    }}
-                    className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    <span>Clear All Filters</span>
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
