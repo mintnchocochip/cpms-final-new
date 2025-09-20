@@ -302,7 +302,7 @@ const formattedPanels = allPanelsData.map((panel) => ({
         }
 
         // Process rows
-        const validDepartments = ["BTech", "MTech (integrated)", "MCS"];
+        const validDepartments = ["BTech", "MTech (integrated)", "MCA"];
         const processedFacultyData = jsonData.slice(1).map((row, index) => {
           const rowObj = {};
           headers.forEach((header, headerIndex) => {
