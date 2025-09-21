@@ -442,115 +442,123 @@ const Guide = () => {
     return deadlinePassed;
   }, [isTeamDeadlinePassed, teams, getTeamRequestStatus]);
 
-  // ✅ UPDATED: Handle review submission with notifications
-  const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pptObj) => {
-    try {
-      console.log('=== [FRONTEND] GUIDE REVIEW SUBMIT STARTED ===');
+// ✅ UPDATED: Handle review submission with PAT updates
+const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pptObj, patUpdates) => {
+  try {
+    console.log('=== [FRONTEND] GUIDE REVIEW SUBMIT STARTED ===');
+    
+    const team = teams.find(t => t.id === teamId);
+    if (!team) {
+      console.error('❌ [FRONTEND] Team not found for ID:', teamId);
+      showNotification('error', 'Team Not Found', 'Team not found! Please refresh and try again.');
+      return;
+    }
+
+    console.log('✅ [FRONTEND] Team found:', team.title);
+    console.log('📋 [FRONTEND] Review Type:', reviewType);
+    console.log('📋 [FRONTEND] Raw Review Data from popup:', reviewData);
+    console.log('🚫 [FRONTEND] PAT Updates:', patUpdates); // ✅ NEW: Log PAT data
+    
+    const reviewTypes = getReviewTypes(team.markingSchema);
+    const reviewConfig = reviewTypes.find(r => r.key === reviewType);
+    
+    if (!reviewConfig) {
+      console.error('❌ [FRONTEND] Review config not found for type:', reviewType);
+      showNotification('error', 'Configuration Error', 'Review configuration not found! Please refresh and try again.');
+      return;
+    }
+
+    const studentUpdates = team.students.map(student => {
+      console.log(`🎓 [FRONTEND] Processing student: ${student.name} (${student.regNo})`);
       
-      const team = teams.find(t => t.id === teamId);
-      if (!team) {
-        console.error('❌ [FRONTEND] Team not found for ID:', teamId);
-        showNotification('error', 'Team Not Found', 'Team not found! Please refresh and try again.');
-        return;
+      const studentReviewData = reviewData[student.regNo] || {};
+      console.log(`📊 [FRONTEND] Student review data for ${student.name}:`, studentReviewData);
+      
+      // Build marks object using component names from schema
+      const marks = {};
+      if (reviewConfig.components && reviewConfig.components.length > 0) {
+        reviewConfig.components.forEach(comp => {
+          const markValue = Number(studentReviewData[comp.name]) || 0;
+          marks[comp.name] = markValue;
+          console.log(`📊 [FRONTEND] Component ${comp.name}: ${markValue} for ${student.name}`);
+        });
       }
 
-      console.log('✅ [FRONTEND] Team found:', team.title);
-      console.log('📋 [FRONTEND] Review Type:', reviewType);
-      console.log('📋 [FRONTEND] Raw Review Data from popup:', reviewData);
-      
-      const reviewTypes = getReviewTypes(team.markingSchema);
-      const reviewConfig = reviewTypes.find(r => r.key === reviewType);
-      
-      if (!reviewConfig) {
-        console.error('❌ [FRONTEND] Review config not found for type:', reviewType);
-        showNotification('error', 'Configuration Error', 'Review configuration not found! Please refresh and try again.');
-        return;
-      }
-
-      const studentUpdates = team.students.map(student => {
-        console.log(`🎓 [FRONTEND] Processing student: ${student.name} (${student.regNo})`);
-        
-        const studentReviewData = reviewData[student.regNo] || {};
-        console.log(`📊 [FRONTEND] Student review data for ${student.name}:`, studentReviewData);
-        
-        // Build marks object using component names from schema
-        const marks = {};
-        if (reviewConfig.components && reviewConfig.components.length > 0) {
-          reviewConfig.components.forEach(comp => {
-            const markValue = Number(studentReviewData[comp.name]) || 0;
-            marks[comp.name] = markValue;
-            console.log(`📊 [FRONTEND] Component ${comp.name}: ${markValue} for ${student.name}`);
-          });
-        }
-
-        const updateData = {
-          studentId: student._id,
-          reviews: {
-            [reviewType]: {
-              marks: marks,
-              attendance: studentReviewData.attendance || { value: false, locked: false },
-              locked: studentReviewData.locked || false,
-              comments: studentReviewData.comments || ''
-            }
+      const updateData = {
+        studentId: student._id,
+        reviews: {
+          [reviewType]: {
+            marks: marks,
+            attendance: studentReviewData.attendance || { value: false, locked: false },
+            locked: studentReviewData.locked || false,
+            comments: studentReviewData.comments || ''
           }
-        };
-
-        if (reviewConfig?.requiresPPT && pptObj?.pptApproved) {
-          updateData.pptApproved = pptObj.pptApproved;
         }
-
-        return updateData;
-      });
-
-      const updatePayload = {
-        projectId: teamId,
-        studentUpdates
       };
 
-      if (reviewConfig?.requiresPPT && pptObj) {
-        updatePayload.pptApproved = pptObj.pptApproved;
+      // ✅ NEW: Add PAT status update
+      if (patUpdates && patUpdates[student.regNo] !== undefined) {
+        updateData.PAT = patUpdates[student.regNo];
+        console.log(`🚫 [FRONTEND] Setting PAT for ${student.name}: ${patUpdates[student.regNo]}`);
       }
 
-      console.log('📤 [FRONTEND] Final update payload:', JSON.stringify(updatePayload, null, 2));
-      
-      // Show loading notification
-      const loadingId = showNotification('info', 'Submitting...', 'Please wait while we save your review data...', 10000);
-      
-      const response = await updateProject(updatePayload);
-      console.log('📨 [FRONTEND] Backend response received:', response);
-      
-      // Hide loading notification
-      hideNotification(loadingId);
-      
-      if (response.data?.success || response.data?.updates) {
-        setActivePopup(null);
-        
-        setTimeout(async () => {
-          await handleRefresh();
-          showNotification(
-            'success', 
-            'Review Saved', 
-            'Guide review submitted and saved successfully!'
-          );
-        }, 300);
-        
-      } else {
-        console.error('❌ [FRONTEND] Backend response indicates failure:', response.data);
-        showNotification(
-          'error', 
-          'Submission Failed', 
-          'Review submission failed. Please try again.'
-        );
+      if (reviewConfig?.requiresPPT && pptObj?.pptApproved) {
+        updateData.pptApproved = pptObj.pptApproved;
       }
-    } catch (error) {
-      console.error('❌ [FRONTEND] Critical error during submission:', error);
+
+      return updateData;
+    });
+
+    const updatePayload = {
+      projectId: teamId,
+      studentUpdates
+    };
+
+    if (reviewConfig?.requiresPPT && pptObj) {
+      updatePayload.pptApproved = pptObj.pptApproved;
+    }
+
+    console.log('📤 [FRONTEND] Final update payload with PAT:', JSON.stringify(updatePayload, null, 2));
+    
+    // Show loading notification
+    const loadingId = showNotification('info', 'Submitting...', 'Please wait while we save your review data...', 10000);
+    
+    const response = await updateProject(updatePayload);
+    console.log('📨 [FRONTEND] Backend response received:', response);
+    
+    // Hide loading notification
+    hideNotification(loadingId);
+    
+    if (response.data?.success || response.data?.updates) {
+      setActivePopup(null);
+      
+      setTimeout(async () => {
+        await handleRefresh();
+        showNotification(
+          'success', 
+          'Review Saved', 
+          'Guide review submitted and saved successfully!'
+        );
+      }, 300);
+      
+    } else {
+      console.error('❌ [FRONTEND] Backend response indicates failure:', response.data);
       showNotification(
         'error', 
-        'Submission Error', 
-        `Error submitting review: ${error.message}`
+        'Submission Failed', 
+        'Review submission failed. Please try again.'
       );
     }
-  }, [teams, getReviewTypes, handleRefresh, showNotification, hideNotification]);
+  } catch (error) {
+    console.error('❌ [FRONTEND] Critical error during submission:', error);
+    showNotification(
+      'error', 
+      'Submission Error', 
+      `Error submitting review: ${error.message}`
+    );
+  }
+}, [teams, getReviewTypes, handleRefresh, showNotification, hideNotification]);
+
 
   // ✅ UPDATED: Use notification system instead of alert
   const handleRequestEdit = useCallback(async (teamId, reviewType) => {
@@ -747,35 +755,37 @@ const Guide = () => {
               defaultReason="Need to correct marks after deadline"
             />
 
-            {/* ✅ Popup Review Modal */}
-            {activePopup && (() => {
-              const team = teams.find(t => t.id === activePopup.teamId);
-              const reviewTypes = getReviewTypes(team.markingSchema);
-              const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
-              const requestStatus = getTeamRequestStatus(team, activePopup.type);
-              
-              const showRequestEdit = isLocked && (requestStatus === 'none' || requestStatus === 'rejected');
-              
-              return (
-                <PopupReview
-                  title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
-                  teamMembers={activePopup.students}
-                  reviewType={activePopup.type}
-                  isOpen={true}
-                  locked={isLocked}
-                  markingSchema={activePopup.markingSchema}
-                  requestStatus={requestStatus}
-                  onClose={() => setActivePopup(null)}
-                  onSubmit={(data, pptObj) => {
-                    handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj);
-                  }}
-                  onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
-                  requestEditVisible={showRequestEdit}
-                  requestPending={requestStatus === 'pending'}
-                  requiresPPT={reviewTypes.find(r => r.key === activePopup.type)?.requiresPPT || false}
-                />
-              );
-            })()} 
+{/* ✅ Popup Review Modal */}
+{activePopup && (() => {
+  const team = teams.find(t => t.id === activePopup.teamId);
+  const reviewTypes = getReviewTypes(team.markingSchema);
+  const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
+  const requestStatus = getTeamRequestStatus(team, activePopup.type);
+  
+  const showRequestEdit = isLocked && (requestStatus === 'none' || requestStatus === 'rejected');
+  
+  return (
+    <PopupReview
+      title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
+      teamMembers={activePopup.students}
+      reviewType={activePopup.type}
+      isOpen={true}
+      locked={isLocked}
+      markingSchema={activePopup.markingSchema}
+      requestStatus={requestStatus}
+      onClose={() => setActivePopup(null)}
+      onSubmit={(data, pptObj, patUpdates) => {
+        // ✅ FIXED: Pass PAT updates as third parameter
+        handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj, patUpdates);
+      }}
+      onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
+      requestEditVisible={showRequestEdit}
+      requestPending={requestStatus === 'pending'}
+      requiresPPT={reviewTypes.find(r => r.key === activePopup.type)?.requiresPPT || false}
+    />
+  );
+})()}
+
 
           </div>
         </div>

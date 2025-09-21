@@ -29,6 +29,9 @@ const PopupReview = ({
   const [error, setError] = useState('');
   const [hasAttendance, setHasAttendance] = useState(true);
   const [sub, setSub] = useState('Locked');
+
+const [patStates, setPatStates] = useState({});
+
   
   // ✅ NEW: Deadline states
   const [deadlineInfo, setDeadlineInfo] = useState({
@@ -184,187 +187,242 @@ const PopupReview = ({
   }, [isOpen, reviewType, markingSchema, requestStatus, finalFormLocked, panelMode]);
 
   // ✅ Initialize form data from existing student data
-  useEffect(() => {
-    if (!isOpen || loading || componentLabels.length === 0) return;
+
+// ✅ Initialize form data from existing student data
+useEffect(() => {
+  if (!isOpen || loading || componentLabels.length === 0) return;
+  
+  console.log('=== [PopupReview] INITIALIZING FORM DATA ===');
+  
+  const initialMarks = {};
+  const initialComments = {};
+  const initialAttendance = {};
+  const initialPatStates = {}; // ✅ NEW: Initialize PAT states
+
+  teamMembers.forEach(member => {
+    console.log(`🔍 [PopupReview] Processing ${member.name}:`, member);
+    console.log(`🔍 [PopupReview] PAT Status for ${member.name}:`, member.PAT); // Debug PAT
     
-    console.log('=== [PopupReview] INITIALIZING FORM DATA ===');
-    
-    const initialMarks = {};
-    const initialComments = {};
-    const initialAttendance = {};
+    let reviewData = null;
+    if (member.reviews?.get) {
+      reviewData = member.reviews.get(reviewType);
+    } else if (member.reviews?.[reviewType]) {
+      reviewData = member.reviews[reviewType];
+    }
 
-    teamMembers.forEach(member => {
-      console.log(`🔍 [PopupReview] Processing ${member.name}:`, member);
-      
-      let reviewData = null;
-      if (member.reviews?.get) {
-        reviewData = member.reviews.get(reviewType);
-      } else if (member.reviews?.[reviewType]) {
-        reviewData = member.reviews[reviewType];
+    console.log(`📋 [PopupReview] Review data for ${member.name}:`, reviewData);
+
+    const componentMarks = {};
+    componentLabels.forEach(comp => {
+      let markValue = '';
+      if (reviewData?.marks) {
+        markValue = reviewData.marks[comp.name] || '';
       }
-
-      console.log(`📋 [PopupReview] Review data for ${member.name}:`, reviewData);
-
-      const componentMarks = {};
-      componentLabels.forEach(comp => {
-        let markValue = '';
-        if (reviewData?.marks) {
-          markValue = reviewData.marks[comp.name] || '';
-        }
-        componentMarks[comp.key] = markValue || '';
-        console.log(`📊 [PopupReview] Component ${comp.name} (${comp.key}): ${markValue} for ${member.name}`);
-      });
-
-      initialMarks[member._id] = componentMarks;
-      initialComments[member._id] = reviewData?.comments || '';
-      
-      if (hasAttendance) {
-        initialAttendance[member._id] = reviewData?.attendance?.value ?? false;
-      }
+      componentMarks[comp.key] = markValue || '';
+      console.log(`📊 [PopupReview] Component ${comp.name} (${comp.key}): ${markValue} for ${member.name}`);
     });
 
-    setMarks(initialMarks);
-    setComments(initialComments);
+    initialMarks[member._id] = componentMarks;
+    initialComments[member._id] = reviewData?.comments || '';
+    
     if (hasAttendance) {
-      setAttendance(initialAttendance);
+      initialAttendance[member._id] = reviewData?.attendance?.value ?? false;
     }
+    
+    // ✅ FIXED: Better PAT initialization with fallback and debugging
+    const patStatus = member.PAT === true || member.PAT === 'true' || member.PAT === 1;
+    initialPatStates[member._id] = patStatus;
+    console.log(`🚫 [PopupReview] PAT initialized for ${member.name}: ${patStatus} (original: ${member.PAT})`);
+  });
 
-    // ✅ Initialize best project status
-    setBestProject(currentBestProject || false);
+  setMarks(initialMarks);
+  setComments(initialComments);
+  if (hasAttendance) {
+    setAttendance(initialAttendance);
+  }
+  setPatStates(initialPatStates); // ✅ NEW: Set PAT states
+  
+  console.log('🚫 [PopupReview] All PAT states initialized:', initialPatStates);
 
-    // ✅ Update sub state based on comments
-    const allCommentsFilled = teamMembers.every(member => 
-      initialComments[member._id]?.trim() !== ''
+  // ✅ Initialize best project status
+  setBestProject(currentBestProject || false);
+
+  const allCommentsFilled = teamMembers.every(member => 
+    initialComments[member._id]?.trim() !== ''
+  );
+  setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
+
+  if (requiresPPT) {
+    setTeamPptApproved(
+      teamMembers.length > 0 && 
+      teamMembers.every(member => member.pptApproved?.approved === true)
     );
-    setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
+  }
+  
+  console.log('✅ [PopupReview] Form data initialized');
+  console.log('🏆 [PopupReview] Best project initialized:', currentBestProject);
+}, [isOpen, teamMembers, reviewType, loading, componentLabels, hasAttendance, requiresPPT, currentBestProject]);
 
-    if (requiresPPT) {
-      setTeamPptApproved(
-        teamMembers.length > 0 && 
-        teamMembers.every(member => member.pptApproved?.approved === true)
-      );
-    }
+
+
+const handleMarksChange = (memberId, value, componentKey) => {
+  if (finalFormLocked) return;
+  if (hasAttendance && attendance[memberId] === false) return;
+  if (patStates[memberId]) return; // ✅ NEW: Prevent marks entry if PAT is enabled
+
+  const componentInfo = componentLabels.find(comp => comp.key === componentKey);
+  const maxPoints = componentInfo?.points || 10;
+  const numValue = Number(value);
+
+  if (numValue > maxPoints) {
+    alert(`Enter value less than ${maxPoints}, resetting to ${maxPoints}`);
+    setMarks(prev => ({
+      ...prev,
+      [memberId]: { ...prev[memberId], [componentKey]: maxPoints }
+    }));
+  } else if (numValue < 0) {
+    setMarks(prev => ({
+      ...prev,
+      [memberId]: { ...prev[memberId], [componentKey]: 0 }
+    }));
+  } else {
+    setMarks(prev => ({
+      ...prev,
+      [memberId]: { ...prev[memberId], [componentKey]: numValue }
+    }));
+  }
+};
+
+
+const handleAttendanceChange = (memberId, isPresent) => {
+  if (finalFormLocked) return;
+  
+  setAttendance(prev => ({ ...prev, [memberId]: isPresent }));
+  
+  if (!isPresent) {
+    // Zero out marks for absent students
+    const zeroedMarks = {};
+    componentLabels.forEach(comp => {
+      zeroedMarks[comp.key] = 0;
+    });
+    setMarks(prev => ({ ...prev, [memberId]: zeroedMarks }));
     
-    console.log('✅ [PopupReview] Form data initialized');
-    console.log('🏆 [PopupReview] Best project initialized:', currentBestProject);
-  }, [isOpen, teamMembers, reviewType, loading, componentLabels, hasAttendance, requiresPPT, currentBestProject]);
+    // ✅ Keep existing comments - don't clear them
+    // Comments are still required even for absent students
+  }
+  
+  // ✅ FIXED: Check that ALL students have comments (regardless of attendance)
+  const allCommentsFilled = teamMembers.every(member => 
+    comments[member._id]?.trim() !== ''
+  );
+  setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
+};
 
-  const handleMarksChange = (memberId, value, componentKey) => {
-    if (finalFormLocked) return;
-    if (hasAttendance && attendance[memberId] === false) return;
 
-    const componentInfo = componentLabels.find(comp => comp.key === componentKey);
-    const maxPoints = componentInfo?.points || 10;
-    const numValue = Number(value);
 
-    if (numValue > maxPoints) {
-      alert(`Enter value less than ${maxPoints}, resetting to ${maxPoints}`);
-      setMarks(prev => ({
-        ...prev,
-        [memberId]: { ...prev[memberId], [componentKey]: maxPoints }
-      }));
-    } else if (numValue < 0) {
-      setMarks(prev => ({
-        ...prev,
-        [memberId]: { ...prev[memberId], [componentKey]: 0 }
-      }));
-    } else {
-      setMarks(prev => ({
-        ...prev,
-        [memberId]: { ...prev[memberId], [componentKey]: numValue }
-      }));
-    }
-  };
+const handleCommentsChange = (memberId, value) => {
+  if (finalFormLocked) return;
+  
+  setComments(prev => ({ ...prev, [memberId]: value }));
+  
+  // ✅ FIXED: ALL students (present AND absent) must have comments
+  const allCommentsFilled = teamMembers.every(member => 
+    member._id === memberId ? value.trim() !== '' : (comments[member._id]?.trim() !== '')
+  );
+  setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
+};
 
-  const handleAttendanceChange = (memberId, isPresent) => {
-    if (finalFormLocked) return;
-    
-    setAttendance(prev => ({ ...prev, [memberId]: isPresent }));
-    
-    if (!isPresent) {
-      const zeroedMarks = {};
-      componentLabels.forEach(comp => {
-        zeroedMarks[comp.key] = 0;
-      });
-      setMarks(prev => ({ ...prev, [memberId]: zeroedMarks }));
-      setComments(prev => ({ ...prev, [memberId]: '' }));
-      
-      const allCommentsFilled = teamMembers.every(member => 
-        member._id === memberId ? true : (comments[member._id]?.trim() !== '')
-      );
-      setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
-    }
-  };
 
-  const handleCommentsChange = (memberId, value) => {
-    if (finalFormLocked) return;
-    
-    setComments(prev => ({ ...prev, [memberId]: value }));
-    
-    const allCommentsFilled = teamMembers.every(member => 
-      member._id === memberId ? value.trim() !== '' : (comments[member._id]?.trim() !== '')
-    );
-    setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
-  };
+const handleSubmit = () => {
+  if (finalFormLocked || sub === 'Locked') return;
+  
+  console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
+  console.log('🏆 [PopupReview] Best project status:', bestProject);
+  
+  const submission = {};
+  const patUpdates = {}; // ✅ NEW: Track PAT updates
+  
+  teamMembers.forEach(member => {
+    const memberMarks = marks[member._id] || {};
+    const submissionData = {
+      comments: comments[member._id] || ''
+    };
 
-  const handleSubmit = () => {
-    if (finalFormLocked || sub === 'Locked') return;
-    
-    console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
-    console.log('🏆 [PopupReview] Best project status:', bestProject);
-    
-    const submission = {};
-    
-    teamMembers.forEach(member => {
-      const memberMarks = marks[member._id] || {};
-      const submissionData = {
-        comments: comments[member._id] || ''
-      };
-
-      componentLabels.forEach(comp => {
-        submissionData[comp.name] = Number(memberMarks[comp.key]) || 0;
-        console.log(`📤 [PopupReview] Setting ${comp.name} = ${submissionData[comp.name]} for ${member.name}`);
-      });
-
-      if (hasAttendance) {
-        submissionData.attendance = {
-          value: attendance[member._id] || false,
-          locked: false
-        };
-      }
-
-      submission[member.regNo] = submissionData;
+    componentLabels.forEach(comp => {
+      const markValue = memberMarks[comp.key];
+      // ✅ Store special value for PAT or convert to number
+      submissionData[comp.name] = patStates[member._id] ? -1 : (Number(markValue) || 0);
+      console.log(`📤 [PopupReview] Setting ${comp.name} = ${submissionData[comp.name]} for ${member.name}`);
     });
 
-    console.log('📤 [PopupReview] Final submission object:', submission);
-
-    // ✅ Handle different submission scenarios
-    if (requiresPPT && panelMode) {
-      // Panel with PPT - include both PPT and best project
-      const teamPptObj = {
-        pptApproved: {
-          approved: teamPptApproved,
-          locked: false
-        }
+    if (hasAttendance) {
+      submissionData.attendance = {
+        value: attendance[member._id] || false,
+        locked: false
       };
-      onSubmit(submission, teamPptObj, { bestProject }); // ✅ Pass best project as third param
-    } else if (panelMode) {
-      // Panel without PPT - include best project
-      onSubmit(submission, null, { bestProject }); // ✅ Pass best project as third param
-    } else if (requiresPPT) {
-      // Guide with PPT - original behavior
-      const teamPptObj = {
-        pptApproved: {
-          approved: teamPptApproved,
-          locked: false
-        }
-      };
-      onSubmit(submission, teamPptObj);
-    } else {
-      // Guide without PPT - original behavior
-      onSubmit(submission);
     }
-  };
+
+    submission[member.regNo] = submissionData;
+    
+    // ✅ NEW: Track PAT status for database update (Guide only)
+    if (!panelMode) {
+      patUpdates[member.regNo] = patStates[member._id] || false;
+      console.log(`🚫 [PopupReview] PAT status for ${member.name} (${member.regNo}): ${patStates[member._id]}`);
+    }
+  });
+
+  console.log('📤 [PopupReview] Final submission object:', submission);
+  console.log('📤 [PopupReview] PAT updates object:', patUpdates);
+
+  // ✅ FIXED: Handle different submission scenarios with PAT data
+  if (requiresPPT && panelMode) {
+    const teamPptObj = {
+      pptApproved: {
+        approved: teamPptApproved,
+        locked: false
+      }
+    };
+    onSubmit(submission, teamPptObj, { bestProject });
+  } else if (panelMode) {
+    onSubmit(submission, null, { bestProject });
+  } else if (requiresPPT) {
+    const teamPptObj = {
+      pptApproved: {
+        approved: teamPptApproved,
+        locked: false
+      }
+    };
+    onSubmit(submission, teamPptObj, patUpdates); // ✅ Pass PAT data for guide
+  } else {
+    // ✅ FIXED: Guide without PPT - pass PAT data as second parameter
+    onSubmit(submission, patUpdates); // ✅ Pass PAT data for guide
+  }
+};
+
+
+  // ✅ NEW: Handle PAT toggle (Guide only)
+const handlePatToggle = (memberId, isPat) => {
+  if (finalFormLocked || panelMode) return; // Don't allow in panel mode
+  
+  setPatStates(prev => ({ ...prev, [memberId]: isPat }));
+  
+  if (isPat) {
+    // When PAT is enabled, set all marks to "PAT" special value
+    const patMarks = {};
+    componentLabels.forEach(comp => {
+      patMarks[comp.key] = 'PAT'; // Special value for database
+    });
+    setMarks(prev => ({ ...prev, [memberId]: patMarks }));
+  } else {
+    // When PAT is disabled, reset marks to 0
+    const resetMarks = {};
+    componentLabels.forEach(comp => {
+      resetMarks[comp.key] = 0;
+    });
+    setMarks(prev => ({ ...prev, [memberId]: resetMarks }));
+  }
+};
+
 
   if (!isOpen) return null;
 
@@ -596,79 +654,129 @@ const PopupReview = ({
                 key={member._id}
                 className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
               >
-                {/* Student Header */}
-                <div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-100">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg text-gray-800 mb-1">
-                      {member.name}
-                    </h3>
-                    <p className="text-sm text-gray-500">{member.regNo}</p>
-                  </div>
-                  
-                  {/* Attendance */}
-                  {hasAttendance && (
-                    <div className="ml-3">
-                      <select
-                        value={attendance[member._id] ? 'present' : 'absent'}
-                        onChange={(e) => handleAttendanceChange(member._id, e.target.value === 'present')}
-                        disabled={finalFormLocked}
-                        className={`px-3 py-2 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 ${
-                          attendance[member._id] 
-                            ? 'bg-green-50 border-green-300 text-green-800' 
-                            : 'bg-red-50 border-red-300 text-red-800'
-                        } ${finalFormLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <option value="present">✓ Present</option>
-                        <option value="absent">✗ Absent</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
+       
+{/* Student Header */}
+<div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-100">
+  <div className="flex-1">
+    <div className="flex items-center justify-between mb-1">
+      <h3 className="font-bold text-lg text-gray-800">
+        {member.name}
+      </h3>
+      {/* ✅ FIXED: PAT indicator stamp - shows in BOTH guide and panel when PAT is true */}
+      {patStates[member._id] && (
+        <div className="bg-red-100 border border-red-300 px-2 py-1 rounded-lg">
+          <span className="text-red-800 text-xs font-bold">🚫 PAT</span>
+        </div>
+      )}
+    </div>
+    <p className="text-sm text-gray-500">{member.regNo}</p>
+    
+    {/* ✅ FIXED: PAT Toggle - ONLY shows in Guide mode, hidden in Panel mode */}
+    {!panelMode && (
+      <div className="mt-2">
+        <label className="flex items-center space-x-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={patStates[member._id] || false}
+            onChange={(e) => handlePatToggle(member._id, e.target.checked)}
+            disabled={finalFormLocked}
+            className="w-4 h-4 text-red-600 bg-red-50 border-red-300 rounded focus:ring-2 focus:ring-red-500"
+          />
+          <span className="text-sm font-medium text-red-700">
+            PAT Detected
+          </span>
+        </label>
+      </div>
+    )}
+  </div>
+  
+  {/* Attendance */}
+  {hasAttendance && (
+    <div className="ml-3">
+      <select
+        value={attendance[member._id] ? 'present' : 'absent'}
+        onChange={(e) => handleAttendanceChange(member._id, e.target.value === 'present')}
+        disabled={finalFormLocked}
+        className={`px-3 py-2 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 ${
+          attendance[member._id] 
+            ? 'bg-green-50 border-green-300 text-green-800' 
+            : 'bg-red-50 border-red-300 text-red-800'
+        } ${finalFormLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        <option value="present">✓ Present</option>
+        <option value="absent">✗ Absent</option>
+      </select>
+    </div>
+  )}
+</div>
 
-                {/* Components */}
-                <div className="space-y-3 mb-4">
-                  {componentLabels.map(comp => (
-                    <div key={comp.key} className="flex items-center justify-between">
-                      <label className="text-sm font-medium text-gray-700 flex-1 mr-3">
-                        {comp.label}
-                      </label>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="number"
-                          min="0"
-                          max={comp.points}
-                          value={marks[member._id]?.[comp.key] || ''}
-                          onChange={(e) => handleMarksChange(member._id, e.target.value, comp.key)}
-                          disabled={finalFormLocked || (hasAttendance && attendance[member._id] === false)}
-                          className={`w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-blue-500 ${
-                            (finalFormLocked || (hasAttendance && attendance[member._id] === false))
-                              ? 'bg-gray-100 cursor-not-allowed' 
-                              : ''
-                          }`}
-                          placeholder="0"
-                        />
-                        <span className="text-xs text-gray-500 min-w-fit">
-                          /{comp.points}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+
+{/* Components */}
+<div className="space-y-3 mb-4">
+  {componentLabels.map(comp => (
+    <div key={comp.key} className="flex items-center justify-between">
+      <label className="text-sm font-medium text-gray-700 flex-1 mr-3">
+        {comp.label}
+      </label>
+      <div className="flex items-center space-x-2">
+        <input
+          type="text" // ✅ Changed to text to show "PAT" when needed
+          min="0"
+          max={comp.points}
+          value={
+            patStates[member._id] 
+              ? 'PAT' // ✅ Show "PAT" when PAT is enabled in both guide and panel
+              : marks[member._id]?.[comp.key] || ''
+          }
+          onChange={(e) => handleMarksChange(member._id, e.target.value, comp.key)}
+          onWheel={(e) => e.target.blur()}
+          disabled={
+            finalFormLocked || 
+            (hasAttendance && attendance[member._id] === false) ||
+            patStates[member._id] || // ✅ Disable if PAT in both modes
+            panelMode // ✅ Panel mode - all inputs disabled anyway
+          }
+          className={`w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-blue-500 ${
+            (finalFormLocked || 
+             (hasAttendance && attendance[member._id] === false) ||
+             patStates[member._id] ||
+             panelMode)
+              ? 'bg-gray-100 cursor-not-allowed' 
+              : ''
+          } ${
+            patStates[member._id] 
+              ? 'text-red-600 font-bold' // ✅ Style PAT text differently in both modes
+              : ''
+          }`}
+          placeholder={patStates[member._id] ? 'PAT' : '0'}
+          readOnly={patStates[member._id] || panelMode} // ✅ Read-only when PAT or panel mode
+        />
+        <span className="text-xs text-gray-500 min-w-fit">
+          /{comp.points}
+        </span>
+      </div>
+    </div>
+  ))}
+</div>
+
+
 
                 {/* Comments */}
-                <textarea
-                  value={comments[member._id] || ''}
-                  onChange={(e) => handleCommentsChange(member._id, e.target.value)}
-                  disabled={finalFormLocked || (hasAttendance && attendance[member._id] === false)}
-                  required
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
-                    (finalFormLocked || (hasAttendance && attendance[member._id] === false))
-                      ? 'bg-gray-100 cursor-not-allowed' 
-                      : ''
-                  }`}
-                  rows="3"
-                  placeholder={finalFormLocked ? "Comments locked" : "Add comments..."}
-                />
+ 
+<textarea
+  value={comments[member._id] || ''}
+  onChange={(e) => handleCommentsChange(member._id, e.target.value)}
+  disabled={finalFormLocked} // ✅ FIXED: Remove attendance check from comments
+  required
+  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
+    finalFormLocked // ✅ FIXED: Remove attendance check from comments styling
+      ? 'bg-gray-100 cursor-not-allowed' 
+      : ''
+  }`}
+  rows="3"
+  placeholder={finalFormLocked ? "Comments locked" : "Add comments..."}
+/>
+
               </div>
             ))}
           </div>
