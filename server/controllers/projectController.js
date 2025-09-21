@@ -1376,6 +1376,7 @@ export const updateProjectDetails = async (req, res) => {
         studentId,
         reviews: reviewsToUpdate,
         pptApproved: studentPptApproved,
+        PAT, // ✅ NEW: Extract PAT status
       } = update;
 
       const student = await Student.findById(studentId).session(session);
@@ -1385,6 +1386,7 @@ export const updateProjectDetails = async (req, res) => {
       }
 
       console.log("✅ [BACKEND] Processing student:", student.name);
+      console.log("🚫 [BACKEND] PAT status for student:", PAT); // ✅ NEW: Log PAT
 
       // Merge updates into existing reviews Map
       for (const [reviewType, reviewData] of Object.entries(
@@ -1404,6 +1406,13 @@ export const updateProjectDetails = async (req, res) => {
       // Update PPT approval if provided
       if (studentPptApproved !== undefined) {
         student.pptApproved = studentPptApproved;
+        console.log(`📋 [BACKEND] Updated PPT approval for ${student.name}:`, studentPptApproved);
+      }
+
+      // ✅ NEW: Update PAT status if provided
+      if (PAT !== undefined) {
+        student.PAT = Boolean(PAT); // Ensure boolean type
+        console.log(`🚫 [BACKEND] Updated PAT status for ${student.name}:`, student.PAT);
       }
 
       await student.save({ session });
@@ -1444,6 +1453,7 @@ export const updateProjectDetails = async (req, res) => {
     session.endSession();
   }
 };
+
 
 // Export other existing functions...
 

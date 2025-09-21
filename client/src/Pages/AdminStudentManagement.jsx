@@ -493,126 +493,125 @@ const downloadExcel = useCallback(async () => {
       const [school, department] = groupKey.split('_');
       const schema = allSchemas[groupKey]; // Use the local schemas object
 
-      // Prepare data for this group
-      const excelData = groupStudents.map(student => {
-        const row = {
-          "Semester (CH2024-25)": "05",
-          "Class Number (CH2024-2505)": "02680",
-          "Mark Mode Code": "PE005",
-          "Register No": student.regNo,
-          "Name": student.name,
-          "School": student.school,
-          "Department": student.department,
-          "Email": student.emailId
-        };
+// Prepare data for this group
+const excelData = groupStudents.map(student => {
+  const row = {
+    "Semester (CH2024-25)": "05",
+    "Class Number (CH2024-2505)": "02680",
+    "Mark Mode Code": "PE005",
+    "Register No": student.regNo,
+    "Name": student.name,
+    "School": student.school,
+    "Department": student.department,
+    "Email": student.emailId,
 
-        // Only add the selected review type data (not all reviews)
-        if (student.reviews && selectedReviewFilter !== "all") {
-          const reviewData = student.reviews[selectedReviewFilter];
-          if (reviewData) {
-            // Get the review schema for display names
-            const reviewSchema = schema?.reviews?.find(r => r.reviewName === selectedReviewFilter);
-            const reviewDisplayName = reviewSchema?.displayName || selectedReviewFilter;
+    "PAT_Detected": student.PAT ? "Yes" : "No"
+  };
 
-            if (reviewSchema && Array.isArray(reviewSchema.components)) {
-              // Use displayName from schema components
-              reviewSchema.components.forEach(component => {
-                const displayName = component.displayName || component.name;
-                const componentName = component.name;
-                row[`${reviewDisplayName}_${displayName}`] = reviewData.marks?.[componentName] ?? "";
-              });
+  // Only add the selected review type data (total marks, not component-wise)
+  if (student.reviews && selectedReviewFilter !== "all") {
+    const reviewData = student.reviews[selectedReviewFilter];
+    if (reviewData) {
+      // Get the review schema for display names
+      const reviewSchema = schema?.reviews?.find(r => r.reviewName === selectedReviewFilter);
+      const reviewDisplayName = reviewSchema?.displayName || selectedReviewFilter;
+
+      // Calculate total marks for this review
+      let totalMarks = 0;
+      let patAdjustedMarks = 0; // ✅ NEW: Track PAT-adjusted marks
+      
+      if (reviewData.marks && typeof reviewData.marks === 'object') {
+        Object.values(reviewData.marks).forEach(mark => {
+          const numericMark = parseFloat(mark) || 0;
+          totalMarks += numericMark;
+          
+          // ✅ NEW: Handle PAT special values (-1 or "PAT")
+          if (mark === -1 || mark === "PAT") {
+            patAdjustedMarks += 0; // PAT marks count as 0 for totals
+          } else {
+            patAdjustedMarks += numericMark;
+          }
+        });
+      }
+
+      // ✅ UPDATED: Add both total and PAT-adjusted marks
+      row[`${reviewDisplayName}_Total_Marks`] = totalMarks;
+      row[`${reviewDisplayName}_PAT_Adjusted_Marks`] = patAdjustedMarks;
+      
+      // ✅ NEW: Add PAT flag for this review
+      const hasPATMarks = reviewData.marks && Object.values(reviewData.marks).some(mark => 
+        mark === -1 || mark === "PAT"
+      );
+      row[`${reviewDisplayName}_Contains_PAT`] = hasPATMarks ? "Yes" : "No";
+
+      // Add review status info using displayName
+      row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
+      row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
+      
+      if (reviewData.comments) {
+        row[`${reviewDisplayName}_Comments`] = reviewData.comments;
+      }
+    }
+  } else if (selectedReviewFilter === "all") {
+    // If "All Reviews" is selected, include total marks for all reviews
+    if (student.reviews) {
+      Object.entries(student.reviews).forEach(([reviewType, reviewData]) => {
+        const reviewSchema = schema?.reviews?.find(r => r.reviewName === reviewType);
+        const reviewDisplayName = reviewSchema?.displayName || reviewType;
+
+        // Calculate total marks for this review
+        let totalMarks = 0;
+        let patAdjustedMarks = 0; // ✅ NEW: Track PAT-adjusted marks
+        
+        if (reviewData.marks && typeof reviewData.marks === 'object') {
+          Object.values(reviewData.marks).forEach(mark => {
+            const numericMark = parseFloat(mark) || 0;
+            totalMarks += numericMark;
+            
+            // ✅ NEW: Handle PAT special values (-1 or "PAT")
+            if (mark === -1 || mark === "PAT") {
+              patAdjustedMarks += 0; // PAT marks count as 0 for totals
             } else {
-              // Fallback: use existing marks structure
-              if (reviewData.marks && typeof reviewData.marks === 'object') {
-                Object.entries(reviewData.marks).forEach(([markKey, markValue]) => {
-                  row[`${reviewDisplayName}_${markKey}`] = markValue ?? "";
-                });
-              }
+              patAdjustedMarks += numericMark;
             }
-
-            // Add review status info using displayName
-            row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
-            row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
-            
-            if (reviewData.comments) {
-              row[`${reviewDisplayName}_Comments`] = reviewData.comments;
-            }
-          }
-        } else if (selectedReviewFilter === "all") {
-          // If "All Reviews" is selected, include all reviews
-        // Only add the selected review type data (total marks, not component-wise)
-        if (student.reviews && selectedReviewFilter !== "all") {
-          const reviewData = student.reviews[selectedReviewFilter];
-          if (reviewData) {
-            // Get the review schema for display names
-            const reviewSchema = schema?.reviews?.find(r => r.reviewName === selectedReviewFilter);
-            const reviewDisplayName = reviewSchema?.displayName || selectedReviewFilter;
-
-            // Calculate total marks for this review
-            let totalMarks = 0;
-            if (reviewData.marks && typeof reviewData.marks === 'object') {
-              totalMarks = Object.values(reviewData.marks).reduce((sum, mark) => {
-                const numericMark = parseFloat(mark) || 0;
-                return sum + numericMark;
-              }, 0);
-            }
-
-            // Add only total marks (not component-wise)
-            row[`${reviewDisplayName}_Total_Marks`] = totalMarks;
-
-            // Add review status info using displayName
-            row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
-            row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
-            
-            if (reviewData.comments) {
-              row[`${reviewDisplayName}_Comments`] = reviewData.comments;
-            }
-          }
-        } else if (selectedReviewFilter === "all") {
-          // If "All Reviews" is selected, include total marks for all reviews
-          if (student.reviews) {
-            Object.entries(student.reviews).forEach(([reviewType, reviewData]) => {
-              const reviewSchema = schema?.reviews?.find(r => r.reviewName === reviewType);
-              const reviewDisplayName = reviewSchema?.displayName || reviewType;
-
-              // Calculate total marks for this review
-              let totalMarks = 0;
-              if (reviewData.marks && typeof reviewData.marks === 'object') {
-                totalMarks = Object.values(reviewData.marks).reduce((sum, mark) => {
-                  const numericMark = parseFloat(mark) || 0;
-                  return sum + numericMark;
-                }, 0);
-              }
-
-              // Add only total marks (not component-wise)
-              row[`${reviewDisplayName}_Total_Marks`] = totalMarks;
-
-              row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
-              row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
-              
-              if (reviewData.comments) {
-                row[`${reviewDisplayName}_Comments`] = reviewData.comments;
-              }
-            });
-          }
-        }
-
-        }
-
-        // Add PPT approval status
-        row["PPT_Approved"] = student.pptApproved?.approved ? "Yes" : "No";
-        row["PPT_Locked"] = student.pptApproved?.locked ? "Yes" : "No";
-
-        // Add deadlines
-        if (student.deadline) {
-          Object.entries(student.deadline).forEach(([type, deadlineData]) => {
-            row[`Deadline_${type}_From`] = deadlineData.from ? new Date(deadlineData.from).toLocaleDateString() : "";
-            row[`Deadline_${type}_To`] = deadlineData.to ? new Date(deadlineData.to).toLocaleDateString() : "";
           });
         }
 
-        return row;
+        // ✅ UPDATED: Add both total and PAT-adjusted marks
+        row[`${reviewDisplayName}_Total_Marks`] = totalMarks;
+        row[`${reviewDisplayName}_PAT_Adjusted_Marks`] = patAdjustedMarks;
+        
+        // ✅ NEW: Add PAT flag for this review
+        const hasPATMarks = reviewData.marks && Object.values(reviewData.marks).some(mark => 
+          mark === -1 || mark === "PAT"
+        );
+        row[`${reviewDisplayName}_Contains_PAT`] = hasPATMarks ? "Yes" : "No";
+
+        row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
+        row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
+        
+        if (reviewData.comments) {
+          row[`${reviewDisplayName}_Comments`] = reviewData.comments;
+        }
       });
+    }
+  }
+
+  // Add PPT approval status
+  row["PPT_Approved"] = student.pptApproved?.approved ? "Yes" : "No";
+  row["PPT_Locked"] = student.pptApproved?.locked ? "Yes" : "No";
+
+  // Add deadlines
+  if (student.deadline) {
+    Object.entries(student.deadline).forEach(([type, deadlineData]) => {
+      row[`Deadline_${type}_From`] = deadlineData.from ? new Date(deadlineData.from).toLocaleDateString() : "";
+      row[`Deadline_${type}_To`] = deadlineData.to ? new Date(deadlineData.to).toLocaleDateString() : "";
+    });
+  }
+
+  return row;
+});
+
 
       // Create worksheet for this group
       const ws = XLSX.utils.json_to_sheet(excelData);
@@ -961,67 +960,85 @@ const downloadExcel = useCallback(async () => {
                           className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 cursor-pointer hover:bg-slate-50 transition-colors"
                           onClick={() => toggleStudentExpanded(student.regNo)}
                         >
-                          <div className="flex items-center space-x-3 sm:space-x-4">
-                            <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl">
-                              {isExpanded ? (
-                                <ChevronDown className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
-                              ) : (
-                                <ChevronRight className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
-                              )}
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-base sm:text-xl text-slate-800 mb-1">
-                                {student.name}
-                              </h4>
-                              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 text-xs sm:text-sm text-slate-600">
-                                <span className="flex items-center space-x-1">
-                                  <BookOpen className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  <span>{student.regNo}</span>
-                                </span>
-                                <span>{student.emailId}</span>
-                                {student.school && <span>{student.school}</span>}
-                                {student.department && <span>{student.department}</span>}
-                              </div>
-                            </div>
-                          </div>
+                   <div className="flex items-center space-x-3 sm:space-x-4">
+  <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl">
+    {isExpanded ? (
+      <ChevronDown className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
+    ) : (
+      <ChevronRight className="text-blue-600 h-5 w-5 sm:h-6 sm:w-6" />
+    )}
+  </div>
+  <div>
+    <div className="flex items-center space-x-2 mb-1">
+      <h4 className="font-bold text-base sm:text-xl text-slate-800">
+        {student.name}
+      </h4>
+      {/* ✅ NEW: PAT Status Stamp */}
+      {student.PAT && (
+        <div className="bg-red-100 border border-red-300 px-2 py-1 rounded-lg">
+          <span className="text-red-800 text-xs font-bold">🚫 PAT</span>
+        </div>
+      )}
+    </div>
+    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 text-xs sm:text-sm text-slate-600">
+      <span className="flex items-center space-x-1">
+        <BookOpen className="h-3 w-3 sm:h-4 sm:w-4" />
+        <span>{student.regNo}</span>
+      </span>
+      <span>{student.emailId}</span>
+      {student.school && <span>{student.school}</span>}
+      {student.department && <span>{student.department}</span>}
+    </div>
+  </div>
+</div>
+
                           
-                          <div className="flex items-center space-x-3 mt-3 sm:mt-0">
-                            {student.reviews && Object.keys(student.reviews).length > 0 && (
-                              <span className="bg-blue-100 text-blue-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
-                                <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4" />
-                                <span>{Object.keys(student.reviews).length} reviews</span>
-                              </span>
-                            )}
-                            {student.pptApproved?.approved && (
-                              <span className="bg-emerald-100 text-emerald-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
-                                <Award className="h-3 w-3 sm:h-4 sm:w-4" />
-                                <span>PPT Approved</span>
-                              </span>
-                            )}
-                            
-                            {/* Action buttons */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(student);
-                              }}
-                              className="text-slate-600 hover:text-blue-600 transition-colors p-1 rounded-md hover:bg-blue-50"
-                              title="Edit Student"
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </button>
-                            
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteConfirm(student);
-                              }}
-                              className="text-slate-600 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
-                              title="Delete Student"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
+                     <div className="flex items-center space-x-3 mt-3 sm:mt-0">
+  {/* ✅ NEW: PAT Status Badge */}
+  {student.PAT && (
+    <span className="bg-red-100 text-red-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
+      <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />
+      <span>PAT Flagged</span>
+    </span>
+  )}
+  
+  {student.reviews && Object.keys(student.reviews).length > 0 && (
+    <span className="bg-blue-100 text-blue-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
+      <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4" />
+      <span>{Object.keys(student.reviews).length} reviews</span>
+    </span>
+  )}
+  {student.pptApproved?.approved && (
+    <span className="bg-emerald-100 text-emerald-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
+      <Award className="h-3 w-3 sm:h-4 sm:w-4" />
+      <span>PPT Approved</span>
+    </span>
+  )}
+  
+  {/* Action buttons */}
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      handleEdit(student);
+    }}
+    className="text-slate-600 hover:text-blue-600 transition-colors p-1 rounded-md hover:bg-blue-50"
+    title="Edit Student"
+  >
+    <Edit3 className="h-4 w-4" />
+  </button>
+  
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      handleDeleteConfirm(student);
+    }}
+    className="text-slate-600 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
+    title="Delete Student"
+  >
+    <Trash2 className="h-4 w-4" />
+  </button>
+</div>
+
                         </div>
 
                         {isExpanded && (
@@ -1169,6 +1186,42 @@ const downloadExcel = useCallback(async () => {
     </div>
   </div>
 )}
+{/* ✅ NEW: PAT Status Section */}
+<div className="mb-6 sm:mb-8">
+  <h5 className="font-bold text-base sm:text-xl mb-3 sm:mb-4 text-slate-800 flex items-center space-x-2">
+    <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
+    <span>PAT Status</span>
+  </h5>
+  <div className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 shadow-sm">
+    <div className="flex items-center space-x-3 sm:space-x-4">
+      <span className="font-semibold text-slate-700 text-xs sm:text-sm">PAT Status:</span>
+      {student.PAT ? (
+        <span className="flex items-center space-x-2 text-red-600 text-xs sm:text-sm">
+          <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+          <span className="font-bold">PAT Flagged </span>
+        </span>
+      ) : (
+        <span className="flex items-center space-x-2 text-emerald-600 text-xs sm:text-sm">
+          <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+          <span>False(Not PAT)</span>
+        </span>
+      )}
+    </div>
+    
+    {student.PAT && (
+      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <div className="flex items-start space-x-2">
+          <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+          <div className="text-xs sm:text-sm text-red-800">
+            <p className="font-semibold mb-1">Action Required:</p>
+            <p>This student has been flagged  (-1 or "PAT") indicating  assessment status.</p>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+</div>
+
 
 
                             {/* PPT Approval Section */}
