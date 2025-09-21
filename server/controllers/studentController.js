@@ -5,34 +5,34 @@ import MarkingSchema from "../models/markingSchema.js";
 export const getMarkingSchema = async (req, res) => {
   try {
     const { school, department } = req.query;
-    
+
     if (!school || !department) {
-      return res.status(400).json({ 
-        message: 'School and department parameters are required' 
+      return res.status(400).json({
+        message: "School and department parameters are required",
       });
     }
-    
+
     // Query your marking schema collection - adjust the model name and fields as needed
-    const markingSchema = await MarkingSchema.findOne({ 
-      school: school, 
-      department: department 
+    const markingSchema = await MarkingSchema.findOne({
+      school: school,
+      department: department,
     });
-    
+
     if (!markingSchema) {
-      return res.status(404).json({ 
-        message: 'Marking schema not found for this school and department' 
+      return res.status(404).json({
+        message: "Marking schema not found for this school and department",
       });
     }
-    
-    res.status(200).json({ 
-      success: true, 
-      schema: markingSchema 
+
+    res.status(200).json({
+      success: true,
+      schema: markingSchema,
     });
   } catch (error) {
-    console.error('Error fetching marking schema:', error);
-    res.status(500).json({ 
-      message: 'Failed to fetch marking schema', 
-      error: error.message 
+    console.error("Error fetching marking schema:", error);
+    res.status(500).json({
+      message: "Failed to fetch marking schema",
+      error: error.message,
     });
   }
 };
@@ -48,7 +48,7 @@ export async function getFilteredStudents(req, res) {
     if (specialization) filter.specialization = specialization;
 
     // Query students matching the filter (if filter is empty returns all)
-    const students = await Student.find(filter)
+    const students = await Student.find(filter);
 
     return res.json({ students });
   } catch (error) {
@@ -202,7 +202,6 @@ export const updateStudentDetails = async (req, res) => {
     const { regNo } = req.params;
     const updateFields = req.body;
 
-    // Whitelist for general fields
     const allowedFields = [
       "name",
       "emailId",
@@ -210,6 +209,7 @@ export const updateStudentDetails = async (req, res) => {
       "department",
       "pptApproved",
       "deadline",
+      "PAT", 
     ];
     const updates = {};
     for (const field of allowedFields) {
@@ -218,12 +218,6 @@ export const updateStudentDetails = async (req, res) => {
       }
     }
 
-    // Batch marks update section: supports updating several reviews and components at once
-    // Expected format:
-    // marksUpdate: [
-    //   { reviewName: "draftReview", marks: { "Zero": 46, "D1": 44 }, comments: "", attendance: { value: true, locked: false } },
-    //   { reviewName: "review0", marks: { } }
-    // ]
     let marksUpdateOps = {};
     if (Array.isArray(updateFields.marksUpdate)) {
       for (const reviewUpdate of updateFields.marksUpdate) {
@@ -234,12 +228,10 @@ export const updateStudentDetails = async (req, res) => {
           marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] =
             markValue;
         }
-
         // Add comments if present
         if (comments !== undefined) {
           marksUpdateOps[`reviews.${reviewName}.comments`] = comments;
         }
-
         // Add attendance if present
         if (attendance !== undefined) {
           marksUpdateOps[`reviews.${reviewName}.attendance`] = attendance;
@@ -249,22 +241,18 @@ export const updateStudentDetails = async (req, res) => {
       // For backward compatibility (single review update)
       const { reviewName, marks, comments, attendance } =
         updateFields.marksUpdate;
-
       for (const [componentName, markValue] of Object.entries(marks || {})) {
         marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] =
           markValue;
       }
-
       if (comments !== undefined) {
         marksUpdateOps[`reviews.${reviewName}.comments`] = comments;
       }
-
       if (attendance !== undefined) {
         marksUpdateOps[`reviews.${reviewName}.attendance`] = attendance;
       }
     }
 
-    // Apply general and marks updates in $set
     const updateOps = Object.keys(updates).length > 0 ? { ...updates } : {};
     if (Object.keys(marksUpdateOps).length > 0) {
       Object.assign(updateOps, marksUpdateOps);
@@ -296,24 +284,22 @@ export const updateStudentDetails = async (req, res) => {
 };
 
 
-
-
 export const deleteStudent = async (req, res) => {
   try {
     const { regNo } = req.params;
-    
+
     const deletedStudent = await Student.findOneAndDelete({ regNo });
-    
+
     if (!deletedStudent) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Student not found." 
+      return res.status(404).json({
+        success: false,
+        message: "Student not found.",
       });
     }
-    
+
     // Also cleanup related requests
     await Request.deleteMany({ student: deletedStudent._id });
-    
+
     return res.status(200).json({
       success: true,
       message: "Student deleted successfully.",
@@ -321,14 +307,11 @@ export const deleteStudent = async (req, res) => {
     });
   } catch (error) {
     console.error("Error deleting student:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Server error", 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
     });
   }
 };
 // Add this to your existing student controller/routes file
-
-
-

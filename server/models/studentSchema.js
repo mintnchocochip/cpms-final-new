@@ -38,6 +38,11 @@ const studentSchema = new mongoose.Schema({
     },
     default: {},
   },
+  PAT: {
+    type: Boolean,
+    default: false,
+    required: true
+  },
   school: String,
   department: String,
 });
