@@ -181,6 +181,7 @@ export async function createProject(req, res, next) {
           deadline: studentDeadlineMap,
           school,
           department,
+          PAT: false, // Explicitly set to false on creation
         });
 
         await student.save({ session });
@@ -275,7 +276,7 @@ export async function getAllProjects(req, res) {
         path: "students",
         model: "Student",
         select:
-          "regNo name emailId reviews pptApproved deadline school department",
+          "regNo name emailId reviews pptApproved deadline school department PAT", // <--- added PAT here
       })
       .populate({
         path: "guideFaculty",
@@ -332,6 +333,7 @@ export async function getAllProjects(req, res) {
           deadline: processedDeadlines,
           school: student.school,
           department: student.department,
+          PAT: student.PAT, // <--- include PAT in returned student object
         };
       });
 
@@ -342,7 +344,7 @@ export async function getAllProjects(req, res) {
         department: project.department,
         specialization: project.specialization,
         type: project.type,
-        bestProject: !!project.bestProject, // <-- NEW LINE to include bestProject
+        bestProject: !!project.bestProject,
         students: processedStudents,
         guideFaculty: project.guideFaculty,
         panel: project.panel,
@@ -711,6 +713,7 @@ export async function createProjectsBulk(req, res) {
               reviews: reviewsObj, // ✅ FIXED: Plain object instead of Map
               pptApproved: { approved: false, locked: false },
               deadline: { ...defaultDeadlinesObj }, // ✅ FIXED: Plain object instead of Map
+              PAT: false,
               school,
               department,
             });
@@ -928,7 +931,7 @@ export async function getAllGuideProjects(req, res) {
         path: "students",
         model: "Student",
         select:
-          "regNo name emailId reviews pptApproved deadline school department",
+          "regNo name emailId reviews pptApproved deadline school department PAT",
       })
       .populate({
         path: "guideFaculty",
@@ -982,6 +985,7 @@ export async function getAllGuideProjects(req, res) {
           deadline: processedDeadlines,
           school: student.school,
           department: student.department,
+          PAT: student.PAT,
         };
       });
 
@@ -1125,7 +1129,7 @@ export async function getAllPanelProjects(req, res) {
         path: "students",
         model: "Student",
         select:
-          "regNo name emailId reviews pptApproved deadline school department", // ✅ Include all student fields
+          "regNo name emailId reviews pptApproved deadline school department PAT", // ✅ Include all student fields
       })
       .populate({
         path: "guideFaculty",
@@ -1195,6 +1199,7 @@ export async function getAllPanelProjects(req, res) {
           deadline: processedDeadlines, // ✅ Plain object instead of Map
           school: student.school,
           department: student.department,
+          PAT: student.PAT,
         };
       });
       return {

@@ -4,17 +4,16 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const EXCEL_PATH =
-  "E:/Desktop/CPMS/Copy of PMCA698J-Internship-1_and_disseration-1_-_Review_1_marks_as_per_template(2).xlsx";
+const EXCEL_PATH = "E:/Desktop/CPMS/BCSE497J Project -Zeroth Review-Marks.xlsx";
 const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:3000/api";
 const AUTH_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4Y2QwMGY4MjdmNzI5NDhjMzQzNjY4MSIsImVtYWlsSWQiOiJhZG1pbkB2aXQuYWMuaW4iLCJlbXBsb3llZUlkIjoiQURNSU4wMDEiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTgyODU2NzQsImV4cCI6MTc1ODM3MjA3NH0.t1KSe8rof5vG6r1d97qMuAQGkGX0BYAX4J0Y_-Eb91A";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4Y2Q4OWYwMmUzMmU2NzZhNTg3OGRhNCIsImVtYWlsSWQiOiJhZG1pbkB2aXQuYWMuaW4iLCJlbXBsb3llZUlkIjoiQURNSU4wMDEiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTg0NjM4OTgsImV4cCI6MTc1ODU1MDI5OH0.SY1Who11rIrWFgNqTg2UztZMmvDyARWJxaYK02X9HhY";
 
-const SHEET_NAME = "Mark entry template"; // Leading space
+const SHEET_NAME = " VTOP -Zeroth Review Mark entry";
 const REG_NO_KEY = "Student Register No";
-const MARK_KEY = "Mark (20)";
+// const MARK_KEY = "Mark (20)";
 
-async function updateZerothReviewMarks() {
+async function updateGuideReviewMarks() {
   const workbook = xlsx.readFile(EXCEL_PATH);
   const sheet = workbook.Sheets[SHEET_NAME];
   const rows = xlsx.utils.sheet_to_json(sheet);
@@ -32,35 +31,30 @@ async function updateZerothReviewMarks() {
       continue;
     }
 
-    const rawMark = row[MARK_KEY];
-    const mark =
-      typeof rawMark === "number"
-        ? rawMark
-        : Number(rawMark?.toString().trim());
-    if (isNaN(mark)) {
-      console.warn(
-        `Skipping row ${index + 1} due to invalid mark: '${rawMark}'`
-      );
-      continue;
-    }
+    // const rawMark = row[MARK_KEY];
+    // // Convert mark from 20-scale to 5-scale
+    // const mark20 =
+    //   typeof rawMark === "number"
+    //     ? rawMark
+    //     : Number(rawMark?.toString().trim());
+    // if (isNaN(mark20)) {
+    //   console.warn(
+    //     `Skipping row ${index + 1} due to invalid mark: '${rawMark}'`
+    //   );
+    //   continue;
+    // }
+    // // Keep decimal values (no rounding)
+    // const mark5 = (mark20 / 20) * 5;
 
+    // Create payload: set draftReview to zero and set guideReview1 with mark5
     const payload = {
-      marksUpdate: [
-        {
-          reviewName: "draftReview",
-          marks: { "Title and Problem statement": mark },
-          comments: "auto filled",
-          attendance: { value: true, locked: false },
-        },
-      ],
+      PAT: false,
     };
 
     try {
-      const res = await axios.put(
-        `${API_BASE_URL}/student/${regNo}`,
-        payload,
-        { headers: { Authorization: `Bearer ${AUTH_TOKEN}` } }
-      );
+      const res = await axios.put(`${API_BASE_URL}/student/${regNo}`, payload, {
+        headers: { Authorization: `Bearer ${AUTH_TOKEN}` },
+      });
       if (res.data && res.data.success) {
         console.log(`Successfully updated student ${regNo}`);
       } else {
@@ -78,6 +72,6 @@ async function updateZerothReviewMarks() {
   }
 }
 
-updateZerothReviewMarks().catch((err) => {
-  console.error("Unhandled error in updateZerothReviewMarks:", err);
+updateGuideReviewMarks().catch((err) => {
+  console.error("Unhandled error in updateGuideReviewMarks:", err);
 });
