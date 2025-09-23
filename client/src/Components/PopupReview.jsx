@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Award, Star, Clock, Calendar } from 'lucide-react';
+import { X, Award, Star, Clock, Calendar, AlertTriangle } from 'lucide-react';
 
 const PopupReview = ({
   title,
@@ -18,7 +18,7 @@ const PopupReview = ({
   panelMode = false,
   currentBestProject = false,
   teamId = null,
-  // NEW: Added props for Guide viewing Panel reviews
+  // ✅ NEW: Added props for Guide viewing Panel reviews
   isGuideReview = false,
   isPanelReview = false,
 }) => {
@@ -34,7 +34,7 @@ const PopupReview = ({
   const [sub, setSub] = useState('Locked');
   const [patStates, setPatStates] = useState({});
   
-  // NEW: Deadline states
+  // ✅ NEW: Deadline states
   const [deadlineInfo, setDeadlineInfo] = useState({
     hasDeadline: false,
     fromDate: null,
@@ -45,18 +45,18 @@ const PopupReview = ({
     timeUntilEnd: '',
   });
 
-  // NEW: Determine if this is a guide viewing panel review
+  // ✅ NEW: Determine if this is a guide viewing panel review
   const isGuideViewingPanel = !panelMode && isPanelReview;
   
-  // NEW: For guide viewing panel reviews, only show PPT approval
+  // ✅ NEW: For guide viewing panel reviews, only show PPT approval
   const showOnlyPPTApproval = isGuideViewingPanel;
 
-  // FIXED: Calculate if form should be locked considering ALL conditions
+  // ✅ FIXED: Calculate if form should be locked considering ALL conditions
   const isFormLocked = locked && requestStatus !== 'approved';
   const isDeadlineLocked = (deadlineInfo.isBeforeStart || deadlineInfo.isAfterEnd) && requestStatus !== 'approved';
   const finalFormLocked = isFormLocked || isDeadlineLocked;
 
-  // NEW: Function to calculate deadline status
+  // ✅ NEW: Function to calculate deadline status
   const calculateDeadlineStatus = (reviewConfig) => {
     if (!reviewConfig?.deadline) {
       return {
@@ -118,7 +118,7 @@ const PopupReview = ({
     }
   };
 
-  // NEW: Function to get human-readable time difference
+  // ✅ NEW: Function to get human-readable time difference
   const getTimeDifference = (from, to) => {
     const diffMs = to - from;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -134,82 +134,82 @@ const PopupReview = ({
     }
   };
 
-  // ENHANCED: Load schema and initialize components with deadline checking
- // ENHANCED: Load schema and initialize components with deadline checking
-useEffect(() => {
-  if (!isOpen) return;
-  
-  setLoading(true);
-  try {
-    console.log('=== [PopupReview] LOADING MARKING SCHEMA WITH DEADLINE CHECK ===');
-    console.log('📋 [PopupReview] Review type:', reviewType);
-    console.log('📋 [PopupReview] Request status:', requestStatus);
-    console.log('📋 [PopupReview] Show only PPT approval:', showOnlyPPTApproval);
+  // ✅ ENHANCED: Load schema and initialize components with deadline checking
+  useEffect(() => {
+    if (!isOpen) return;
     
-    let components = [];
-    let hasValidSchema = false;
-    let reviewConfig = null;
-    
-    if (markingSchema?.reviews) {
-      reviewConfig = markingSchema.reviews.find(review => 
-        review.reviewName === reviewType
-      );
+    setLoading(true);
+    try {
+      console.log('=== [PopupReview] LOADING MARKING SCHEMA WITH DEADLINE CHECK ===');
+      console.log('📋 [PopupReview] Review type:', reviewType);
+      console.log('📋 [PopupReview] Request status:', requestStatus);
+      console.log('📋 [PopupReview] Show only PPT approval:', showOnlyPPTApproval);
       
-      if (reviewConfig?.components?.length > 0) {
-        hasValidSchema = true;
-        components = reviewConfig.components.map((comp, index) => ({
-          key: `component${index + 1}`,
-          label: comp.name,
-          name: comp.name,
-          points: comp.weight || 10
-        }));
-        console.log('✅ [PopupReview] Schema components loaded:', components);
-      }
-    }
-    
-    // NEW: Skip deadline calculation for guide viewing panel reviews
-    const deadlineStatus = showOnlyPPTApproval 
-      ? { 
-          hasDeadline: false, 
-          fromDate: null, 
-          toDate: null, 
-          isBeforeStart: false, 
-          isAfterEnd: false, 
-          timeUntilStart: '', 
-          timeUntilEnd: '' 
+      let components = [];
+      let hasValidSchema = false;
+      let reviewConfig = null;
+      
+      if (markingSchema?.reviews) {
+        reviewConfig = markingSchema.reviews.find(review => 
+          review.reviewName === reviewType
+        );
+        
+        if (reviewConfig?.components?.length > 0) {
+          hasValidSchema = true;
+          components = reviewConfig.components.map((comp, index) => ({
+            key: `component${index + 1}`,
+            label: comp.name,
+            name: comp.name,
+            points: comp.weight || 10
+          }));
+          console.log('✅ [PopupReview] Schema components loaded:', components);
         }
-      : calculateDeadlineStatus(reviewConfig);
-    setDeadlineInfo(deadlineStatus);
-    
-    console.log('📅 [PopupReview] Deadline status:', deadlineStatus);
-    console.log('🔒 [PopupReview] Final form locked status:', finalFormLocked);
-    
-    if (!hasValidSchema && !showOnlyPPTApproval) {
-      console.log('❌ [PopupReview] No valid schema or components found');
-      setError('No marking components found for this review type');
-      components = [];
+      }
+      
+      // ✅ NEW: Skip deadline calculation for guide viewing panel reviews
+      const deadlineStatus = showOnlyPPTApproval 
+        ? { 
+            hasDeadline: false, 
+            fromDate: null, 
+            toDate: null, 
+            isBeforeStart: false, 
+            isAfterEnd: false, 
+            timeUntilStart: '', 
+            timeUntilEnd: '' 
+          }
+        : calculateDeadlineStatus(reviewConfig);
+      setDeadlineInfo(deadlineStatus);
+      
+      console.log('📅 [PopupReview] Deadline status:', deadlineStatus);
+      console.log('🔒 [PopupReview] Final form locked status:', finalFormLocked);
+      
+      if (!hasValidSchema && !showOnlyPPTApproval) {
+        console.log('❌ [PopupReview] No valid schema or components found');
+        setError('No marking components found for this review type');
+        components = [];
+      }
+      
+      // ✅ For guide viewing panel, don't require components
+      setComponentLabels(showOnlyPPTApproval ? [] : components);
+      setHasAttendance(showOnlyPPTApproval ? false : components.length > 0);
+      
+    } catch (err) {
+      console.error('❌ [PopupReview] Error loading schema:', err);
+      setComponentLabels([]);
+      setHasAttendance(false);
+      setError('Schema loading error');
+    } finally {
+      setLoading(false);
     }
-    
-    // For guide viewing panel, don't require components
-    setComponentLabels(showOnlyPPTApproval ? [] : components);
-    setHasAttendance(showOnlyPPTApproval ? false : components.length > 0);
-    
-  } catch (err) {
-    console.error('❌ [PopupReview] Error loading schema:', err);
-    setComponentLabels([]);
-    setHasAttendance(false);
-    setError('Schema loading error');
-  } finally {
-    setLoading(false);
-  }
-}, [isOpen, reviewType, markingSchema, requestStatus, finalFormLocked, panelMode, showOnlyPPTApproval]);
+  }, [isOpen, reviewType, markingSchema, requestStatus, finalFormLocked, panelMode, showOnlyPPTApproval]);
 
-  // Initialize form data from existing student data
+  // ✅ UPDATED: Enhanced useEffect to handle schema-based PPT requirements
   useEffect(() => {
     if (!isOpen || loading) return;
     
     console.log('=== [PopupReview] INITIALIZING FORM DATA ===');
     console.log('🔍 [PopupReview] Show only PPT approval:', showOnlyPPTApproval);
+    console.log('📋 [PopupReview] Marking schema:', markingSchema);
     
     const initialMarks = {};
     const initialComments = {};
@@ -229,7 +229,7 @@ useEffect(() => {
 
       console.log(`📋 [PopupReview] Review data for ${member.name}:`, reviewData);
 
-      // Only initialize marks/attendance if not guide viewing panel
+      // ✅ Only initialize marks/attendance if not guide viewing panel
       if (!showOnlyPPTApproval) {
         const componentMarks = {};
         componentLabels.forEach(comp => {
@@ -249,7 +249,7 @@ useEffect(() => {
         }
       }
       
-      // FIXED: Better PAT initialization with fallback and debugging
+      // ✅ FIXED: Better PAT initialization with fallback and debugging
       const patStatus = member.PAT === true || member.PAT === 'true' || member.PAT === 1;
       initialPatStates[member._id] = patStatus;
       console.log(`🚫 [PopupReview] PAT initialized for ${member.name}: ${patStatus} (original: ${member.PAT})`);
@@ -267,7 +267,7 @@ useEffect(() => {
     // Initialize best project status
     setBestProject(currentBestProject || false);
 
-    // For guide viewing panel, always unlock submit (only PPT approval needed)
+    // ✅ For guide viewing panel, always unlock submit (only PPT approval needed)
     if (showOnlyPPTApproval) {
       setSub('Unlocked');
     } else {
@@ -277,11 +277,21 @@ useEffect(() => {
       setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
     }
 
+    // ✅ CHANGED: Initialize PPT approval from schema-based requirement
     if (requiresPPT) {
+      console.log('📽️ [PopupReview] PPT is required for this review');
+      console.log('📽️ [PopupReview] Team members PPT status:', teamMembers.map(m => ({
+        name: m.name,
+        pptApproved: m.pptApproved
+      })));
+      
       setTeamPptApproved(
         teamMembers.length > 0 && 
         teamMembers.every(member => member.pptApproved?.approved === true)
       );
+    } else {
+      console.log('📽️ [PopupReview] PPT is NOT required for this review');
+      setTeamPptApproved(false);
     }
     
     console.log('✅ [PopupReview] Form data initialized');
@@ -346,87 +356,97 @@ useEffect(() => {
     setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
   };
 
-  const handleSubmit = () => {
-    if (finalFormLocked || (sub === 'Locked' && !showOnlyPPTApproval)) return;
-    
-    console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
-    console.log('🏆 [PopupReview] Best project status:', bestProject);
-    console.log('🔍 [PopupReview] Show only PPT approval:', showOnlyPPTApproval);
-    
-    const submission = {};
-    const patUpdates = {};
-    
-    // Only process marks/comments if not guide viewing panel
-    if (!showOnlyPPTApproval) {
-      teamMembers.forEach(member => {
-        const memberMarks = marks[member._id] || {};
-        const submissionData = {
-          comments: comments[member._id] || ''
-        };
+ const handleSubmit = () => {
+  if (finalFormLocked || (sub === 'Locked' && !showOnlyPPTApproval)) return;
+  
+  console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
+  console.log('🏆 [PopupReview] Best project status:', bestProject);
+  console.log('🔍 [PopupReview] Show only PPT approval:', showOnlyPPTApproval);
+  console.log('📽️ [PopupReview] PPT Required:', requiresPPT);
+  console.log('📽️ [PopupReview] Team PPT Approved:', teamPptApproved);
+  
+  const submission = {};
+  const patUpdates = {};
+  
+  // ✅ Only process marks/comments if not guide viewing panel
+  if (!showOnlyPPTApproval) {
+    teamMembers.forEach(member => {
+      const memberMarks = marks[member._id] || {};
+      const submissionData = {
+        comments: comments[member._id] || ''
+      };
 
-        componentLabels.forEach(comp => {
-          const markValue = memberMarks[comp.key];
-          submissionData[comp.name] = patStates[member._id] ? -1 : (Number(markValue) || 0);
-          console.log(`📤 [PopupReview] Setting ${comp.name} = ${submissionData[comp.name]} for ${member.name}`);
-        });
-
-        if (hasAttendance) {
-          submissionData.attendance = {
-            value: attendance[member._id] || false,
-            locked: false
-          };
-        }
-
-        submission[member.regNo] = submissionData;
-        
-        if (!panelMode) {
-          patUpdates[member.regNo] = patStates[member._id] || false;
-          console.log(`🚫 [PopupReview] PAT status for ${member.name} (${member.regNo}): ${patStates[member._id]}`);
-        }
+      componentLabels.forEach(comp => {
+        const markValue = memberMarks[comp.key];
+        submissionData[comp.name] = patStates[member._id] ? -1 : (Number(markValue) || 0);
+        console.log(`📤 [PopupReview] Setting ${comp.name} = ${submissionData[comp.name]} for ${member.name}`);
       });
-    }
 
-    console.log('📤 [PopupReview] Final submission object:', submission);
-    console.log('📤 [PopupReview] PAT updates object:', patUpdates);
+      if (hasAttendance) {
+        submissionData.attendance = {
+          value: attendance[member._id] || false,
+          locked: false
+        };
+      }
 
-    // MODIFIED: Handle different submission scenarios - Guide viewing panel reviews only sees PPT approval
-    if (showOnlyPPTApproval) {
-      // Guide viewing panel review - only handle PPT approval, no marks/attendance
-      const teamPptObj = {
-        pptApproved: {
-          approved: teamPptApproved,
-          locked: false
-        }
-      };
-      onSubmit({}, teamPptObj, patUpdates); // Empty submission object, only PPT data
-    } else if (requiresPPT && panelMode) {
-      // Panel mode with PPT - handle full review
-      const teamPptObj = {
-        pptApproved: {
-          approved: teamPptApproved,
-          locked: false
-        }
-      };
-      onSubmit(submission, teamPptObj, { bestProject });
-    } else if (panelMode) {
-      // Panel mode without PPT - handle full review
-      onSubmit(submission, null, { bestProject });
-    } else if (requiresPPT) {
-      // Guide mode with PPT - handle normal guide review
-      const teamPptObj = {
-        pptApproved: {
-          approved: teamPptApproved,
-          locked: false
-        }
-      };
-      onSubmit(submission, teamPptObj, patUpdates);
-    } else {
-      // Guide mode without PPT - handle normal guide review
-      onSubmit(submission, patUpdates);
-    }
-  };
+      submission[member.regNo] = submissionData;
+      
+      if (!panelMode) {
+        patUpdates[member.regNo] = patStates[member._id] || false;
+        console.log(`🚫 [PopupReview] PAT status for ${member.name} (${member.regNo}): ${patStates[member._id]}`);
+      }
+    });
+  }
 
-  // Handle PAT toggle (Guide only)
+  console.log('📤 [PopupReview] Final submission object:', submission);
+  console.log('📤 [PopupReview] PAT updates object:', patUpdates);
+
+  // ✅ CORRECTED: Handle different submission scenarios with proper structure
+  if (showOnlyPPTApproval) {
+    // Guide viewing panel review - only handle PPT approval, no marks/attendance
+    const teamPptObj = requiresPPT ? {
+      pptApproved: {
+        approved: teamPptApproved,
+        locked: false
+      }
+    } : null;
+    console.log('📽️ [PopupReview] Guide panel PPT submission:', teamPptObj);
+    onSubmit({}, teamPptObj, {}); // ✅ FIXED: Empty PAT updates for panel reviews
+  } else if (requiresPPT && panelMode) {
+    // Panel mode with PPT - handle full review
+    const teamPptObj = {
+      pptApproved: {
+        approved: teamPptApproved,
+        locked: false
+      }
+    };
+    console.log('📽️ [PopupReview] Panel mode PPT submission:', teamPptObj);
+    // ✅ FIXED: Pass bestProject in correct structure for panel
+    onSubmit(submission, teamPptObj, { bestProject });
+  } else if (panelMode) {
+    // Panel mode without PPT - handle full review
+    console.log('📽️ [PopupReview] Panel mode without PPT submission');
+    // ✅ FIXED: Pass bestProject in correct structure for panel
+    onSubmit(submission, null, { bestProject });
+  } else if (requiresPPT) {
+    // Guide mode with PPT - handle normal guide review
+    const teamPptObj = {
+      pptApproved: {
+        approved: teamPptApproved,
+        locked: false
+      }
+    };
+    console.log('📽️ [PopupReview] Guide mode PPT submission:', teamPptObj);
+    onSubmit(submission, teamPptObj, patUpdates);
+  } else {
+    // Guide mode without PPT - handle normal guide review
+    console.log('📽️ [PopupReview] Guide mode without PPT submission');
+    onSubmit(submission, null, patUpdates);
+  }
+};
+
+
+  // ✅ Handle PAT toggle (Guide only)
   const handlePatToggle = (memberId, isPat) => {
     if (finalFormLocked || panelMode || showOnlyPPTApproval) return;
     
@@ -530,31 +550,31 @@ useEffect(() => {
             </button>
           </div>
         </div>
-        {/* NEW: Guide PPT Approval Required Banner - Only for Panel mode */}
-{panelMode && requiresPPT && !teamPptApproved && (
-  <div className="mb-6 p-4 rounded-xl border-2 bg-orange-50 border-orange-200">
-    <div className="flex items-start space-x-3">
-      <div className="flex-shrink-0">
-        <AlertTriangle className="w-6 h-6 text-orange-600" />
-      </div>
-      <div className="flex-1">
-        <h3 className="font-bold text-lg text-orange-800">
-          ⚠️ Guide PPT Approval Required
-        </h3>
-        <p className="text-orange-700 mt-2">
-          This review requires the project guide to approve the team's PPT before you can proceed with marking. 
-          Please wait for the guide to approve the presentation.
-        </p>
-        <div className="mt-3 p-2 bg-orange-100 border border-orange-300 rounded">
-          <p className="text-orange-800 font-medium text-sm">
-            🔒 Marking is currently blocked until guide approval is received
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
 
+        {/* ✅ NEW: Guide PPT Approval Required Banner - Only for Panel mode */}
+        {panelMode && requiresPPT && !teamPptApproved && (
+          <div className="mb-6 p-4 rounded-xl border-2 bg-orange-50 border-orange-200">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-orange-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-lg text-orange-800">
+                  ⚠️ Guide PPT Approval Required
+                </h3>
+                <p className="text-orange-700 mt-2">
+                  This review requires the project guide to approve the team's PPT before you can proceed with marking. 
+                  Please wait for the guide to approve the presentation.
+                </p>
+                <div className="mt-3 p-2 bg-orange-100 border border-orange-300 rounded">
+                  <p className="text-orange-800 font-medium text-sm">
+                    🔒 Marking is currently blocked until guide approval is received
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
@@ -679,9 +699,18 @@ useEffect(() => {
             </div>
           )}
 
-          {/* Team PPT Approval */}
+          {/* ✅ UPDATED: Team PPT Approval Section - Only show when schema requires it */}
           {requiresPPT && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-blue-800 flex items-center gap-2">
+                  <span>📽️</span>
+                  Team PPT Approval Required
+                </h3>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                  Schema Required
+                </span>
+              </div>
               <label className="flex items-center space-x-3">
                 <input
                   type="checkbox"
@@ -691,13 +720,16 @@ useEffect(() => {
                   className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="font-semibold text-blue-800">
-                  Team PPT Approved
+                  Approve Team PPT for this review
                 </span>
               </label>
+              <p className="text-sm text-blue-600 mt-2">
+                This review requires PPT approval as configured in the marking schema.
+              </p>
             </div>
           )}
 
-          {/* Guide viewing Panel Review - Show only PPT Approval */}
+          {/* ✅ UPDATED: Guide viewing Panel Review - Show PPT if schema requires */}
           {showOnlyPPTApproval && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
               <h3 className="text-lg font-bold text-blue-800 mb-4">
@@ -707,9 +739,15 @@ useEffect(() => {
                 As a guide, you can only approve/disapprove the PPT for this panel review.
               </p>
               
-              {/* Team PPT Approval */}
-              {requiresPPT && (
+              {/* Team PPT Approval - Only show if schema requires it */}
+              {requiresPPT ? (
                 <div className="mb-6 p-4 bg-white border border-blue-200 rounded-xl">
+                  <div className="flex items-center justify-center space-x-3 mb-3">
+                    <span className="text-2xl">📽️</span>
+                    <span className="font-semibold text-blue-800 text-lg">
+                      PPT Approval Required
+                    </span>
+                  </div>
                   <label className="flex items-center justify-center space-x-3">
                     <input
                       type="checkbox"
@@ -722,12 +760,16 @@ useEffect(() => {
                       Approve Team PPT
                     </span>
                   </label>
+                  <p className="text-sm text-blue-600 mt-2">
+                    This panel review requires PPT approval as per the marking schema.
+                  </p>
                 </div>
-              )}
-              
-              {!requiresPPT && (
-                <div className="text-gray-500 italic">
-                  This panel review does not require PPT approval.
+              ) : (
+                <div className="text-gray-500 italic p-4 bg-gray-50 rounded-xl">
+                  <span className="text-4xl mb-2 block">ℹ️</span>
+                  This panel review does not require PPT approval according to the marking schema.
+                  <br />
+                  <span className="text-sm mt-2 block">No action needed from guide side.</span>
                 </div>
               )}
             </div>
@@ -880,16 +922,22 @@ useEffect(() => {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={finalFormLocked || (sub === 'Locked' && !showOnlyPPTApproval) || (showOnlyPPTApproval && !requiresPPT)}
+              disabled={
+                finalFormLocked || 
+                (sub === 'Locked' && !showOnlyPPTApproval) || 
+                (showOnlyPPTApproval && !requiresPPT) // ✅ CHANGED: Only disable if PPT not required in schema
+              }
               className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                finalFormLocked || (sub === 'Locked' && !showOnlyPPTApproval) || (showOnlyPPTApproval && !requiresPPT)
+                finalFormLocked || 
+                (sub === 'Locked' && !showOnlyPPTApproval) || 
+                (showOnlyPPTApproval && !requiresPPT)
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : panelMode && bestProject
                     ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
               }`}
             >
-              {/* Updated button text */}
+              {/* ✅ UPDATED: Button text logic */}
               {deadlineInfo.isBeforeStart && requestStatus !== 'approved' && !showOnlyPPTApproval
                 ? '⏳ Not Yet Open'
                 : deadlineInfo.isAfterEnd && requestStatus !== 'approved' && !showOnlyPPTApproval
@@ -901,12 +949,14 @@ useEffect(() => {
                       : sub === 'Locked' && !showOnlyPPTApproval
                         ? 'Comments Required'
                         : showOnlyPPTApproval && !requiresPPT
-                          ? 'No PPT Required'
-                        : showOnlyPPTApproval
-                          ? 'Submit PPT Approval'
-                          : panelMode && bestProject
-                            ? '⭐ Submit Best Project Review'
-                            : `Submit ${panelMode ? 'Panel ' : ''}Review`}
+                          ? 'No PPT Required by Schema'
+                          : showOnlyPPTApproval && requiresPPT
+                            ? '📽️ Submit PPT Approval'
+                            : panelMode && bestProject
+                              ? '⭐ Submit Best Project Review'
+                              : requiresPPT
+                                ? `📽️ Submit ${panelMode ? 'Panel ' : ''}Review + PPT`
+                                : `Submit ${panelMode ? 'Panel ' : ''}Review`}
             </button>
           </div>
         </div>

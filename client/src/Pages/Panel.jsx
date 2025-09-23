@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNotification } from '../Components/NotificationProvider';
 import PopupReview from '../Components/PopupReview';
 import ReviewTable from '../Components/ReviewTable';
 import Navbar from '../Components/UniversalNavbar';
-import { ChevronRight, RefreshCw, Users, Calendar, AlertCircle, MapPin } from 'lucide-react';
+import { ChevronRight, RefreshCw, Users, Calendar, AlertCircle, MapPin, AlertTriangle } from 'lucide-react';
 import { 
   getPanelProjects,
   updateProject,
@@ -53,7 +54,7 @@ const PanelContent = React.memo(({
   getButtonColor,
   setActivePopup,
   refreshKey,
-  getGuidePPTStatus // FIXED: Pass as prop
+  getGuidePPTStatus
 }) => {
   console.log('🔄 [PanelContent] Rendering inner content with refreshKey:', refreshKey);
   
@@ -75,7 +76,6 @@ const PanelContent = React.memo(({
       ) : (
         <div className="divide-y divide-gray-100">
           {teams.map(team => {
-            // ✅ FIXED: Get review types and deadlines per team like Guide does
             const reviewTypes = getReviewTypes(team.markingSchema);
             const deadlines = getDeadlines(team.markingSchema);
             
@@ -164,27 +164,25 @@ const PanelContent = React.memo(({
                                       </span>
                                     )}
                                     
-                                    {/* Guide PPT Approval Status for PPT-required reviews */}
-                                    {reviewType.requiresPPT && (
-                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                        guidePPTStatus === 'approved'
-                                          ? 'bg-green-100 text-green-700'
-                                          : guidePPTStatus === 'partial'
-                                          ? 'bg-yellow-100 text-yellow-700'
-                                          : guidePPTStatus === 'not-approved'
-                                          ? 'bg-red-100 text-red-700'
-                                          : 'bg-gray-100 text-gray-700'
-                                      }`}>
-                                        {guidePPTStatus === 'approved'
-                                          ? 'Guide ✓'
-                                          : guidePPTStatus === 'partial'
-                                          ? 'Guide ⚠'
-                                          : guidePPTStatus === 'not-approved'
-                                          ? 'Guide ✗'
-                                          : 'Guide ?'
-                                        }
-                                      </span>
-                                    )}
+                                    {/* FIXED: Guide PPT Approval Status - Always show since all reviews require PPT now */}
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      guidePPTStatus === 'approved'
+                                        ? 'bg-green-100 text-green-700'
+                                        : guidePPTStatus === 'partial'
+                                        ? 'bg-yellow-100 text-yellow-700'
+                                        : guidePPTStatus === 'not-approved'
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {guidePPTStatus === 'approved'
+                                        ? 'Guide ✓'
+                                        : guidePPTStatus === 'partial'
+                                        ? 'Guide ⚠'
+                                        : guidePPTStatus === 'not-approved'
+                                        ? 'Guide ✗'
+                                        : 'Guide ?'
+                                      }
+                                    </span>
                                   </div>
                                 </div>
                               );
@@ -199,6 +197,9 @@ const PanelContent = React.memo(({
                       {reviewTypes.map(reviewType => {
                         const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
                         const requestStatus = getTeamRequestStatus(team, reviewType.key);
+                        const guidePPTStatus = getGuidePPTStatus(team, reviewType.key);
+                        const isBlockedByGuide = guidePPTStatus !== 'approved';
+                        
                         return (
                          <button
                             key={reviewType.key}
@@ -207,24 +208,33 @@ const PanelContent = React.memo(({
                               teamId: team.id,
                               teamTitle: team.title,
                               students: team.students,
-                              markingSchema: team.markingSchema // ✅ Pass team's marking schema
+                              markingSchema: team.markingSchema
                             })}
                             className={`px-4 py-3 text-white text-sm font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${getButtonColor(reviewType.key)} ${
-                              isPassed ? 'opacity-75' : ''
+                              isPassed || isBlockedByGuide ? 'opacity-75' : ''
                             } flex items-center gap-2 whitespace-nowrap min-w-0`}
                             title={`${reviewType.components?.length || 0} components${
                               requestStatus === 'approved' ? ' | Extended by Admin' : ''
-                            }${isPassed ? ' | DEADLINE PASSED' : ''}`}
+                            }${isPassed ? ' | DEADLINE PASSED' : ''}${
+                              isBlockedByGuide ? ' | BLOCKED: Guide approval required' : ''
+                            }`}
                           >
                             <span className="truncate max-w-24 sm:max-w-none">{reviewType.name}</span>
-                            {reviewType.requiresPPT && (
-                              <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">PPT</span>
-                            )}
+                            
+                            {/* Always show PPT indicator since all reviews have PPT now */}
+                            <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">PPT</span>
+                            
                             {requestStatus === 'approved' && (
                               <span className="text-xs bg-purple-500 px-2 py-1 rounded-full flex-shrink-0 font-bold">EXT</span>
                             )}
+                            
                             {isPassed && (
-                              <span className="text-xs bg-red-500 px-2 py-1 rounded-full flex-shrink-0">🔒</span>
+                              <span className="text-xs bg-red-500 px-2 py-1 rounded-full flex-shrink-0">⏰</span>
+                            )}
+                            
+                            {/* NEW: Show blocked indicator */}
+                            {isBlockedByGuide && (
+                              <span className="text-xs bg-orange-500 px-2 py-1 rounded-full flex-shrink-0">🔒</span>
                             )}
                           </button>
                         );
@@ -242,7 +252,7 @@ const PanelContent = React.memo(({
                           requestStatuses={requestStatuses}
                           isDeadlinePassed={(reviewType) => isTeamDeadlinePassed(reviewType, team.id)}
                           isReviewLocked={(student, reviewType) => isReviewLocked(student, reviewType, team.id)}
-                          markingSchema={team.markingSchema} // ✅ Pass team's marking schema
+                          markingSchema={team.markingSchema}
                           panelMode={true}
                         />
                       </div>
@@ -268,7 +278,9 @@ const Panel = () => {
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // FIXED: Moved inside component - Function to get guide PPT approval status
+  const { showNotification, hideNotification } = useNotification();
+
+  // Function to get guide PPT approval status
   const getGuidePPTStatus = useCallback((team, reviewType) => {
     if (!team.students || team.students.length === 0) return 'unknown';
     
@@ -287,7 +299,7 @@ const Panel = () => {
     return 'not-approved';
   }, []);
 
-  // ✅ FIXED: Same as Guide - get review types per team's marking schema
+  // FIXED: Get panel review types with requiresPPT always true
   const getReviewTypes = useCallback((markingSchema) => {
     console.log('🔍 [Panel] Getting review types from schema:', markingSchema);
     if (markingSchema?.reviews) {
@@ -297,7 +309,7 @@ const Panel = () => {
           key: review.reviewName,
           name: review.displayName || review.reviewName,
           components: review.components || [],
-          requiresPPT: review.requiresPPT || false,
+          requiresPPT: true, // All reviews now have pptApproved in schema
           facultyType: review.facultyType
         }));
       console.log('✅ [Panel] Panel reviews found:', panelReviews);
@@ -308,7 +320,7 @@ const Panel = () => {
     return [];
   }, []);
 
-  // ✅ FIXED: Same as Guide - get deadlines per team's marking schema
+  // Get deadlines per team's marking schema
   const getDeadlines = useCallback((markingSchema) => {
     console.log('📅 [Panel] Getting deadlines from schema:', markingSchema);
     const deadlineData = {};
@@ -329,7 +341,6 @@ const Panel = () => {
       setLoading(true);
       setError(null);
       
-      // ✅ FIXED: Only call getPanelProjects - it should include marking schema per project
       const projectsRes = await getPanelProjects().catch(error => ({ data: { success: false, error: error.message } }));
 
       let mappedTeams = [];
@@ -344,12 +355,11 @@ const Panel = () => {
           pptApproved: project.pptApproved || { approved: false, locked: false },
           panel: project.panel,
           bestProject: !!project.bestProject,
-          markingSchema: project.markingSchema, // ✅ Each team has its own marking schema
+          markingSchema: project.markingSchema,
         }));
         setTeams(mappedTeams);
         console.log('✅ [Panel] Teams mapped with marking schemas:', mappedTeams.map(t => ({ title: t.title, hasSchema: !!t.markingSchema })));
 
-        // ✅ FIXED: Batch fetch request statuses using per-team marking schemas
         if (mappedTeams.length > 0) {
           const batchRequests = [];
           
@@ -378,10 +388,11 @@ const Panel = () => {
     } catch (err) {
       console.error('❌ [Panel] Error fetching data:', err);
       setError('Failed to load panel data. Please try again.');
+      showNotification('error', 'Data Load Error', 'Failed to load panel data. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [getReviewTypes]);
+  }, [getReviewTypes, showNotification]);
 
   useEffect(() => {
     fetchData();
@@ -399,14 +410,14 @@ const Panel = () => {
     } catch (err) {
       console.error('❌ [Panel] Error during refresh:', err);
       setError('Failed to refresh panel data. Please try again.');
+      showNotification('error', 'Refresh Error', 'Failed to refresh panel data. Please try again.');
     } finally {
       setRefreshing(false);
     }
-  }, [fetchData]);
+  }, [fetchData, showNotification]);
 
-  // ✅ FIXED: Dynamic button colors based on actual review types
+  // Dynamic button colors based on actual review types
   const getButtonColor = useCallback((reviewType) => {
-    // ✅ Generate colors based on review type hash for consistency
     const hash = reviewType.split('').reduce((a, b) => {
       a = ((a << 5) - a) + b.charCodeAt(0);
       return a & a;
@@ -439,7 +450,6 @@ const Panel = () => {
     const team = teams.find(t => t.id === teamId);
     if (!team) return false;
 
-    // ✅ FIXED: Use team's marking schema for deadlines
     const teamDeadlines = getDeadlines(team.markingSchema);
     if (!teamDeadlines || !teamDeadlines[reviewType]) {
       return false;
@@ -511,7 +521,7 @@ const Panel = () => {
       const team = teams.find(t => t.id === teamId);
       if (!team) {
         console.error('❌ [PANEL] Team not found for ID:', teamId);
-        alert('Team not found! Please refresh and try again.');
+        showNotification('error', 'Team Not Found', 'Team not found! Please refresh and try again.');
         return;
       }
 
@@ -520,23 +530,20 @@ const Panel = () => {
       console.log('📋 [PANEL] Raw Review Data from popup:', reviewData);
       console.log('🏆 [PANEL] Project data (best project):', projectObj);
 
-      // ✅ FIXED: Use team's marking schema
       const reviewConfig = team.markingSchema?.reviews?.find(r => r.reviewName === reviewType);
       
       if (!reviewConfig) {
         console.error('❌ [PANEL] Review config not found for type:', reviewType);
-        alert('Review configuration not found! Please refresh and try again.');
+        showNotification('error', 'Configuration Error', 'Review configuration not found! Please refresh and try again.');
         return;
       }
 
-      // Process student updates
       const studentUpdates = team.students.map(student => {
         console.log(`🎓 [PANEL] Processing student: ${student.name} (${student.regNo})`);
         
         const studentReviewData = reviewData[student.regNo] || {};
         console.log(`📊 [PANEL] Student review data for ${student.name}:`, studentReviewData);
         
-        // Build marks object using component names from schema
         const marks = {};
         if (reviewConfig.components && reviewConfig.components.length > 0) {
           reviewConfig.components.forEach(comp => {
@@ -552,7 +559,7 @@ const Panel = () => {
             [reviewType]: {
               marks: marks,
               attendance: studentReviewData.attendance || { value: false, locked: false },
-              locked: studentReviewData.locked || false,
+              
               comments: studentReviewData.comments || ''
             }
           }
@@ -581,8 +588,12 @@ const Panel = () => {
 
       console.log('📤 [PANEL] Final project data:', JSON.stringify(projectData, null, 2));
       
+      const loadingId = showNotification('info', 'Submitting...', 'Please wait while we save your review data...', 10000);
+      
       const response = await updateProject(teamId, projectData);
       console.log('📨 [PANEL] Backend response received:', response);
+      
+      hideNotification(loadingId);
       
       if (response.data?.success || response.data?.updates) {
         setActivePopup(null);
@@ -591,28 +602,31 @@ const Panel = () => {
           await handleRefresh();
           
           if (projectObj?.bestProject) {
-            alert('🏆 SUCCESS! Panel review submitted and project marked as BEST PROJECT!');
+            showNotification('success', 'Review Saved', '🏆 SUCCESS! Panel review submitted and project marked as BEST PROJECT!');
           } else if (response.data?.bestProject === false) {
-            alert('Panel review submitted. Project is no longer marked as best project.');
+            showNotification('success', 'Review Saved', 'Panel review submitted. Project is no longer marked as best project.');
           } else {
-            alert('Panel review submitted and saved successfully!');
+            showNotification('success', 'Review Saved', 'Panel review submitted and saved successfully!');
           }
         }, 300);
         
       } else {
         console.error('❌ [PANEL] Backend response indicates failure:', response.data);
-        alert('Review submission failed. Please try again.');
+        showNotification('error', 'Submission Failed', 'Review submission failed. Please try again.');
       }
     } catch (error) {
       console.error('❌ [PANEL] Critical error during submission:', error);
-      alert(`Error submitting panel review: ${error.message}`);
+      showNotification('error', 'Submission Error', `Error submitting panel review: ${error.message}`);
     }
-  }, [teams, handleRefresh]);
+  }, [teams, handleRefresh, showNotification, hideNotification]);
 
   const handleRequestEdit = useCallback(async (teamId, reviewType) => {
     try {
       const team = teams.find(t => t.id === teamId);
-      if (!team) return;
+      if (!team) {
+        showNotification('error', 'Team Not Found', 'Team not found. Please refresh and try again.');
+        return;
+      }
 
       const reason = prompt('Please enter the reason for requesting edit access:', 'Need to correct marks after deadline');
       if (!reason?.trim()) return;
@@ -623,18 +637,23 @@ const Panel = () => {
         reason: reason.trim()
       };
 
+      const loadingId = showNotification('info', 'Submitting Request...', 'Please wait while we process your request...', 10000);
+
       const response = await createReviewRequest('panel', requestData);
+      
+      hideNotification(loadingId);
+
       if (response.success) {
-        alert('Edit request submitted successfully!');
+        showNotification('success', 'Request Submitted', 'Edit request submitted successfully!');
         await handleRefresh();
       } else {
-        alert(response.message || 'Error submitting request');
+        showNotification('error', 'Request Failed', response.message || 'Error submitting request');
       }
     } catch (error) {
       console.error('❌ [Panel] Error submitting edit request:', error);
-      alert('Error submitting panel request. Please try again.');
+      showNotification('error', 'Request Error', 'Error submitting panel request. Please try again.');
     }
-  }, [teams, handleRefresh]);
+  }, [teams, handleRefresh, showNotification, hideNotification]);
 
   if (loading) {
     return (
@@ -729,7 +748,7 @@ const Panel = () => {
               getButtonColor={getButtonColor}
               setActivePopup={setActivePopup}
               refreshKey={refreshKey}
-              getGuidePPTStatus={getGuidePPTStatus} // FIXED: Pass as prop
+              getGuidePPTStatus={getGuidePPTStatus}
             />
             
             {/* Popup Review Modal */}
@@ -743,9 +762,9 @@ const Panel = () => {
                 const reviewTypes = getReviewTypes(team.markingSchema);
                 const reviewTypeCfg = reviewTypes.find(r => r.key === activePopup.type);
                 
-                // Check if guide has approved PPT for PPT-required reviews
+                // Check if guide has approved PPT (all reviews require PPT now)
                 const guidePPTStatus = getGuidePPTStatus(team, activePopup.type);
-                const isBlockedByGuide = reviewTypeCfg?.requiresPPT && guidePPTStatus !== 'approved';
+                const isBlockedByGuide = guidePPTStatus !== 'approved';
                 
                 return (
                   <PopupReview
@@ -761,9 +780,9 @@ const Panel = () => {
                     onClose={() => setActivePopup(null)}
                     onSubmit={(data, pptObj, projectObj) => handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj, projectObj)}
                     onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
-                    requestEditVisible={isLocked && requestStatus !== 'none' && requestStatus !== 'rejected'}
+                    requestEditVisible={isLocked && requestStatus !== 'none' && requestStatus !== 'rejected' && !isBlockedByGuide}
                     requestPending={requestStatus === 'pending'}
-                    requiresPPT={!!reviewTypeCfg?.requiresPPT}
+                    requiresPPT={true} // All reviews require PPT now
                   />
                 );
               })()
