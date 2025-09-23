@@ -495,15 +495,15 @@ export async function getAllFaculty(req, res) {
     // Build dynamic query based on provided filters
     let query = {};
 
-    if (school && school !== "all") query.schools = school;
-    if (department && department !== "all") query.departments = department;
+    if (school && school !== "all") query.school = school;
+    if (department && department !== "all") query.department = department;
     if (specialization && specialization !== "all")
       query.specialization = specialization;
 
     // Allowed sorting fields
     const validSortFields = [
-      "schools",
-      "departments",
+      "school",
+      "department",
       "specialization",
       "name",
       "employeeId",
@@ -546,6 +546,7 @@ export async function getAllFaculty(req, res) {
     });
   }
 }
+
 
 export async function getAllGuideWithProjects(req, res) {
   try {
