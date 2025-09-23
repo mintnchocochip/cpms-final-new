@@ -2,6 +2,7 @@ import Faculty from "../models/facultySchema.js";
 import Student from "../models/studentSchema.js";
 import Request from "../models/requestSchema.js";
 import MarkingSchema from "../models/markingSchema.js";
+
 export const getMarkingSchema = async (req, res) => {
   try {
     const { school, department } = req.query;

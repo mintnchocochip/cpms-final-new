@@ -23,7 +23,6 @@ export async function createOrUpdateMarkingSchema(req, res) {
       .json({ success: false, message: "Missing or invalid fields." });
   }
 
-  // Validate reviews structure
   for (const review of reviews) {
     if (
       !review.reviewName ||
@@ -43,10 +42,40 @@ export async function createOrUpdateMarkingSchema(req, res) {
         message: "Each review must have valid deadline with from and to dates",
       });
     }
+
+    if (review.components) {
+      if (!Array.isArray(review.components)) {
+        return res.status(400).json({
+          success: false,
+          message: "Components must be an array if provided",
+        });
+      }
+      for (const comp of review.components) {
+        if (!comp.name || typeof comp.weight !== "number") {
+          return res.status(400).json({
+            success: false,
+            message: "Each component must have a name and numeric weight",
+          });
+        }
+      }
+    }
+
+    if (review.pptApproved) {
+      if (
+        typeof review.pptApproved.approved !== "boolean" ||
+        typeof review.pptApproved.locked !== "boolean"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "pptApproved field must have boolean approved and locked values",
+        });
+      }
+    }
   }
 
   try {
-    const updated = await MarkingSchema.findOneAndUpdate(
+    const updated = await MarkingSchemaModel.findOneAndUpdate(
       { school, department },
       { reviews },
       { new: true, upsert: true }
@@ -546,7 +575,6 @@ export async function getAllFaculty(req, res) {
     });
   }
 }
-
 
 export async function getAllGuideWithProjects(req, res) {
   try {

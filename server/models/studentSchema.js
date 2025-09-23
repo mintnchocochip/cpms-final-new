@@ -13,6 +13,10 @@ const reviewComponentSchema = new mongoose.Schema(
       locked: { type: Boolean, default: false },
     },
     locked: { type: Boolean, default: false },
+    pptApproved: {
+      approved: { type: Boolean, default: false },
+      locked: { type: Boolean, default: false },
+    },
   },
   { _id: false }
 );
@@ -26,10 +30,6 @@ const studentSchema = new mongoose.Schema({
     of: reviewComponentSchema,
     default: {},
   },
-  pptApproved: {
-    approved: { type: Boolean, default: false },
-    locked: { type: Boolean, default: false },
-  },
   deadline: {
     type: Map,
     of: {
@@ -41,12 +41,11 @@ const studentSchema = new mongoose.Schema({
   PAT: {
     type: Boolean,
     default: false,
-    required: true
+    required: true,
   },
   school: String,
   department: String,
 });
-
 
 const Student = mongoose.model("Student", studentSchema);
 export default Student;

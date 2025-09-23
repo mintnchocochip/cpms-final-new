@@ -921,6 +921,7 @@ export async function deleteProject(req, res) {
  * Get all projects where the logged-in faculty is the guide.
  * Relies on req.user.id (set by authMiddleware).
  */
+// This is for adding ppt approvoal for 
 export async function getAllGuideProjects(req, res) {
   try {
     const userId = req.user.id;
