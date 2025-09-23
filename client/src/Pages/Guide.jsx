@@ -124,40 +124,54 @@ const GuideContent = React.memo(({
                       </div>
                     </div>
                     
-                    {/* Review Buttons */}
-                    <div className="flex flex-wrap gap-3 justify-start lg:justify-end">
-                      {reviewTypes.map(reviewType => {
-                        const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
-                        const requestStatus = getTeamRequestStatus(team, reviewType.key);
-                        
-                        return (
-                          <button
-                            key={reviewType.key}
-                            onClick={() => setActivePopup({ 
-                              type: reviewType.key, 
-                              teamId: team.id,
-                              teamTitle: team.title,
-                              students: team.students,
-                              markingSchema: team.markingSchema
-                            })}
-                            className={`px-4 py-3 text-white text-sm font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${getButtonColor(reviewType.key)} ${
-                              isPassed ? 'opacity-75' : ''
-                            } flex items-center gap-2 whitespace-nowrap min-w-0`}
-                          >
-                            <span className="truncate max-w-24 sm:max-w-none">{reviewType.name}</span>
-                            {reviewType.requiresPPT && (
-                              <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">PPT</span>
-                            )}
-                            {requestStatus === 'approved' && (
-                              <span className="text-xs bg-purple-500 px-2 py-1 rounded-full flex-shrink-0 font-bold">EXT</span>
-                            )}
-                            {isPassed && (
-                              <span className="text-xs bg-red-500 px-2 py-1 rounded-full flex-shrink-0">🔒</span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+  {/* Review Buttons */}
+<div className="flex flex-wrap gap-3 justify-start lg:justify-end">
+  {reviewTypes.map(reviewType => {
+    const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
+    const requestStatus = getTeamRequestStatus(team, reviewType.key);
+    
+    return (
+      <button
+        key={reviewType.key}
+        onClick={() => setActivePopup({
+          type: reviewType.key,
+          teamId: team.id,
+          teamTitle: team.title,
+          students: team.students,
+          markingSchema: team.markingSchema,
+          // NEW: Add review type identification
+          isGuideReview: reviewType.facultyType === 'guide',
+          isPanelReview: reviewType.facultyType === 'panel'
+        })}
+        className={`px-4 py-3 text-white text-sm font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${getButtonColor(reviewType.key)} ${isPassed ? 'opacity-75' : ''} flex items-center gap-2 whitespace-nowrap min-w-0`}
+      >
+        <span className="truncate max-w-24 sm:max-w-none">
+          {reviewType.facultyType === 'panel' ? `${reviewType.name} (Panel)` : reviewType.name}
+        </span>
+        
+        {reviewType.requiresPPT && (
+          <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">
+            PPT
+          </span>
+        )}
+        
+        {requestStatus === 'approved' && (
+          <span className="text-xs bg-purple-500 px-2 py-1 rounded-full flex-shrink-0 font-bold">
+            EXT
+          </span>
+        )}
+        
+        {isPassed && requestStatus !== 'approved' && reviewType.facultyType === 'guide' && (
+          <span className="text-xs bg-red-500 px-2 py-1 rounded-full flex-shrink-0">
+            ⏰
+          </span>
+        )}
+      </button>
+    );
+  })}
+</div>
+
+
                   </div>
                   
                   {/* Expanded Content */}
@@ -206,25 +220,31 @@ const Guide = () => {
   // ✅ NEW: Use your existing notification hook
   const { showNotification, hideNotification } = useNotification();
 
-  const getReviewTypes = useCallback((markingSchema) => {
-    console.log('🔍 [Guide] Getting review types from schema:', markingSchema);
-    if (markingSchema?.reviews) {
-      const guideReviews = markingSchema.reviews
-        .filter(review => review.facultyType === 'guide')
-        .map(review => ({
-          key: review.reviewName,
-          name: review.displayName || review.reviewName,
-          components: review.components || [],
-          requiresPPT: review.requiresPPT || false,
-          facultyType: review.facultyType
-        }));
-      console.log('✅ [Guide] Guide reviews found:', guideReviews);
-      return guideReviews;
-    }
+const getReviewTypes = useCallback((markingSchema) => {
+  console.log('🔄 Guide Getting ALL review types from schema:', markingSchema);
+  
+  if (markingSchema?.reviews) {
+    // Show ALL reviews (guide + panel) but filter what's displayed later
+    const allReviews = markingSchema.reviews
+      .map(review => ({
+        key: review.reviewName,
+        name: review.displayName || review.reviewName,
+        components: review.components || [],
+        requiresPPT: review.requiresPPT || false,
+        facultyType: review.facultyType,
+        isGuideReview: review.facultyType === 'guide',
+        isPanelReview: review.facultyType === 'panel'
+      }));
     
-    console.log('❌ [Guide] No schema found - returning empty reviews');
-    return [];
-  }, []);
+    console.log('📋 Guide All reviews found:', allReviews);
+    return allReviews;
+  }
+  
+  console.log('⚠️ Guide No schema found - returning empty reviews');
+  return [];
+}, []);
+
+
 
   const getDeadlines = useCallback((markingSchema) => {
     console.log('📅 [Guide] Getting deadlines from schema:', markingSchema);
@@ -755,36 +775,38 @@ const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pp
               defaultReason="Need to correct marks after deadline"
             />
 
-{/* ✅ Popup Review Modal */}
-{activePopup && (() => {
-  const team = teams.find(t => t.id === activePopup.teamId);
-  const reviewTypes = getReviewTypes(team.markingSchema);
-  const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
-  const requestStatus = getTeamRequestStatus(team, activePopup.type);
-  
-  const showRequestEdit = isLocked && (requestStatus === 'none' || requestStatus === 'rejected');
-  
-  return (
-    <PopupReview
-      title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
-      teamMembers={activePopup.students}
-      reviewType={activePopup.type}
-      isOpen={true}
-      locked={isLocked}
-      markingSchema={activePopup.markingSchema}
-      requestStatus={requestStatus}
-      onClose={() => setActivePopup(null)}
-      onSubmit={(data, pptObj, patUpdates) => {
-        // ✅ FIXED: Pass PAT updates as third parameter
-        handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj, patUpdates);
-      }}
-      onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
-      requestEditVisible={showRequestEdit}
-      requestPending={requestStatus === 'pending'}
-      requiresPPT={reviewTypes.find(r => r.key === activePopup.type)?.requiresPPT || false}
-    />
-  );
-})()}
+{/* Popup Review Modal */}
+{activePopup && (
+  (() => {
+    const team = teams.find(t => t.id === activePopup.teamId);
+    const reviewTypes = getReviewTypes(team.markingSchema);
+    const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
+    const requestStatus = getTeamRequestStatus(team, activePopup.type);
+    const showRequestEdit = isLocked && requestStatus !== 'none' && requestStatus !== 'rejected';
+    
+    return (
+      <PopupReview
+        title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
+        teamMembers={activePopup.students}
+        reviewType={activePopup.type}
+        isOpen={true}
+        locked={isLocked}
+        markingSchema={activePopup.markingSchema}
+        requestStatus={requestStatus}
+        onClose={() => setActivePopup(null)}
+        onSubmit={(data, pptObj, patUpdates) => handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj, patUpdates)}
+        onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
+        requestEditVisible={showRequestEdit}
+        requestPending={requestStatus === 'pending'}
+        requiresPPT={reviewTypes.find(r => r.key === activePopup.type)?.requiresPPT || false}
+        // NEW: Pass the review identification props
+        isGuideReview={activePopup.isGuideReview || false}
+        isPanelReview={activePopup.isPanelReview || false}
+      />
+    );
+  })()
+)}
+
 
 
           </div>

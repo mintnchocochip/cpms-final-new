@@ -38,32 +38,34 @@ function Schedule() {
   const [selectedDepartment, setSelectedDepartment] = useState('');
 
   // State for Guide Reviews
-  const [guideReviews, setGuideReviews] = useState([
-    {
-      id: 'guide-draftReview',
-      reviewName: 'draftReview',
-      displayName: 'Draft Review',
-      facultyType: 'guide',
-      from: defaultDate,
-      to: defaultDate,
-      components: [{ name: "", weight: "" }],
-      requiresPPT: false
-    }
-  ]);
+ // State for Guide Reviews  
+const [guideReviews, setGuideReviews] = useState([
+  {
+    id: 'guide-draftReview',
+    reviewName: 'draftReview',
+    displayName: 'Draft Review',
+    facultyType: 'guide',
+    from: defaultDate,
+    to: defaultDate,
+    components: [{ name: '', weight: '' }],
+    // REMOVED: requiresPPT: false
+  }
+]);
 
-  // State for Panel Reviews
-  const [panelReviews, setPanelReviews] = useState([
-    {
-      id: 'panel-review0',
-      reviewName: 'review0',
-      displayName: 'Review 0',
-      facultyType: 'panel',
-      from: defaultDate,
-      to: defaultDate,
-      components: [{ name: "", weight: "" }],
-      requiresPPT: false
-    }
-  ]);
+// State for Panel Reviews
+const [panelReviews, setPanelReviews] = useState([
+  {
+    id: 'panel-review0', 
+    reviewName: 'review0',
+    displayName: 'Review 0',
+    facultyType: 'panel',
+    from: defaultDate,
+    to: defaultDate,
+    components: [{ name: '', weight: '' }],
+    // REMOVED: requiresPPT: false
+  }
+]);
+
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -126,44 +128,49 @@ function Schedule() {
   }, 0);
 
   // Add new guide review
-  const addGuideReview = () => {
-    if (!canAddReview) {
-      showNotification("error", "Cannot Add Review", "Total weight would exceed 100 marks.");
-      return;
-    }
-    
-    const newReview = {
-      id: `guide-${Date.now()}`,
-      reviewName: `guideReview${guideReviews.length}`,
-      displayName: `Guide Review ${guideReviews.length + 1}`,
-      facultyType: 'guide',
-      from: defaultDate,
-      to: defaultDate,
-      components: [{ name: "", weight: "" }],
-      requiresPPT: false
-    };
-    setGuideReviews([...guideReviews, newReview]);
+  // Add new guide review
+const addGuideReview = () => {
+  if (!canAddReview) {
+    showNotification('error', 'Cannot Add Review', 'Total weight would exceed 100 marks.');
+    return;
+  }
+
+  const newReview = {
+    id: `guide-${Date.now()}`,
+    reviewName: `guideReview${guideReviews.length}`,
+    displayName: `Guide Review ${guideReviews.length + 1}`,
+    facultyType: 'guide',
+    from: defaultDate,
+    to: defaultDate,
+    components: [{ name: '', weight: '' }],
+    // REMOVED: requiresPPT: false
   };
 
+  setGuideReviews([...guideReviews, newReview]);
+};
+
   // Add new panel review
-  const addPanelReview = () => {
-    if (!canAddReview) {
-      showNotification("error", "Cannot Add Review", "Total weight would exceed 100 marks.");
-      return;
-    }
-    
-    const newReview = {
-      id: `panel-${Date.now()}`,
-      reviewName: `panelReview${panelReviews.length}`,
-      displayName: `Panel Review ${panelReviews.length + 1}`,
-      facultyType: 'panel',
-      from: defaultDate,
-      to: defaultDate,
-      components: [{ name: "", weight: "" }],
-      requiresPPT: false
-    };
-    setPanelReviews([...panelReviews, newReview]);
+  // Add new panel review
+const addPanelReview = () => {
+  if (!canAddReview) {
+    showNotification('error', 'Cannot Add Review', 'Total weight would exceed 100 marks.');
+    return;
+  }
+
+  const newReview = {
+    id: `panel-${Date.now()}`,
+    reviewName: `panelReview${panelReviews.length}`, 
+    displayName: `Panel Review ${panelReviews.length + 1}`,
+    facultyType: 'panel',
+    from: defaultDate,
+    to: defaultDate,
+    components: [{ name: '', weight: '' }],
+    // REMOVED: requiresPPT: false
   };
+
+  setPanelReviews([...panelReviews, newReview]);
+};
+
 
   // Remove guide review
   const removeGuideReview = (reviewId) => {
@@ -276,29 +283,30 @@ function Schedule() {
           const newGuideReviews = [];
           const newPanelReviews = [];
           
-          data.reviews.forEach((review) => {
-            const reviewData = {
-              id: `${review.facultyType || 'guide'}-${review.reviewName}`,
-              reviewName: review.reviewName,
-              displayName: review.displayName || review.reviewName,
-              facultyType: review.facultyType || 'guide',
-              from: review.deadline ? new Date(review.deadline.from) : defaultDate,
-              to: review.deadline ? new Date(review.deadline.to) : defaultDate,
-              components: review.components && review.components.length > 0 
-                ? review.components.map(comp => ({
-                    name: comp.name || "",
-                    weight: comp.weight ? comp.weight.toString() : ""
-                  }))
-                : [{ name: "", weight: "" }],
-              requiresPPT: Boolean(review.requiresPPT)
-            };
+        data.reviews.forEach(review => {
+  const reviewData = {
+    id: `${review.facultyType}-${review.reviewName}`,
+    reviewName: review.reviewName,
+    displayName: review.displayName || review.reviewName,
+    facultyType: review.facultyType || 'guide',
+    from: review.deadline ? new Date(review.deadline.from) : defaultDate,
+    to: review.deadline ? new Date(review.deadline.to) : defaultDate,
+    components: review.components && review.components.length > 0 
+      ? review.components.map(comp => ({ 
+          name: comp.name || '', 
+          weight: comp.weight ? comp.weight.toString() : '' 
+        }))
+      : [{ name: '', weight: '' }],
+    // REMOVED: requiresPPT: Boolean(review.requiresPPT)
+  };
+  
+  if (review.facultyType === 'panel') {
+    newPanelReviews.push(reviewData);
+  } else {
+    newGuideReviews.push(reviewData);
+  }
+});
 
-            if (review.facultyType === 'panel') {
-              newPanelReviews.push(reviewData);
-            } else {
-              newGuideReviews.push(reviewData);
-            }
-          });
           
           if (newGuideReviews.length > 0) setGuideReviews(newGuideReviews);
           if (newPanelReviews.length > 0) setPanelReviews(newPanelReviews);
@@ -341,21 +349,26 @@ function Schedule() {
       const allReviews = [...guideReviews, ...panelReviews];
       
       const reviews = allReviews.map(review => ({
-        reviewName: review.reviewName,
-        displayName: review.displayName,
-        facultyType: review.facultyType,
-        components: review.components
-          .filter(comp => comp.name && comp.name.trim())
-          .map(comp => ({
-            name: comp.name.trim(),
-            weight: parseInt(comp.weight) || 0
-          })),
-        deadline: {
-          from: review.from.toISOString(),
-          to: review.to.toISOString(),
-        },
-        requiresPPT: review.requiresPPT || false,
-      }));
+  reviewName: review.reviewName,
+  displayName: review.displayName,
+  facultyType: review.facultyType,
+  components: review.components
+    .filter(comp => comp.name && comp.name.trim())
+    .map(comp => ({
+      name: comp.name.trim(),
+      weight: parseInt(comp.weight) || 0
+    })),
+  deadline: {
+    from: review.from.toISOString(),
+    to: review.to.toISOString()
+  },
+  // ALWAYS include pptApproved for all reviews
+  pptApproved: {
+    approved: false,
+    locked: false
+  }
+}));
+
 
       console.log("Final reviews payload:", JSON.stringify(reviews, null, 2));
 
@@ -454,7 +467,7 @@ function Schedule() {
                         className="text-base sm:text-lg font-bold text-slate-800 border-2 border-slate-200 px-3 sm:px-4 py-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all w-full sm:w-auto"
                         placeholder="Review Name"
                       />
-                      <div className="flex items-center space-x-3 bg-slate-50 px-3 sm:px-4 py-2 rounded-lg">
+                      {/* <div className="flex items-center space-x-3 bg-slate-50 px-3 sm:px-4 py-2 rounded-lg">
                         <input
                           type="checkbox"
                           checked={review.requiresPPT}
@@ -463,7 +476,7 @@ function Schedule() {
                           className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
                         />
                         <span className="text-xs sm:text-sm font-medium text-slate-700">PPT Required</span>
-                      </div>
+                      </div> */}
                     </div>
                     <button
                       onClick={() => removeFunction(review.id)}
@@ -823,7 +836,7 @@ function Schedule() {
                     </div>
                     <div className="flex items-start space-x-3">
                       <div className="w-2 h-2 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>
-                      <div><strong>PPT Required:</strong> Enable PPT approval section for specific reviews</div>
+                      {/* <div><strong>PPT Required:</strong> Enable PPT approval section for specific reviews</div> */}
                     </div>
                     <div className="flex items-start space-x-3">
                       <div className="w-2 h-2 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>

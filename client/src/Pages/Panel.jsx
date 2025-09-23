@@ -52,7 +52,8 @@ const PanelContent = React.memo(({
   isReviewLocked,
   getButtonColor,
   setActivePopup,
-  refreshKey
+  refreshKey,
+  getGuidePPTStatus // FIXED: Pass as prop
 }) => {
   console.log('🔄 [PanelContent] Rendering inner content with refreshKey:', refreshKey);
   
@@ -135,22 +136,54 @@ const PanelContent = React.memo(({
                             {reviewTypes.map(reviewType => {
                               const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
                               const requestStatus = getTeamRequestStatus(team, reviewType.key);
+                              const guidePPTStatus = getGuidePPTStatus(team, reviewType.key);
+                              
                               return (
                                 <div key={reviewType.key} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                                  <span className="font-medium text-gray-700 truncate">{reviewType.name}:</span>
+                                  <span className="font-medium text-gray-700 truncate">
+                                    {reviewType.name}
+                                  </span>
                                   <div className="flex items-center gap-1">
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                      isPassed 
-                                        ? 'bg-red-100 text-red-700' 
-                                        : 'bg-green-100 text-green-700'
+                                      isPassed ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                                     }`}>
                                       {isPassed ? 'Deadline Passed' : 'Active'}
                                     </span>
+                                    
+                                    {/* Extension status */}
                                     {requestStatus === 'approved' && (
-                                      <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">Extended</span>
+                                      <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">
+                                        Extended
+                                      </span>
                                     )}
+                                    
+                                    {/* Pending status */}
                                     {requestStatus === 'pending' && (
-                                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">Pending</span>
+                                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">
+                                        Pending
+                                      </span>
+                                    )}
+                                    
+                                    {/* Guide PPT Approval Status for PPT-required reviews */}
+                                    {reviewType.requiresPPT && (
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                        guidePPTStatus === 'approved'
+                                          ? 'bg-green-100 text-green-700'
+                                          : guidePPTStatus === 'partial'
+                                          ? 'bg-yellow-100 text-yellow-700'
+                                          : guidePPTStatus === 'not-approved'
+                                          ? 'bg-red-100 text-red-700'
+                                          : 'bg-gray-100 text-gray-700'
+                                      }`}>
+                                        {guidePPTStatus === 'approved'
+                                          ? 'Guide ✓'
+                                          : guidePPTStatus === 'partial'
+                                          ? 'Guide ⚠'
+                                          : guidePPTStatus === 'not-approved'
+                                          ? 'Guide ✗'
+                                          : 'Guide ?'
+                                        }
+                                      </span>
                                     )}
                                   </div>
                                 </div>
@@ -234,6 +267,25 @@ const Panel = () => {
   const [requestStatuses, setRequestStatuses] = useState({});
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // FIXED: Moved inside component - Function to get guide PPT approval status
+  const getGuidePPTStatus = useCallback((team, reviewType) => {
+    if (!team.students || team.students.length === 0) return 'unknown';
+    
+    // Check if ALL students have guide PPT approval
+    const allApproved = team.students.every(student => 
+      student.pptApproved?.approved === true
+    );
+    
+    // Check if ANY student has guide PPT approval
+    const someApproved = team.students.some(student => 
+      student.pptApproved?.approved === true
+    );
+    
+    if (allApproved) return 'approved';
+    if (someApproved) return 'partial';
+    return 'not-approved';
+  }, []);
 
   // ✅ FIXED: Same as Guide - get review types per team's marking schema
   const getReviewTypes = useCallback((markingSchema) => {
@@ -677,40 +729,45 @@ const Panel = () => {
               getButtonColor={getButtonColor}
               setActivePopup={setActivePopup}
               refreshKey={refreshKey}
+              getGuidePPTStatus={getGuidePPTStatus} // FIXED: Pass as prop
             />
             
             {/* Popup Review Modal */}
-            {activePopup && (() => {
-              const team = teams.find(t => t.id === activePopup.teamId);
-              if (!team) return null;
-
-              const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
-              const requestStatus = getTeamRequestStatus(team, activePopup.type);
-              const reviewTypes = getReviewTypes(team.markingSchema); // ✅ Use team's schema
-              const reviewTypeCfg = reviewTypes.find(r => r.key === activePopup.type);
-
-              return (
-                <PopupReview
-                  title={`${reviewTypeCfg?.name || activePopup.type} - ${team.title}`}
-                  teamMembers={team.students}
-                  reviewType={activePopup.type}
-                  isOpen={true}
-                  locked={isLocked}
-                  markingSchema={team.markingSchema} // ✅ Use team's schema
-                  requestStatus={requestStatus}
-                  panelMode={true}
-                  currentBestProject={team.bestProject || false}
-                  onClose={() => setActivePopup(null)}
-                  onSubmit={(data, pptObj, projectObj) => {
-                    handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj, projectObj);
-                  }}
-                  onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
-                  requestEditVisible={isLocked && (requestStatus === 'none' || requestStatus === 'rejected')}
-                  requestPending={requestStatus === 'pending'}
-                  requiresPPT={!!reviewTypeCfg?.requiresPPT}
-                />
-              );
-            })()}
+            {activePopup && (
+              (() => {
+                const team = teams.find(t => t.id === activePopup.teamId);
+                if (!team) return null;
+                
+                const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
+                const requestStatus = getTeamRequestStatus(team, activePopup.type);
+                const reviewTypes = getReviewTypes(team.markingSchema);
+                const reviewTypeCfg = reviewTypes.find(r => r.key === activePopup.type);
+                
+                // Check if guide has approved PPT for PPT-required reviews
+                const guidePPTStatus = getGuidePPTStatus(team, activePopup.type);
+                const isBlockedByGuide = reviewTypeCfg?.requiresPPT && guidePPTStatus !== 'approved';
+                
+                return (
+                  <PopupReview
+                    title={`${reviewTypeCfg?.name || activePopup.type} - ${team.title}`}
+                    teamMembers={team.students}
+                    reviewType={activePopup.type}
+                    isOpen={true}
+                    locked={isLocked || isBlockedByGuide} // Block if guide hasn't approved
+                    markingSchema={team.markingSchema}
+                    requestStatus={requestStatus}
+                    panelMode={true}
+                    currentBestProject={team.bestProject || false}
+                    onClose={() => setActivePopup(null)}
+                    onSubmit={(data, pptObj, projectObj) => handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj, projectObj)}
+                    onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
+                    requestEditVisible={isLocked && requestStatus !== 'none' && requestStatus !== 'rejected'}
+                    requestPending={requestStatus === 'pending'}
+                    requiresPPT={!!reviewTypeCfg?.requiresPPT}
+                  />
+                );
+              })()
+            )}
           </div>
         </div>
       </div>

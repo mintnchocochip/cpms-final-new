@@ -5,12 +5,14 @@ import Student from "../models/studentSchema.js";
 import Request from "../models/requestSchema.js";
 import Project from "../models/projectSchema.js";
 import Panel from "../models/panelSchema.js";
-import MarkingSchema from "../models/markingSchema.js";
+import MarkingSchema from "../models/markingSchema.js"
 
 // for updating the structure of the marks
 
 export async function createOrUpdateMarkingSchema(req, res) {
   const { school, department, reviews } = req.body;
+
+  console.log('📝 Received marking schema request:', { school, department, reviewCount: reviews?.length });
 
   if (
     !school ||
@@ -23,8 +25,11 @@ export async function createOrUpdateMarkingSchema(req, res) {
       .json({ success: false, message: "Missing or invalid fields." });
   }
 
-  // Validate reviews structure
+  // Validate each review
   for (const review of reviews) {
+    console.log('🔍 Validating review:', review.reviewName);
+
+    // Required fields validation
     if (
       !review.reviewName ||
       !review.facultyType ||
@@ -32,25 +37,72 @@ export async function createOrUpdateMarkingSchema(req, res) {
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Each review must have reviewName and facultyType (guide or panel)",
+        message: "Each review must have reviewName and facultyType (guide or panel)",
       });
     }
 
+    // Deadline validation
     if (!review.deadline || !review.deadline.from || !review.deadline.to) {
       return res.status(400).json({
         success: false,
         message: "Each review must have valid deadline with from and to dates",
       });
     }
+
+    // Components validation (optional but if provided must be valid)
+    if (review.components) {
+      if (!Array.isArray(review.components)) {
+        return res.status(400).json({
+          success: false,
+          message: "Components must be an array if provided",
+        });
+      }
+      for (const comp of review.components) {
+        if (!comp.name || typeof comp.weight !== "number") {
+          return res.status(400).json({
+            success: false,
+            message: "Each component must have a name and numeric weight",
+          });
+        }
+      }
+    }
+
+    // PPT Approved validation (should always be present now)
+    if (!review.pptApproved) {
+      return res.status(400).json({
+        success: false,
+        message: "Each review must have pptApproved field",
+      });
+    }
+
+    if (
+      typeof review.pptApproved.approved !== "boolean" ||
+      typeof review.pptApproved.locked !== "boolean"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "pptApproved field must have boolean approved and locked values",
+      });
+    }
   }
 
   try {
-    const updated = await MarkingSchema.findOneAndUpdate(
+    console.log('💾 Attempting to save/update marking schema for:', { school, department });
+    
+    const updated = await MarkingSchemaModel.findOneAndUpdate(
       { school, department },
-      { reviews },
-      { new: true, upsert: true }
+      { 
+        school,
+        department, 
+        reviews 
+      },
+      { 
+        new: true, 
+        upsert: true 
+      }
     );
+
+    console.log('✅ Marking schema saved successfully:', updated._id);
 
     res.status(200).json({
       success: true,
@@ -58,13 +110,15 @@ export async function createOrUpdateMarkingSchema(req, res) {
       data: updated,
     });
   } catch (error) {
-    console.error("Error saving marking schema:", error);
+    console.error("❌ Error saving marking schema:", error);
     res.status(500).json({
       success: false,
       message: "Server error while saving marking schema",
+      error: error.message
     });
   }
 }
+
 
 // Updated getDefaultDeadline function
 export async function getDefaultDeadline(req, res) {
@@ -546,7 +600,6 @@ export async function getAllFaculty(req, res) {
     });
   }
 }
-
 
 export async function getAllGuideWithProjects(req, res) {
   try {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Award, Star, Clock, Calendar } from 'lucide-react'; // ✅ Added Clock and Calendar icons
+import { X, Award, Star, Clock, Calendar } from 'lucide-react';
 
 const PopupReview = ({
   title,
@@ -17,7 +17,10 @@ const PopupReview = ({
   requestStatus = 'none',
   panelMode = false,
   currentBestProject = false,
-  teamId = null, // ✅ NEW: Team ID for deadline checking
+  teamId = null,
+  // NEW: Added props for Guide viewing Panel reviews
+  isGuideReview = false,
+  isPanelReview = false,
 }) => {
   const [marks, setMarks] = useState({});
   const [comments, setComments] = useState({});
@@ -29,11 +32,9 @@ const PopupReview = ({
   const [error, setError] = useState('');
   const [hasAttendance, setHasAttendance] = useState(true);
   const [sub, setSub] = useState('Locked');
-
-const [patStates, setPatStates] = useState({});
-
+  const [patStates, setPatStates] = useState({});
   
-  // ✅ NEW: Deadline states
+  // NEW: Deadline states
   const [deadlineInfo, setDeadlineInfo] = useState({
     hasDeadline: false,
     fromDate: null,
@@ -44,12 +45,18 @@ const [patStates, setPatStates] = useState({});
     timeUntilEnd: '',
   });
 
-  // ✅ FIXED: Calculate if form should be locked considering ALL conditions
+  // NEW: Determine if this is a guide viewing panel review
+  const isGuideViewingPanel = !panelMode && isPanelReview;
+  
+  // NEW: For guide viewing panel reviews, only show PPT approval
+  const showOnlyPPTApproval = isGuideViewingPanel;
+
+  // FIXED: Calculate if form should be locked considering ALL conditions
   const isFormLocked = locked && requestStatus !== 'approved';
   const isDeadlineLocked = (deadlineInfo.isBeforeStart || deadlineInfo.isAfterEnd) && requestStatus !== 'approved';
   const finalFormLocked = isFormLocked || isDeadlineLocked;
 
-  // ✅ NEW: Function to calculate deadline status
+  // NEW: Function to calculate deadline status
   const calculateDeadlineStatus = (reviewConfig) => {
     if (!reviewConfig?.deadline) {
       return {
@@ -75,9 +82,8 @@ const [patStates, setPatStates] = useState({});
         fromDate = new Date(deadline.from);
         toDate = new Date(deadline.to);
       } else if (typeof deadline === 'string' || deadline instanceof Date) {
-        // If only single deadline provided, assume it's the end date and review opens immediately
         toDate = new Date(deadline);
-        fromDate = new Date(0); // Beginning of time - always open from start
+        fromDate = new Date(0);
       }
 
       const fromIST = fromDate ? new Date(fromDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })) : null;
@@ -86,7 +92,6 @@ const [patStates, setPatStates] = useState({});
       const isBeforeStart = fromIST && currentIST < fromIST;
       const isAfterEnd = toIST && currentIST > toIST;
 
-      // Calculate time until events
       const timeUntilStart = isBeforeStart ? getTimeDifference(currentIST, fromIST) : '';
       const timeUntilEnd = (!isAfterEnd && toIST) ? getTimeDifference(currentIST, toIST) : '';
 
@@ -113,7 +118,7 @@ const [patStates, setPatStates] = useState({});
     }
   };
 
-  // ✅ NEW: Function to get human-readable time difference
+  // NEW: Function to get human-readable time difference
   const getTimeDifference = (from, to) => {
     const diffMs = to - from;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -129,300 +134,318 @@ const [patStates, setPatStates] = useState({});
     }
   };
 
-  // ✅ ENHANCED: Load schema and initialize components with deadline checking
-  useEffect(() => {
-    if (!isOpen) return;
+  // ENHANCED: Load schema and initialize components with deadline checking
+ // ENHANCED: Load schema and initialize components with deadline checking
+useEffect(() => {
+  if (!isOpen) return;
+  
+  setLoading(true);
+  try {
+    console.log('=== [PopupReview] LOADING MARKING SCHEMA WITH DEADLINE CHECK ===');
+    console.log('📋 [PopupReview] Review type:', reviewType);
+    console.log('📋 [PopupReview] Request status:', requestStatus);
+    console.log('📋 [PopupReview] Show only PPT approval:', showOnlyPPTApproval);
     
-    setLoading(true);
-    try {
-      console.log('=== [PopupReview] LOADING MARKING SCHEMA WITH DEADLINE CHECK ===');
-      console.log('📋 [PopupReview] Review type:', reviewType);
-      console.log('📋 [PopupReview] Request status:', requestStatus);
+    let components = [];
+    let hasValidSchema = false;
+    let reviewConfig = null;
+    
+    if (markingSchema?.reviews) {
+      reviewConfig = markingSchema.reviews.find(review => 
+        review.reviewName === reviewType
+      );
       
-      let components = [];
-      let hasValidSchema = false;
-      let reviewConfig = null;
+      if (reviewConfig?.components?.length > 0) {
+        hasValidSchema = true;
+        components = reviewConfig.components.map((comp, index) => ({
+          key: `component${index + 1}`,
+          label: comp.name,
+          name: comp.name,
+          points: comp.weight || 10
+        }));
+        console.log('✅ [PopupReview] Schema components loaded:', components);
+      }
+    }
+    
+    // NEW: Skip deadline calculation for guide viewing panel reviews
+    const deadlineStatus = showOnlyPPTApproval 
+      ? { 
+          hasDeadline: false, 
+          fromDate: null, 
+          toDate: null, 
+          isBeforeStart: false, 
+          isAfterEnd: false, 
+          timeUntilStart: '', 
+          timeUntilEnd: '' 
+        }
+      : calculateDeadlineStatus(reviewConfig);
+    setDeadlineInfo(deadlineStatus);
+    
+    console.log('📅 [PopupReview] Deadline status:', deadlineStatus);
+    console.log('🔒 [PopupReview] Final form locked status:', finalFormLocked);
+    
+    if (!hasValidSchema && !showOnlyPPTApproval) {
+      console.log('❌ [PopupReview] No valid schema or components found');
+      setError('No marking components found for this review type');
+      components = [];
+    }
+    
+    // For guide viewing panel, don't require components
+    setComponentLabels(showOnlyPPTApproval ? [] : components);
+    setHasAttendance(showOnlyPPTApproval ? false : components.length > 0);
+    
+  } catch (err) {
+    console.error('❌ [PopupReview] Error loading schema:', err);
+    setComponentLabels([]);
+    setHasAttendance(false);
+    setError('Schema loading error');
+  } finally {
+    setLoading(false);
+  }
+}, [isOpen, reviewType, markingSchema, requestStatus, finalFormLocked, panelMode, showOnlyPPTApproval]);
+
+  // Initialize form data from existing student data
+  useEffect(() => {
+    if (!isOpen || loading) return;
+    
+    console.log('=== [PopupReview] INITIALIZING FORM DATA ===');
+    console.log('🔍 [PopupReview] Show only PPT approval:', showOnlyPPTApproval);
+    
+    const initialMarks = {};
+    const initialComments = {};
+    const initialAttendance = {};
+    const initialPatStates = {};
+
+    teamMembers.forEach(member => {
+      console.log(`🔍 [PopupReview] Processing ${member.name}:`, member);
+      console.log(`🔍 [PopupReview] PAT Status for ${member.name}:`, member.PAT);
       
-      if (markingSchema?.reviews) {
-        reviewConfig = markingSchema.reviews.find(review => 
-          review.reviewName === reviewType
-        );
+      let reviewData = null;
+      if (member.reviews?.get) {
+        reviewData = member.reviews.get(reviewType);
+      } else if (member.reviews?.[reviewType]) {
+        reviewData = member.reviews[reviewType];
+      }
+
+      console.log(`📋 [PopupReview] Review data for ${member.name}:`, reviewData);
+
+      // Only initialize marks/attendance if not guide viewing panel
+      if (!showOnlyPPTApproval) {
+        const componentMarks = {};
+        componentLabels.forEach(comp => {
+          let markValue = '';
+          if (reviewData?.marks) {
+            markValue = reviewData.marks[comp.name] || '';
+          }
+          componentMarks[comp.key] = markValue || '';
+          console.log(`📊 [PopupReview] Component ${comp.name} (${comp.key}): ${markValue} for ${member.name}`);
+        });
+
+        initialMarks[member._id] = componentMarks;
+        initialComments[member._id] = reviewData?.comments || '';
         
-        if (reviewConfig?.components?.length > 0) {
-          hasValidSchema = true;
-          components = reviewConfig.components.map((comp, index) => ({
-            key: `component${index + 1}`,
-            label: comp.name,
-            name: comp.name,
-            points: comp.weight || 10
-          }));
-          console.log('✅ [PopupReview] Schema components loaded:', components);
+        if (hasAttendance) {
+          initialAttendance[member._id] = reviewData?.attendance?.value ?? false;
         }
       }
       
-      // ✅ NEW: Calculate deadline status
-      const deadlineStatus = calculateDeadlineStatus(reviewConfig);
-      setDeadlineInfo(deadlineStatus);
-      
-      console.log('📅 [PopupReview] Deadline status:', deadlineStatus);
-      console.log('🔒 [PopupReview] Final form locked status:', finalFormLocked);
-      
-      if (!hasValidSchema) {
-        console.log('❌ [PopupReview] No valid schema or components found');
-        setError('No marking components found for this review type');
-        components = [];
-      }
-      
-      setComponentLabels(components);
-      setHasAttendance(components.length > 0);
-      
-    } catch (err) {
-      console.error('❌ [PopupReview] Error loading schema:', err);
-      setComponentLabels([]);
-      setHasAttendance(false);
-      setError('Schema loading error');
-    } finally {
-      setLoading(false);
-    }
-  }, [isOpen, reviewType, markingSchema, requestStatus, finalFormLocked, panelMode]);
-
-  // ✅ Initialize form data from existing student data
-
-// ✅ Initialize form data from existing student data
-useEffect(() => {
-  if (!isOpen || loading || componentLabels.length === 0) return;
-  
-  console.log('=== [PopupReview] INITIALIZING FORM DATA ===');
-  
-  const initialMarks = {};
-  const initialComments = {};
-  const initialAttendance = {};
-  const initialPatStates = {}; // ✅ NEW: Initialize PAT states
-
-  teamMembers.forEach(member => {
-    console.log(`🔍 [PopupReview] Processing ${member.name}:`, member);
-    console.log(`🔍 [PopupReview] PAT Status for ${member.name}:`, member.PAT); // Debug PAT
-    
-    let reviewData = null;
-    if (member.reviews?.get) {
-      reviewData = member.reviews.get(reviewType);
-    } else if (member.reviews?.[reviewType]) {
-      reviewData = member.reviews[reviewType];
-    }
-
-    console.log(`📋 [PopupReview] Review data for ${member.name}:`, reviewData);
-
-    const componentMarks = {};
-    componentLabels.forEach(comp => {
-      let markValue = '';
-      if (reviewData?.marks) {
-        markValue = reviewData.marks[comp.name] || '';
-      }
-      componentMarks[comp.key] = markValue || '';
-      console.log(`📊 [PopupReview] Component ${comp.name} (${comp.key}): ${markValue} for ${member.name}`);
+      // FIXED: Better PAT initialization with fallback and debugging
+      const patStatus = member.PAT === true || member.PAT === 'true' || member.PAT === 1;
+      initialPatStates[member._id] = patStatus;
+      console.log(`🚫 [PopupReview] PAT initialized for ${member.name}: ${patStatus} (original: ${member.PAT})`);
     });
 
-    initialMarks[member._id] = componentMarks;
-    initialComments[member._id] = reviewData?.comments || '';
-    
+    setMarks(initialMarks);
+    setComments(initialComments);
     if (hasAttendance) {
-      initialAttendance[member._id] = reviewData?.attendance?.value ?? false;
+      setAttendance(initialAttendance);
+    }
+    setPatStates(initialPatStates);
+    
+    console.log('🚫 [PopupReview] All PAT states initialized:', initialPatStates);
+
+    // Initialize best project status
+    setBestProject(currentBestProject || false);
+
+    // For guide viewing panel, always unlock submit (only PPT approval needed)
+    if (showOnlyPPTApproval) {
+      setSub('Unlocked');
+    } else {
+      const allCommentsFilled = teamMembers.every(member => 
+        initialComments[member._id]?.trim() !== ''
+      );
+      setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
+    }
+
+    if (requiresPPT) {
+      setTeamPptApproved(
+        teamMembers.length > 0 && 
+        teamMembers.every(member => member.pptApproved?.approved === true)
+      );
     }
     
-    // ✅ FIXED: Better PAT initialization with fallback and debugging
-    const patStatus = member.PAT === true || member.PAT === 'true' || member.PAT === 1;
-    initialPatStates[member._id] = patStatus;
-    console.log(`🚫 [PopupReview] PAT initialized for ${member.name}: ${patStatus} (original: ${member.PAT})`);
-  });
+    console.log('✅ [PopupReview] Form data initialized');
+    console.log('🏆 [PopupReview] Best project initialized:', currentBestProject);
+  }, [isOpen, teamMembers, reviewType, loading, componentLabels, hasAttendance, requiresPPT, currentBestProject, showOnlyPPTApproval]);
 
-  setMarks(initialMarks);
-  setComments(initialComments);
-  if (hasAttendance) {
-    setAttendance(initialAttendance);
-  }
-  setPatStates(initialPatStates); // ✅ NEW: Set PAT states
-  
-  console.log('🚫 [PopupReview] All PAT states initialized:', initialPatStates);
+  const handleMarksChange = (memberId, value, componentKey) => {
+    if (finalFormLocked || showOnlyPPTApproval) return;
+    if (hasAttendance && attendance[memberId] === false) return;
+    if (patStates[memberId]) return;
 
-  // ✅ Initialize best project status
-  setBestProject(currentBestProject || false);
+    const componentInfo = componentLabels.find(comp => comp.key === componentKey);
+    const maxPoints = componentInfo?.points || 10;
+    const numValue = Number(value);
 
-  const allCommentsFilled = teamMembers.every(member => 
-    initialComments[member._id]?.trim() !== ''
-  );
-  setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
+    if (numValue > maxPoints) {
+      alert(`Enter value less than ${maxPoints}, resetting to ${maxPoints}`);
+      setMarks(prev => ({
+        ...prev,
+        [memberId]: { ...prev[memberId], [componentKey]: maxPoints }
+      }));
+    } else if (numValue < 0) {
+      setMarks(prev => ({
+        ...prev,
+        [memberId]: { ...prev[memberId], [componentKey]: 0 }
+      }));
+    } else {
+      setMarks(prev => ({
+        ...prev,
+        [memberId]: { ...prev[memberId], [componentKey]: numValue }
+      }));
+    }
+  };
 
-  if (requiresPPT) {
-    setTeamPptApproved(
-      teamMembers.length > 0 && 
-      teamMembers.every(member => member.pptApproved?.approved === true)
+  const handleAttendanceChange = (memberId, isPresent) => {
+    if (finalFormLocked || showOnlyPPTApproval) return;
+    
+    setAttendance(prev => ({ ...prev, [memberId]: isPresent }));
+    
+    if (!isPresent) {
+      const zeroedMarks = {};
+      componentLabels.forEach(comp => {
+        zeroedMarks[comp.key] = 0;
+      });
+      setMarks(prev => ({ ...prev, [memberId]: zeroedMarks }));
+    }
+    
+    const allCommentsFilled = teamMembers.every(member => 
+      comments[member._id]?.trim() !== ''
     );
-  }
-  
-  console.log('✅ [PopupReview] Form data initialized');
-  console.log('🏆 [PopupReview] Best project initialized:', currentBestProject);
-}, [isOpen, teamMembers, reviewType, loading, componentLabels, hasAttendance, requiresPPT, currentBestProject]);
+    setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
+  };
 
-
-
-const handleMarksChange = (memberId, value, componentKey) => {
-  if (finalFormLocked) return;
-  if (hasAttendance && attendance[memberId] === false) return;
-  if (patStates[memberId]) return; // ✅ NEW: Prevent marks entry if PAT is enabled
-
-  const componentInfo = componentLabels.find(comp => comp.key === componentKey);
-  const maxPoints = componentInfo?.points || 10;
-  const numValue = Number(value);
-
-  if (numValue > maxPoints) {
-    alert(`Enter value less than ${maxPoints}, resetting to ${maxPoints}`);
-    setMarks(prev => ({
-      ...prev,
-      [memberId]: { ...prev[memberId], [componentKey]: maxPoints }
-    }));
-  } else if (numValue < 0) {
-    setMarks(prev => ({
-      ...prev,
-      [memberId]: { ...prev[memberId], [componentKey]: 0 }
-    }));
-  } else {
-    setMarks(prev => ({
-      ...prev,
-      [memberId]: { ...prev[memberId], [componentKey]: numValue }
-    }));
-  }
-};
-
-
-const handleAttendanceChange = (memberId, isPresent) => {
-  if (finalFormLocked) return;
-  
-  setAttendance(prev => ({ ...prev, [memberId]: isPresent }));
-  
-  if (!isPresent) {
-    // Zero out marks for absent students
-    const zeroedMarks = {};
-    componentLabels.forEach(comp => {
-      zeroedMarks[comp.key] = 0;
-    });
-    setMarks(prev => ({ ...prev, [memberId]: zeroedMarks }));
+  const handleCommentsChange = (memberId, value) => {
+    if (finalFormLocked || showOnlyPPTApproval) return;
     
-    // ✅ Keep existing comments - don't clear them
-    // Comments are still required even for absent students
-  }
-  
-  // ✅ FIXED: Check that ALL students have comments (regardless of attendance)
-  const allCommentsFilled = teamMembers.every(member => 
-    comments[member._id]?.trim() !== ''
-  );
-  setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
-};
+    setComments(prev => ({ ...prev, [memberId]: value }));
+    
+    const allCommentsFilled = teamMembers.every(member => 
+      member._id === memberId ? value.trim() !== '' : (comments[member._id]?.trim() !== '')
+    );
+    setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
+  };
 
+  const handleSubmit = () => {
+    if (finalFormLocked || (sub === 'Locked' && !showOnlyPPTApproval)) return;
+    
+    console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
+    console.log('🏆 [PopupReview] Best project status:', bestProject);
+    console.log('🔍 [PopupReview] Show only PPT approval:', showOnlyPPTApproval);
+    
+    const submission = {};
+    const patUpdates = {};
+    
+    // Only process marks/comments if not guide viewing panel
+    if (!showOnlyPPTApproval) {
+      teamMembers.forEach(member => {
+        const memberMarks = marks[member._id] || {};
+        const submissionData = {
+          comments: comments[member._id] || ''
+        };
 
+        componentLabels.forEach(comp => {
+          const markValue = memberMarks[comp.key];
+          submissionData[comp.name] = patStates[member._id] ? -1 : (Number(markValue) || 0);
+          console.log(`📤 [PopupReview] Setting ${comp.name} = ${submissionData[comp.name]} for ${member.name}`);
+        });
 
-const handleCommentsChange = (memberId, value) => {
-  if (finalFormLocked) return;
-  
-  setComments(prev => ({ ...prev, [memberId]: value }));
-  
-  // ✅ FIXED: ALL students (present AND absent) must have comments
-  const allCommentsFilled = teamMembers.every(member => 
-    member._id === memberId ? value.trim() !== '' : (comments[member._id]?.trim() !== '')
-  );
-  setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
-};
+        if (hasAttendance) {
+          submissionData.attendance = {
+            value: attendance[member._id] || false,
+            locked: false
+          };
+        }
 
+        submission[member.regNo] = submissionData;
+        
+        if (!panelMode) {
+          patUpdates[member.regNo] = patStates[member._id] || false;
+          console.log(`🚫 [PopupReview] PAT status for ${member.name} (${member.regNo}): ${patStates[member._id]}`);
+        }
+      });
+    }
 
-const handleSubmit = () => {
-  if (finalFormLocked || sub === 'Locked') return;
-  
-  console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
-  console.log('🏆 [PopupReview] Best project status:', bestProject);
-  
-  const submission = {};
-  const patUpdates = {}; // ✅ NEW: Track PAT updates
-  
-  teamMembers.forEach(member => {
-    const memberMarks = marks[member._id] || {};
-    const submissionData = {
-      comments: comments[member._id] || ''
-    };
+    console.log('📤 [PopupReview] Final submission object:', submission);
+    console.log('📤 [PopupReview] PAT updates object:', patUpdates);
 
-    componentLabels.forEach(comp => {
-      const markValue = memberMarks[comp.key];
-      // ✅ Store special value for PAT or convert to number
-      submissionData[comp.name] = patStates[member._id] ? -1 : (Number(markValue) || 0);
-      console.log(`📤 [PopupReview] Setting ${comp.name} = ${submissionData[comp.name]} for ${member.name}`);
-    });
-
-    if (hasAttendance) {
-      submissionData.attendance = {
-        value: attendance[member._id] || false,
-        locked: false
+    // MODIFIED: Handle different submission scenarios - Guide viewing panel reviews only sees PPT approval
+    if (showOnlyPPTApproval) {
+      // Guide viewing panel review - only handle PPT approval, no marks/attendance
+      const teamPptObj = {
+        pptApproved: {
+          approved: teamPptApproved,
+          locked: false
+        }
       };
+      onSubmit({}, teamPptObj, patUpdates); // Empty submission object, only PPT data
+    } else if (requiresPPT && panelMode) {
+      // Panel mode with PPT - handle full review
+      const teamPptObj = {
+        pptApproved: {
+          approved: teamPptApproved,
+          locked: false
+        }
+      };
+      onSubmit(submission, teamPptObj, { bestProject });
+    } else if (panelMode) {
+      // Panel mode without PPT - handle full review
+      onSubmit(submission, null, { bestProject });
+    } else if (requiresPPT) {
+      // Guide mode with PPT - handle normal guide review
+      const teamPptObj = {
+        pptApproved: {
+          approved: teamPptApproved,
+          locked: false
+        }
+      };
+      onSubmit(submission, teamPptObj, patUpdates);
+    } else {
+      // Guide mode without PPT - handle normal guide review
+      onSubmit(submission, patUpdates);
     }
+  };
 
-    submission[member.regNo] = submissionData;
+  // Handle PAT toggle (Guide only)
+  const handlePatToggle = (memberId, isPat) => {
+    if (finalFormLocked || panelMode || showOnlyPPTApproval) return;
     
-    // ✅ NEW: Track PAT status for database update (Guide only)
-    if (!panelMode) {
-      patUpdates[member.regNo] = patStates[member._id] || false;
-      console.log(`🚫 [PopupReview] PAT status for ${member.name} (${member.regNo}): ${patStates[member._id]}`);
+    setPatStates(prev => ({ ...prev, [memberId]: isPat }));
+    
+    if (isPat) {
+      const patMarks = {};
+      componentLabels.forEach(comp => {
+        patMarks[comp.key] = 'PAT';
+      });
+      setMarks(prev => ({ ...prev, [memberId]: patMarks }));
+    } else {
+      const resetMarks = {};
+      componentLabels.forEach(comp => {
+        resetMarks[comp.key] = 0;
+      });
+      setMarks(prev => ({ ...prev, [memberId]: resetMarks }));
     }
-  });
-
-  console.log('📤 [PopupReview] Final submission object:', submission);
-  console.log('📤 [PopupReview] PAT updates object:', patUpdates);
-
-  // ✅ FIXED: Handle different submission scenarios with PAT data
-  if (requiresPPT && panelMode) {
-    const teamPptObj = {
-      pptApproved: {
-        approved: teamPptApproved,
-        locked: false
-      }
-    };
-    onSubmit(submission, teamPptObj, { bestProject });
-  } else if (panelMode) {
-    onSubmit(submission, null, { bestProject });
-  } else if (requiresPPT) {
-    const teamPptObj = {
-      pptApproved: {
-        approved: teamPptApproved,
-        locked: false
-      }
-    };
-    onSubmit(submission, teamPptObj, patUpdates); // ✅ Pass PAT data for guide
-  } else {
-    // ✅ FIXED: Guide without PPT - pass PAT data as second parameter
-    onSubmit(submission, patUpdates); // ✅ Pass PAT data for guide
-  }
-};
-
-
-  // ✅ NEW: Handle PAT toggle (Guide only)
-const handlePatToggle = (memberId, isPat) => {
-  if (finalFormLocked || panelMode) return; // Don't allow in panel mode
-  
-  setPatStates(prev => ({ ...prev, [memberId]: isPat }));
-  
-  if (isPat) {
-    // When PAT is enabled, set all marks to "PAT" special value
-    const patMarks = {};
-    componentLabels.forEach(comp => {
-      patMarks[comp.key] = 'PAT'; // Special value for database
-    });
-    setMarks(prev => ({ ...prev, [memberId]: patMarks }));
-  } else {
-    // When PAT is disabled, reset marks to 0
-    const resetMarks = {};
-    componentLabels.forEach(comp => {
-      resetMarks[comp.key] = 0;
-    });
-    setMarks(prev => ({ ...prev, [memberId]: resetMarks }));
-  }
-};
-
+  };
 
   if (!isOpen) return null;
 
@@ -452,7 +475,7 @@ const handlePatToggle = (memberId, isPat) => {
               </div>
               <div className="mt-2 flex flex-wrap gap-2 text-sm text-white/90">
                 <span className="bg-white/20 px-3 py-1 rounded-full">
-                  {componentLabels.length} components
+                  {showOnlyPPTApproval ? 'PPT Approval Only' : `${componentLabels.length} components`}
                 </span>
                 <span className="bg-white/20 px-3 py-1 rounded-full">
                   {teamMembers.length} students
@@ -462,13 +485,16 @@ const handlePatToggle = (memberId, isPat) => {
                     PPT Required
                   </span>
                 )}
-                {/* ✅ Show panel mode */}
                 {panelMode && (
                   <span className="bg-purple-400/30 px-3 py-1 rounded-full">
                     👥 Panel Review
                   </span>
                 )}
-                {/* ✅ Show best project status */}
+                {showOnlyPPTApproval && (
+                  <span className="bg-green-400/30 px-3 py-1 rounded-full">
+                    👨‍🏫 Guide View
+                  </span>
+                )}
                 {panelMode && bestProject && (
                   <span className="bg-yellow-500/30 px-3 py-1 rounded-full">
                     ⭐ Best Project
@@ -479,7 +505,6 @@ const handlePatToggle = (memberId, isPat) => {
                     🔓 Extension Approved
                   </span>
                 )}
-                {/* ✅ NEW: Deadline status indicators */}
                 {deadlineInfo.isBeforeStart && (
                   <span className="bg-orange-400/30 px-3 py-1 rounded-full">
                     🕒 Not Yet Open
@@ -505,17 +530,42 @@ const handlePatToggle = (memberId, isPat) => {
             </button>
           </div>
         </div>
+        {/* NEW: Guide PPT Approval Required Banner - Only for Panel mode */}
+{panelMode && requiresPPT && !teamPptApproved && (
+  <div className="mb-6 p-4 rounded-xl border-2 bg-orange-50 border-orange-200">
+    <div className="flex items-start space-x-3">
+      <div className="flex-shrink-0">
+        <AlertTriangle className="w-6 h-6 text-orange-600" />
+      </div>
+      <div className="flex-1">
+        <h3 className="font-bold text-lg text-orange-800">
+          ⚠️ Guide PPT Approval Required
+        </h3>
+        <p className="text-orange-700 mt-2">
+          This review requires the project guide to approve the team's PPT before you can proceed with marking. 
+          Please wait for the guide to approve the presentation.
+        </p>
+        <div className="mt-3 p-2 bg-orange-100 border border-orange-300 rounded">
+          <p className="text-orange-800 font-medium text-sm">
+            🔒 Marking is currently blocked until guide approval is received
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-          {error && (
+          {error && !showOnlyPPTApproval && (
             <div className="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 mb-6 rounded">
               <p className="font-medium">Error: {error}</p>
             </div>
           )}
 
-          {/* ✅ NEW: Deadline Information Banner */}
-          {deadlineInfo.hasDeadline && (
+          {/* Deadline Information Banner - Only show if not guide viewing panel */}
+          {!showOnlyPPTApproval && deadlineInfo.hasDeadline && (
             <div className={`mb-6 p-4 rounded-xl border-2 ${
               deadlineInfo.isBeforeStart 
                 ? 'bg-orange-50 border-orange-200' 
@@ -605,8 +655,8 @@ const handlePatToggle = (memberId, isPat) => {
             </div>
           )}
 
-          {/* ✅ PANEL ONLY: Best Project Selection */}
-          {panelMode && (
+          {/* PANEL ONLY: Best Project Selection */}
+          {panelMode && !showOnlyPPTApproval && (
             <div className="mb-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl">
               <label className="flex items-center space-x-3 cursor-pointer">
                 <input
@@ -647,134 +697,166 @@ const handlePatToggle = (memberId, isPat) => {
             </div>
           )}
 
-          {/* Students Grid - Rest of the component remains the same */}
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {teamMembers.map(member => (
-              <div 
-                key={member._id}
-                className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
-              >
-       
-{/* Student Header */}
-<div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-100">
-  <div className="flex-1">
-    <div className="flex items-center justify-between mb-1">
-      <h3 className="font-bold text-lg text-gray-800">
-        {member.name}
-      </h3>
-      {/* ✅ FIXED: PAT indicator stamp - shows in BOTH guide and panel when PAT is true */}
-      {patStates[member._id] && (
-        <div className="bg-red-100 border border-red-300 px-2 py-1 rounded-lg">
-          <span className="text-red-800 text-xs font-bold">🚫 PAT</span>
-        </div>
-      )}
-    </div>
-    <p className="text-sm text-gray-500">{member.regNo}</p>
-    
-    {/* ✅ FIXED: PAT Toggle - ONLY shows in Guide mode, hidden in Panel mode */}
-    {!panelMode && (
-      <div className="mt-2">
-        <label className="flex items-center space-x-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={patStates[member._id] || false}
-            onChange={(e) => handlePatToggle(member._id, e.target.checked)}
-            disabled={finalFormLocked}
-            className="w-4 h-4 text-red-600 bg-red-50 border-red-300 rounded focus:ring-2 focus:ring-red-500"
-          />
-          <span className="text-sm font-medium text-red-700">
-            PAT Detected
-          </span>
-        </label>
-      </div>
-    )}
-  </div>
-  
-  {/* Attendance */}
-  {hasAttendance && (
-    <div className="ml-3">
-      <select
-        value={attendance[member._id] ? 'present' : 'absent'}
-        onChange={(e) => handleAttendanceChange(member._id, e.target.value === 'present')}
-        disabled={finalFormLocked}
-        className={`px-3 py-2 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 ${
-          attendance[member._id] 
-            ? 'bg-green-50 border-green-300 text-green-800' 
-            : 'bg-red-50 border-red-300 text-red-800'
-        } ${finalFormLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-      >
-        <option value="present">✓ Present</option>
-        <option value="absent">✗ Absent</option>
-      </select>
-    </div>
-  )}
-</div>
+          {/* Guide viewing Panel Review - Show only PPT Approval */}
+          {showOnlyPPTApproval && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
+              <h3 className="text-lg font-bold text-blue-800 mb-4">
+                Panel Review - PPT Approval Only
+              </h3>
+              <p className="text-blue-600 mb-4">
+                As a guide, you can only approve/disapprove the PPT for this panel review.
+              </p>
+              
+              {/* Team PPT Approval */}
+              {requiresPPT && (
+                <div className="mb-6 p-4 bg-white border border-blue-200 rounded-xl">
+                  <label className="flex items-center justify-center space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={teamPptApproved}
+                      onChange={(e) => setTeamPptApproved(e.target.checked)}
+                      disabled={finalFormLocked}
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="font-semibold text-blue-800 text-lg">
+                      Approve Team PPT
+                    </span>
+                  </label>
+                </div>
+              )}
+              
+              {!requiresPPT && (
+                <div className="text-gray-500 italic">
+                  This panel review does not require PPT approval.
+                </div>
+              )}
+            </div>
+          )}
 
+          {/* Students Grid - Only show when not guide viewing panel reviews */}
+          {!showOnlyPPTApproval && (
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {teamMembers.map(member => (
+                <div 
+                  key={member._id}
+                  className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+                >
+                  {/* Student Header */}
+                  <div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-100">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-bold text-lg text-gray-800">
+                          {member.name}
+                        </h3>
+                        {/* PAT indicator - shows in BOTH guide and panel when PAT is true */}
+                        {patStates[member._id] && (
+                          <div className="bg-red-100 border border-red-300 px-2 py-1 rounded-lg">
+                            <span className="text-red-800 text-xs font-bold">🚫 PAT</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500">{member.regNo}</p>
+                      
+                      {/* PAT Toggle - ONLY shows in Guide mode, hidden in Panel mode */}
+                      {!panelMode && (
+                        <div className="mt-2">
+                          <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={patStates[member._id] || false}
+                              onChange={(e) => handlePatToggle(member._id, e.target.checked)}
+                              disabled={finalFormLocked}
+                              className="w-4 h-4 text-red-600 bg-red-50 border-red-300 rounded focus:ring-2 focus:ring-red-500"
+                            />
+                            <span className="text-sm font-medium text-red-700">
+                              PAT Detected
+                            </span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Attendance */}
+                    {hasAttendance && (
+                      <div className="ml-3">
+                        <select
+                          value={attendance[member._id] ? 'present' : 'absent'}
+                          onChange={(e) => handleAttendanceChange(member._id, e.target.value === 'present')}
+                          disabled={finalFormLocked}
+                          className={`px-3 py-2 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 ${
+                            attendance[member._id] 
+                              ? 'bg-green-50 border-green-300 text-green-800' 
+                              : 'bg-red-50 border-red-300 text-red-800'
+                          } ${finalFormLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <option value="present">✓ Present</option>
+                          <option value="absent">✗ Absent</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
 
-{/* Components */}
-<div className="space-y-3 mb-4">
-  {componentLabels.map(comp => (
-    <div key={comp.key} className="flex items-center justify-between">
-      <label className="text-sm font-medium text-gray-700 flex-1 mr-3">
-        {comp.label}
-      </label>
-      <div className="flex items-center space-x-2">
-        <input
-  type={patStates[member._id] ? 'text' : 'number'}
-  min="0"
-  max={comp.points}
-  value={patStates[member._id] ? 'PAT' : marks[member._id]?.[comp.key] ?? ''}
-  onChange={(e) => !patStates[member._id] &&
-    handleMarksChange(member._id, e.target.value, comp.key)}
-  onWheel={(e) => e.target.blur()}
-  disabled={
-    finalFormLocked || 
-    (hasAttendance && attendance[member._id] === false) ||
-    patStates[member._id]
-  }
-  readOnly={patStates[member._id]}
-  placeholder={patStates[member._id] ? 'PAT' : '0'}
-  className={`w-16 px-2 py-1 border rounded text-center text-sm focus:ring-2 focus:ring-blue-500 ${
-    (finalFormLocked || (hasAttendance && attendance[member._id] === false))
-      ? 'bg-gray-100 cursor-not-allowed'
-      : ''
-  } ${patStates[member._id] ? 'text-red-600 font-bold' : ''}`}
-/>
-        <span className="text-xs text-gray-500 min-w-fit">
-          /{comp.points}
-        </span>
-      </div>
-    </div>
-  ))}
-</div>
+                  {/* Components */}
+                  <div className="space-y-3 mb-4">
+                    {componentLabels.map(comp => (
+                      <div key={comp.key} className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-gray-700 flex-1 mr-3">
+                          {comp.label}
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type={patStates[member._id] ? 'text' : 'number'}
+                            min="0"
+                            max={comp.points}
+                            value={patStates[member._id] ? 'PAT' : marks[member._id]?.[comp.key] ?? ''}
+                            onChange={(e) => !patStates[member._id] &&
+                              handleMarksChange(member._id, e.target.value, comp.key)}
+                            onWheel={(e) => e.target.blur()}
+                            disabled={
+                              finalFormLocked || 
+                              (hasAttendance && attendance[member._id] === false) ||
+                              patStates[member._id]
+                            }
+                            readOnly={patStates[member._id]}
+                            placeholder={patStates[member._id] ? 'PAT' : '0'}
+                            className={`w-16 px-2 py-1 border rounded text-center text-sm focus:ring-2 focus:ring-blue-500 ${
+                              (finalFormLocked || (hasAttendance && attendance[member._id] === false))
+                                ? 'bg-gray-100 cursor-not-allowed'
+                                : ''
+                            } ${patStates[member._id] ? 'text-red-600 font-bold' : ''}`}
+                          />
+                          <span className="text-xs text-gray-500 min-w-fit">
+                            /{comp.points}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-
-
-                {/* Comments */}
- 
-<textarea
-  value={comments[member._id] || ''}
-  onChange={(e) => handleCommentsChange(member._id, e.target.value)}
-  disabled={finalFormLocked} // ✅ FIXED: Remove attendance check from comments
-  required
-  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
-    finalFormLocked // ✅ FIXED: Remove attendance check from comments styling
-      ? 'bg-gray-100 cursor-not-allowed' 
-      : ''
-  }`}
-  rows="3"
-  placeholder={finalFormLocked ? "Comments locked" : "Add comments..."}
-/>
-
-              </div>
-            ))}
-          </div>
+                  {/* Comments */}
+                  <textarea
+                    value={comments[member._id] || ''}
+                    onChange={(e) => handleCommentsChange(member._id, e.target.value)}
+                    disabled={finalFormLocked}
+                    required
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
+                      finalFormLocked
+                        ? 'bg-gray-100 cursor-not-allowed' 
+                        : ''
+                    }`}
+                    rows="3"
+                    placeholder={finalFormLocked ? "Comments locked" : "Add comments..."}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="bg-white border-t border-gray-200 px-6 py-4 flex justify-between items-center rounded-b-2xl">
           <div className="flex space-x-3">
-            {requestEditVisible && !requestPending && (
+            {requestEditVisible && !requestPending && !showOnlyPPTApproval && (
               <button
                 onClick={onRequestEdit}
                 className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors"
@@ -798,28 +880,30 @@ const handlePatToggle = (memberId, isPat) => {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={finalFormLocked || sub === 'Locked'}
+              disabled={finalFormLocked || (sub === 'Locked' && !showOnlyPPTApproval) || (showOnlyPPTApproval && !requiresPPT)}
               className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                finalFormLocked || sub === 'Locked'
+                finalFormLocked || (sub === 'Locked' && !showOnlyPPTApproval) || (showOnlyPPTApproval && !requiresPPT)
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : panelMode && bestProject
                     ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
               }`}
             >
-              {/* ✅ Updated button text with deadline context */}
-              {deadlineInfo.isBeforeStart && requestStatus !== 'approved'
+              {/* Updated button text */}
+              {deadlineInfo.isBeforeStart && requestStatus !== 'approved' && !showOnlyPPTApproval
                 ? '⏳ Not Yet Open'
-                : deadlineInfo.isAfterEnd && requestStatus !== 'approved'
+                : deadlineInfo.isAfterEnd && requestStatus !== 'approved' && !showOnlyPPTApproval
                   ? '⌛ Deadline Passed'
-                  : requestStatus === 'approved' && (deadlineInfo.isBeforeStart || deadlineInfo.isAfterEnd)
+                  : requestStatus === 'approved' && (deadlineInfo.isBeforeStart || deadlineInfo.isAfterEnd) && !showOnlyPPTApproval
                     ? `Submit ${panelMode ? 'Panel ' : ''}Review (Extended)`
-                    : requestStatus === 'approved' && !finalFormLocked
-                      ? `Submit ${panelMode ? 'Panel ' : ''}Review (Extended)` 
-                      : finalFormLocked 
-                        ? 'Locked' 
-                        : sub === 'Locked' 
-                          ? 'Comments Required' 
+                    : finalFormLocked && !showOnlyPPTApproval
+                      ? 'Locked' 
+                      : sub === 'Locked' && !showOnlyPPTApproval
+                        ? 'Comments Required'
+                        : showOnlyPPTApproval && !requiresPPT
+                          ? 'No PPT Required'
+                        : showOnlyPPTApproval
+                          ? 'Submit PPT Approval'
                           : panelMode && bestProject
                             ? '⭐ Submit Best Project Review'
                             : `Submit ${panelMode ? 'Panel ' : ''}Review`}
