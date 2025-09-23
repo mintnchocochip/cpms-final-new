@@ -276,7 +276,7 @@ export async function getAllProjects(req, res) {
         path: "students",
         model: "Student",
         select:
-          "regNo name emailId reviews pptApproved deadline school department PAT", // <--- added PAT here
+          "regNo name emailId reviews pptApproved deadline school department PAT", // <--- included pptApproved and PAT
       })
       .populate({
         path: "guideFaculty",
@@ -326,14 +326,18 @@ export async function getAllProjects(req, res) {
           name: student.name,
           emailId: student.emailId,
           reviews: processedReviews,
-          pptApproved: student.pptApproved || {
-            approved: false,
-            locked: false,
+
+          // Always return pptApproved object with fields and fallback
+          pptApproved: {
+            approved: student.pptApproved?.approved ?? false,
+            locked: student.pptApproved?.locked ?? false,
+            // Add any other pptApproved nested fields here if needed
           },
+
           deadline: processedDeadlines,
           school: student.school,
           department: student.department,
-          PAT: student.PAT, // <--- include PAT in returned student object
+          PAT: student.PAT, // include PAT in returned student object
         };
       });
 
@@ -366,6 +370,7 @@ export async function getAllProjects(req, res) {
     });
   }
 }
+
 
 export async function createProjectsBulk(req, res) {
   console.log(
