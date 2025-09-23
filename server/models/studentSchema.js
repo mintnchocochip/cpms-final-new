@@ -26,10 +26,6 @@ const studentSchema = new mongoose.Schema({
     of: reviewComponentSchema,
     default: {},
   },
-  pptApproved: {
-    approved: { type: Boolean, default: false },
-    locked: { type: Boolean, default: false },
-  },
   deadline: {
     type: Map,
     of: {

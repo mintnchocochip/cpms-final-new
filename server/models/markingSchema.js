@@ -16,7 +16,11 @@ const reviewSchema = new mongoose.Schema({
   facultyType: { type: String, enum: ['guide', 'panel'], required: true }, // ✅ MISSING FIELD
   components: [componentSchema],
   deadline: { type: deadlineSchema, required: true },
-  requiresPPT: { type: Boolean, default: false }
+  pptApproved: {
+    approved: { type: Boolean, default: false },
+    locked: { type: Boolean, default: false },
+  },
+ 
 }, { _id: false });
 
 const markingSchema = new mongoose.Schema({
