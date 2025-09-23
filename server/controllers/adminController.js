@@ -12,7 +12,11 @@ import MarkingSchema from "../models/markingSchema.js"
 export async function createOrUpdateMarkingSchema(req, res) {
   const { school, department, reviews } = req.body;
 
-  console.log('📝 Received marking schema request:', { school, department, reviewCount: reviews?.length });
+  console.log("📝 Received marking schema request:", {
+    school,
+    department,
+    reviewCount: reviews?.length,
+  });
 
   if (
     !school ||
@@ -27,7 +31,7 @@ export async function createOrUpdateMarkingSchema(req, res) {
 
   // Validate each review
   for (const review of reviews) {
-    console.log('🔍 Validating review:', review.reviewName);
+    console.log("🔍 Validating review:", review.reviewName);
 
     // Required fields validation
     if (
@@ -37,7 +41,8 @@ export async function createOrUpdateMarkingSchema(req, res) {
     ) {
       return res.status(400).json({
         success: false,
-        message: "Each review must have reviewName and facultyType (guide or panel)",
+        message:
+          "Each review must have reviewName and facultyType (guide or panel)",
       });
     }
 
@@ -81,28 +86,32 @@ export async function createOrUpdateMarkingSchema(req, res) {
     ) {
       return res.status(400).json({
         success: false,
-        message: "pptApproved field must have boolean approved and locked values",
+        message:
+          "pptApproved field must have boolean approved and locked values",
       });
     }
   }
 
   try {
-    console.log('💾 Attempting to save/update marking schema for:', { school, department });
-    
-    const updated = await MarkingSchemaModel.findOneAndUpdate(
+    console.log("💾 Attempting to save/update marking schema for:", {
+      school,
+      department,
+    });
+
+    const updated = await MarkingSchema.findOneAndUpdate(
       { school, department },
-      { 
+      {
         school,
-        department, 
-        reviews 
+        department,
+        reviews,
       },
-      { 
-        new: true, 
-        upsert: true 
+      {
+        new: true,
+        upsert: true,
       }
     );
 
-    console.log('✅ Marking schema saved successfully:', updated._id);
+    console.log("✅ Marking schema saved successfully with _id:", updated._id);
 
     res.status(200).json({
       success: true,
@@ -114,7 +123,7 @@ export async function createOrUpdateMarkingSchema(req, res) {
     res.status(500).json({
       success: false,
       message: "Server error while saving marking schema",
-      error: error.message
+      error: error.message,
     });
   }
 }
