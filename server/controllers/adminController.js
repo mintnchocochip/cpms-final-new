@@ -95,7 +95,7 @@ export async function createOrUpdateMarkingSchema(req, res) {
       department,
     });
 
-    const updated = await MarkingSchemaModel.findOneAndUpdate(
+    const updated = await MarkingSchema.findOneAndUpdate(
       { school, department },
       {
         school,

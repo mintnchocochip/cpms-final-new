@@ -1358,7 +1358,7 @@ export const updateProjectDetails = async (req, res) => {
         "department",
         "specialization",
         "type",
-        "bestProject", // <--- Add here!
+        "bestProject",
       ];
 
       for (const key of Object.keys(projectUpdates)) {
@@ -1376,8 +1376,7 @@ export const updateProjectDetails = async (req, res) => {
       const {
         studentId,
         reviews: reviewsToUpdate,
-        pptApproved: studentPptApproved,
-        PAT, // ✅ NEW: Extract PAT status
+        PAT, // Extract PAT status (no need to handle student-level pptApproved any more!)
       } = update;
 
       const student = await Student.findById(studentId).session(session);
@@ -1387,7 +1386,7 @@ export const updateProjectDetails = async (req, res) => {
       }
 
       console.log("✅ [BACKEND] Processing student:", student.name);
-      console.log("🚫 [BACKEND] PAT status for student:", PAT); // ✅ NEW: Log PAT
+      console.log("🚫 [BACKEND] PAT status for student:", PAT);
 
       // Merge updates into existing reviews Map
       for (const [reviewType, reviewData] of Object.entries(
@@ -1396,24 +1395,32 @@ export const updateProjectDetails = async (req, res) => {
         if (!student.reviews) {
           student.reviews = new Map();
         }
-        student.reviews.set(reviewType, {
+
+        const newReviewData = {
           marks: new Map(Object.entries(reviewData.marks || {})),
           comments: reviewData.comments || "",
           attendance: reviewData.attendance || { value: false, locked: false },
           locked: reviewData.locked || false,
-        });
+        };
+
+        if ("pptApproved" in reviewData) {
+          newReviewData.pptApproved = reviewData.pptApproved;
+        }
+
+        if (typeof student.reviews.set === "function") {
+          student.reviews.set(reviewType, newReviewData);
+        } else {
+          student.reviews[reviewType] = newReviewData;
+        }
       }
 
-      // Update PPT approval if provided
-      if (studentPptApproved !== undefined) {
-        student.pptApproved = studentPptApproved;
-        console.log(`📋 [BACKEND] Updated PPT approval for ${student.name}:`, studentPptApproved);
-      }
-
-      // ✅ NEW: Update PAT status if provided
+      // ✅ Update PAT status if provided
       if (PAT !== undefined) {
         student.PAT = Boolean(PAT); // Ensure boolean type
-        console.log(`🚫 [BACKEND] Updated PAT status for ${student.name}:`, student.PAT);
+        console.log(
+          `🚫 [BACKEND] Updated PAT status for ${student.name}:`,
+          student.PAT
+        );
       }
 
       await student.save({ session });
@@ -1454,6 +1461,7 @@ export const updateProjectDetails = async (req, res) => {
     session.endSession();
   }
 };
+
 
 
 // Export other existing functions...
