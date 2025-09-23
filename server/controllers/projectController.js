@@ -1180,8 +1180,7 @@ export async function getAllPanelProjects(req, res) {
       .populate({
         path: "students",
         model: "Student",
-        select:
-          "regNo name emailId reviews pptApproved deadline school department PAT",
+        select: "regNo name emailId reviews pptApproved deadline school department PAT",
       })
       .populate({
         path: "guideFaculty",
@@ -1202,13 +1201,11 @@ export async function getAllPanelProjects(req, res) {
 
     console.log("Found panel projects:", panelProjects.length);
 
-    // Process each project and students
+    // ✅ FIXED: Process each project and students with PPT data
     const processedProjects = panelProjects.map((project) => {
       console.log(`🔄 Processing panel project: ${project.name}`);
       const processedStudents = project.students.map((student) => {
-        console.log(
-          `👤 Processing panel student: ${student.name} (${student.regNo})`
-        );
+        console.log(`👤 Processing panel student: ${student.name} (${student.regNo})`);
 
         let processedReviews = {};
         if (student.reviews) {
@@ -1219,6 +1216,36 @@ export async function getAllPanelProjects(req, res) {
           }
         }
 
+        // ✅ FIXED: Process each review and preserve PPT approval data
+        Object.keys(processedReviews).forEach(reviewKey => {
+          const review = processedReviews[reviewKey];
+          
+          if (review && typeof review === 'object') {
+            // ✅ FIXED: Handle marks properly
+            if (review.marks) {
+              if (review.marks instanceof Map) {
+                review.marks = Object.fromEntries(review.marks);
+              } else if (typeof review.marks === 'object') {
+                review.marks = { ...review.marks };
+              }
+            }
+            
+            // ✅ FIXED: Preserve PPT approval structure in each review
+            if (review.pptApproved) {
+              review.pptApproved = {
+                approved: Boolean(review.pptApproved.approved || false),
+                locked: Boolean(review.pptApproved.locked || false)
+              };
+              console.log(`📽️ [Panel Backend] PPT approval found in review ${reviewKey} for ${student.name}:`, review.pptApproved);
+            }
+
+            // ✅ FIXED: Ensure other review properties are properly structured
+            review.comments = review.comments || '';
+            review.attendance = review.attendance || { value: false, locked: false };
+            review.locked = Boolean(review.locked || false);
+          }
+        });
+
         let processedDeadlines = {};
         if (student.deadline) {
           if (student.deadline instanceof Map) {
@@ -1228,21 +1255,15 @@ export async function getAllPanelProjects(req, res) {
           }
         }
 
-        console.log(
-          `📊 Panel student ${student.name} reviews:`,
-          Object.keys(processedReviews)
-        );
-        console.log(
-          `📅 Panel student ${student.name} deadlines:`,
-          Object.keys(processedDeadlines)
-        );
+        console.log(`📊 Panel student ${student.name} reviews:`, Object.keys(processedReviews));
+        console.log(`📅 Panel student ${student.name} deadlines:`, Object.keys(processedDeadlines));
 
         return {
           _id: student._id,
           regNo: student.regNo,
           name: student.name,
           emailId: student.emailId,
-          reviews: processedReviews,
+          reviews: processedReviews, // ✅ Now includes PPT approval data
           pptApproved: student.pptApproved || {
             approved: false,
             locked: false,
@@ -1261,17 +1282,30 @@ export async function getAllPanelProjects(req, res) {
       };
     });
 
-    console.log("✅ All panel projects processed with full population");
+    console.log("✅ All panel projects processed with full population and PPT data");
 
-    // Unique pairs for marking schema fetching
+    // ✅ Enhanced logging to verify PPT data processing
+    processedProjects.forEach((project) => {
+      console.log(`\n🔍 [Panel Backend] Project: ${project.name}`);
+      project.students.forEach((student) => {
+        console.log(`  👤 Student: ${student.name}`);
+        Object.keys(student.reviews || {}).forEach(reviewKey => {
+          const review = student.reviews[reviewKey];
+          if (review.pptApproved) {
+            console.log(`    📽️ Review ${reviewKey} PPT:`, review.pptApproved);
+          } else {
+            console.log(`    📝 Review ${reviewKey}: No PPT data`);
+          }
+        });
+      });
+    });
+
+    // Rest of your existing code for marking schemas...
     const schoolDeptPairs = [
       ...new Set(processedProjects.map((p) => `${p.school}-${p.department}`)),
     ];
 
-    console.log(
-      "Unique school-dept pairs for panel projects:",
-      schoolDeptPairs
-    );
+    console.log("Unique school-dept pairs for panel projects:", schoolDeptPairs);
 
     // Batch fetch marking schemas
     const markingSchemas = {};
@@ -1290,6 +1324,13 @@ export async function getAllPanelProjects(req, res) {
                 schema.reviews?.length || 0
               } reviews`
             );
+            
+            // ✅ Enhanced logging for schema PPT requirements
+            if (schema.reviews) {
+              schema.reviews.forEach(review => {
+                console.log(`  📋 Panel Schema Review ${review.reviewName}: PPT Required = ${!!review.pptApproved}`);
+              });
+            }
           } else {
             console.log(`⚠️ No panel schema found for ${school}-${department}`);
           }
@@ -1313,7 +1354,7 @@ export async function getAllPanelProjects(req, res) {
       if (projectSchema) {
         console.log(
           `📋 Panel schema reviews for ${project.name}:`,
-          projectSchema.reviews?.map((r) => r.reviewName) || []
+          projectSchema.reviews?.map((r) => `${r.reviewName} (PPT: ${!!r.pptApproved})`) || []
         );
       }
 
@@ -1323,36 +1364,32 @@ export async function getAllPanelProjects(req, res) {
       };
     });
 
-    console.log(
-      "✅ Final panel response prepared with schemas and full population"
-    );
+    console.log("✅ Final panel response prepared with schemas, full population, and PPT data");
 
-    // Debug logs for final data structure
+    // ✅ Enhanced final data structure logging
     projectsWithSchemas.forEach((project) => {
       console.log(`\n📊 Final Panel Project: ${project.name}`);
       console.log(`👥 Students: ${project.students.length}`);
       project.students.forEach((student) => {
+        const reviewsWithPPT = Object.keys(student.reviews || {}).filter(key => 
+          student.reviews[key]?.pptApproved
+        ).length;
         console.log(
-          `  - ${student.name}: ${
-            Object.keys(student.reviews || {}).length
-          } reviews`
+          `  - ${student.name}: ${Object.keys(student.reviews || {}).length} reviews, ${reviewsWithPPT} with PPT data`
         );
       });
       console.log(`📋 Schema: ${project.markingSchema ? "YES" : "NO"}`);
       if (project.markingSchema) {
+        const schemaWithPPT = project.markingSchema.reviews?.filter(r => r.pptApproved).length || 0;
         console.log(
-          `📋 Panel Schema Reviews: ${
-            project.markingSchema.reviews
-              ?.map((r) => r.reviewName)
-              .join(", ") || "None"
-          }`
+          `📋 Panel Schema Reviews: ${project.markingSchema.reviews?.length || 0} total, ${schemaWithPPT} require PPT`
         );
       }
     });
 
     return res.status(200).json({
       success: true,
-      data: projectsWithSchemas,
+      data: projectsWithSchemas, // ✅ Now includes complete PPT approval data
       message: "Panel projects fetched successfully",
     });
   } catch (error) {

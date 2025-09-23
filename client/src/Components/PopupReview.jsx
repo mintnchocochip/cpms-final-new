@@ -277,59 +277,57 @@ const PopupReview = ({
       setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
     }
 
-    // ✅ CHANGED: Initialize PPT approval from schema-based requirement
-// ✅ COMPLETELY FIXED: Initialize PPT approval from review-specific data or schema requirement
-if (requiresPPT) {
-  console.log('📽️ [PopupReview] PPT is required for this review');
-  
-  // ✅ FIXED: Check if PPT is already approved for this specific review
-  let pptAlreadyApproved = false;
-  
-  if (teamMembers.length > 0) {
-    // ✅ FIXED: Check EACH student for PPT approval in this specific review
-    const pptApprovals = teamMembers.map(member => {
-      let reviewData = null;
+    // ✅ COMPLETELY FIXED: Initialize PPT approval from review-specific data or schema requirement
+    if (requiresPPT) {
+      console.log('📽️ [PopupReview] PPT is required for this review');
       
-      // Get the review data for this specific review type
-      if (member.reviews?.get) {
-        reviewData = member.reviews.get(reviewType);
-      } else if (member.reviews?.[reviewType]) {
-        reviewData = member.reviews[reviewType];
+      // ✅ FIXED: Check if PPT is already approved for this specific review
+      let pptAlreadyApproved = false;
+      
+      if (teamMembers.length > 0) {
+        // ✅ FIXED: Check EACH student for PPT approval in this specific review
+        const pptApprovals = teamMembers.map(member => {
+          let reviewData = null;
+          
+          // Get the review data for this specific review type
+          if (member.reviews?.get) {
+            reviewData = member.reviews.get(reviewType);
+          } else if (member.reviews?.[reviewType]) {
+            reviewData = member.reviews[reviewType];
+          }
+          
+          console.log(`📽️ [PopupReview] Review data for ${member.name} in ${reviewType}:`, reviewData);
+          
+          // Check if PPT is approved in this specific review
+          if (reviewData?.pptApproved) {
+            const isApproved = Boolean(reviewData.pptApproved.approved);
+            console.log(`📽️ [PopupReview] Review-specific PPT for ${member.name}:`, isApproved);
+            return isApproved;
+          }
+          
+          // Fallback to student-level PPT approval
+          if (member.pptApproved) {
+            const isApproved = Boolean(member.pptApproved.approved);
+            console.log(`📽️ [PopupReview] Student-level PPT for ${member.name}:`, isApproved);
+            return isApproved;
+          }
+          
+          console.log(`📽️ [PopupReview] No PPT data found for ${member.name}`);
+          return false;
+        });
+        
+        // ✅ FIXED: PPT is approved if ALL students have it approved
+        pptAlreadyApproved = pptApprovals.length > 0 && pptApprovals.every(approval => approval === true);
+        console.log('📽️ [PopupReview] Individual PPT approvals:', pptApprovals);
+        console.log('📽️ [PopupReview] Final team PPT status:', pptAlreadyApproved);
       }
       
-      console.log(`📽️ [PopupReview] Review data for ${member.name} in ${reviewType}:`, reviewData);
-      
-      // Check if PPT is approved in this specific review
-      if (reviewData?.pptApproved) {
-        const isApproved = Boolean(reviewData.pptApproved.approved);
-        console.log(`📽️ [PopupReview] Review-specific PPT for ${member.name}:`, isApproved);
-        return isApproved;
-      }
-      
-      // Fallback to student-level PPT approval
-      if (member.pptApproved) {
-        const isApproved = Boolean(member.pptApproved.approved);
-        console.log(`📽️ [PopupReview] Student-level PPT for ${member.name}:`, isApproved);
-        return isApproved;
-      }
-      
-      console.log(`📽️ [PopupReview] No PPT data found for ${member.name}`);
-      return false;
-    });
-    
-    // ✅ FIXED: PPT is approved if ALL students have it approved
-    pptAlreadyApproved = pptApprovals.length > 0 && pptApprovals.every(approval => approval === true);
-    console.log('📽️ [PopupReview] Individual PPT approvals:', pptApprovals);
-    console.log('📽️ [PopupReview] Final team PPT status:', pptAlreadyApproved);
-  }
-  
-  setTeamPptApproved(pptAlreadyApproved);
-  console.log('📽️ [PopupReview] PPT approval initialized to:', pptAlreadyApproved);
-} else {
-  console.log('📽️ [PopupReview] PPT is NOT required for this review');
-  setTeamPptApproved(false);
-}
-
+      setTeamPptApproved(pptAlreadyApproved);
+      console.log('📽️ [PopupReview] PPT approval initialized to:', pptAlreadyApproved);
+    } else {
+      console.log('📽️ [PopupReview] PPT is NOT required for this review');
+      setTeamPptApproved(false);
+    }
     
     console.log('✅ [PopupReview] Form data initialized');
     console.log('🏆 [PopupReview] Best project initialized:', currentBestProject);
@@ -393,95 +391,94 @@ if (requiresPPT) {
     setSub(allCommentsFilled ? 'Unlocked' : 'Locked');
   };
 
- const handleSubmit = () => {
-  if (finalFormLocked || (sub === 'Locked' && !showOnlyPPTApproval)) return;
-  
-  console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
-  console.log('🏆 [PopupReview] Best project status:', bestProject);
-  console.log('🔍 [PopupReview] Show only PPT approval:', showOnlyPPTApproval);
-  console.log('📽️ [PopupReview] PPT Required:', requiresPPT);
-  console.log('📽️ [PopupReview] Team PPT Approved:', teamPptApproved);
-  
-  const submission = {};
-  const patUpdates = {};
-  
-  // ✅ Only process marks/comments if not guide viewing panel
-  if (!showOnlyPPTApproval) {
-    teamMembers.forEach(member => {
-      const memberMarks = marks[member._id] || {};
-      const submissionData = {
-        comments: comments[member._id] || ''
-      };
-
-      componentLabels.forEach(comp => {
-        const markValue = memberMarks[comp.key];
-        submissionData[comp.name] = patStates[member._id] ? -1 : (Number(markValue) || 0);
-        console.log(`📤 [PopupReview] Setting ${comp.name} = ${submissionData[comp.name]} for ${member.name}`);
-      });
-
-      if (hasAttendance) {
-        submissionData.attendance = {
-          value: attendance[member._id] || false,
-          locked: false
+  const handleSubmit = () => {
+    if (finalFormLocked || (sub === 'Locked' && !showOnlyPPTApproval)) return;
+    
+    console.log('=== [PopupReview] SUBMITTING REVIEW DATA ===');
+    console.log('🏆 [PopupReview] Best project status:', bestProject);
+    console.log('🔍 [PopupReview] Show only PPT approval:', showOnlyPPTApproval);
+    console.log('📽️ [PopupReview] PPT Required:', requiresPPT);
+    console.log('📽️ [PopupReview] Team PPT Approved:', teamPptApproved);
+    
+    const submission = {};
+    const patUpdates = {};
+    
+    // ✅ Only process marks/comments if not guide viewing panel
+    if (!showOnlyPPTApproval) {
+      teamMembers.forEach(member => {
+        const memberMarks = marks[member._id] || {};
+        const submissionData = {
+          comments: comments[member._id] || ''
         };
-      }
 
-      submission[member.regNo] = submissionData;
-      
-      if (!panelMode) {
-        patUpdates[member.regNo] = patStates[member._id] || false;
-        console.log(`🚫 [PopupReview] PAT status for ${member.name} (${member.regNo}): ${patStates[member._id]}`);
-      }
-    });
-  }
+        componentLabels.forEach(comp => {
+          const markValue = memberMarks[comp.key];
+          submissionData[comp.name] = patStates[member._id] ? -1 : (Number(markValue) || 0);
+          console.log(`📤 [PopupReview] Setting ${comp.name} = ${submissionData[comp.name]} for ${member.name}`);
+        });
 
-  console.log('📤 [PopupReview] Final submission object:', submission);
-  console.log('📤 [PopupReview] PAT updates object:', patUpdates);
+        if (hasAttendance) {
+          submissionData.attendance = {
+            value: attendance[member._id] || false,
+            locked: false
+          };
+        }
 
-  // ✅ CORRECTED: Handle different submission scenarios with proper structure
-  if (showOnlyPPTApproval) {
-    // Guide viewing panel review - only handle PPT approval, no marks/attendance
-    const teamPptObj = requiresPPT ? {
-      pptApproved: {
-        approved: teamPptApproved,
-        locked: false
-      }
-    } : null;
-    console.log('📽️ [PopupReview] Guide panel PPT submission:', teamPptObj);
-    onSubmit({}, teamPptObj, {}); // ✅ FIXED: Empty PAT updates for panel reviews
-  } else if (requiresPPT && panelMode) {
-    // Panel mode with PPT - handle full review
-    const teamPptObj = {
-      pptApproved: {
-        approved: teamPptApproved,
-        locked: false
-      }
-    };
-    console.log('📽️ [PopupReview] Panel mode PPT submission:', teamPptObj);
-    // ✅ FIXED: Pass bestProject in correct structure for panel
-    onSubmit(submission, teamPptObj, { bestProject });
-  } else if (panelMode) {
-    // Panel mode without PPT - handle full review
-    console.log('📽️ [PopupReview] Panel mode without PPT submission');
-    // ✅ FIXED: Pass bestProject in correct structure for panel
-    onSubmit(submission, null, { bestProject });
-  } else if (requiresPPT) {
-    // Guide mode with PPT - handle normal guide review
-    const teamPptObj = {
-      pptApproved: {
-        approved: teamPptApproved,
-        locked: false
-      }
-    };
-    console.log('📽️ [PopupReview] Guide mode PPT submission:', teamPptObj);
-    onSubmit(submission, teamPptObj, patUpdates);
-  } else {
-    // Guide mode without PPT - handle normal guide review
-    console.log('📽️ [PopupReview] Guide mode without PPT submission');
-    onSubmit(submission, null, patUpdates);
-  }
-};
+        submission[member.regNo] = submissionData;
+        
+        if (!panelMode) {
+          patUpdates[member.regNo] = patStates[member._id] || false;
+          console.log(`🚫 [PopupReview] PAT status for ${member.name} (${member.regNo}): ${patStates[member._id]}`);
+        }
+      });
+    }
 
+    console.log('📤 [PopupReview] Final submission object:', submission);
+    console.log('📤 [PopupReview] PAT updates object:', patUpdates);
+
+    // ✅ CORRECTED: Handle different submission scenarios with proper structure
+    if (showOnlyPPTApproval) {
+      // Guide viewing panel review - only handle PPT approval, no marks/attendance
+      const teamPptObj = requiresPPT ? {
+        pptApproved: {
+          approved: teamPptApproved,
+          locked: false
+        }
+      } : null;
+      console.log('📽️ [PopupReview] Guide panel PPT submission:', teamPptObj);
+      onSubmit({}, teamPptObj, {}); // ✅ FIXED: Empty PAT updates for panel reviews
+    } else if (requiresPPT && panelMode) {
+      // Panel mode with PPT - handle full review
+      const teamPptObj = {
+        pptApproved: {
+          approved: teamPptApproved,
+          locked: false
+        }
+      };
+      console.log('📽️ [PopupReview] Panel mode PPT submission:', teamPptObj);
+      // ✅ FIXED: Pass bestProject in correct structure for panel
+      onSubmit(submission, teamPptObj, { bestProject });
+    } else if (panelMode) {
+      // Panel mode without PPT - handle full review
+      console.log('📽️ [PopupReview] Panel mode without PPT submission');
+      // ✅ FIXED: Pass bestProject in correct structure for panel
+      onSubmit(submission, null, { bestProject });
+    } else if (requiresPPT) {
+      // Guide mode with PPT - handle normal guide review
+      const teamPptObj = {
+        pptApproved: {
+          approved: teamPptApproved,
+          locked: false
+        }
+      };
+      console.log('📽️ [PopupReview] Guide mode PPT submission:', teamPptObj);
+      onSubmit(submission, teamPptObj, patUpdates);
+    } else {
+      // Guide mode without PPT - handle normal guide review
+      console.log('📽️ [PopupReview] Guide mode without PPT submission');
+      onSubmit(submission, null, patUpdates);
+    }
+  };
 
   // ✅ Handle PAT toggle (Guide only)
   const handlePatToggle = (memberId, isPat) => {
@@ -588,30 +585,99 @@ if (requiresPPT) {
           </div>
         </div>
 
-        {/* ✅ NEW: Guide PPT Approval Required Banner - Only for Panel mode */}
-        {panelMode && requiresPPT && !teamPptApproved && (
-          <div className="mb-6 p-4 rounded-xl border-2 bg-orange-50 border-orange-200">
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0">
-                <AlertTriangle className="w-6 h-6 text-orange-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-lg text-orange-800">
-                  ⚠️ Guide PPT Approval Required
-                </h3>
-                <p className="text-orange-700 mt-2">
-                  This review requires the project guide to approve the team's PPT before you can proceed with marking. 
-                  Please wait for the guide to approve the presentation.
-                </p>
-                <div className="mt-3 p-2 bg-orange-100 border border-orange-300 rounded">
-                  <p className="text-orange-800 font-medium text-sm">
-                    🔒 Marking is currently blocked until guide approval is received
-                  </p>
+        {/* ✅ FIXED: Panel PPT Approval Required Banner - Block when guide hasn't approved */}
+        {panelMode && requiresPPT && (() => {
+          // Check guide PPT approval status for this specific review
+          const guidePPTApprovals = teamMembers.map(member => {
+            let reviewData = null;
+            
+            // Get the review data for this specific review type
+            if (member.reviews?.get) {
+              reviewData = member.reviews.get(reviewType);
+            } else if (member.reviews?.[reviewType]) {
+              reviewData = member.reviews[reviewType];
+            }
+            
+            // Check if guide approved PPT in this specific review
+            if (reviewData?.pptApproved) {
+              return Boolean(reviewData.pptApproved.approved);
+            }
+            
+            // Fallback to student-level PPT approval
+            if (member.pptApproved) {
+              return Boolean(member.pptApproved.approved);
+            }
+            
+            return false;
+          });
+          
+          const allGuidePPTApproved = guidePPTApprovals.length > 0 && guidePPTApprovals.every(approval => approval === true);
+          const someGuidePPTApproved = guidePPTApprovals.some(approval => approval === true);
+          
+          if (!allGuidePPTApproved) {
+            return (
+              <div className="mb-6 p-6 rounded-xl border-2 bg-red-50 border-red-200">
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <AlertTriangle className="w-8 h-8 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-xl text-red-800 mb-3">
+                      🚫 Panel Review Blocked
+                    </h3>
+                    <p className="text-red-700 text-lg mb-4">
+                      This panel review requires the project <strong>guide to approve the team's PPT</strong> before you can proceed with evaluation.
+                    </p>
+                    
+                    <div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-4">
+                      <h4 className="font-semibold text-red-800 mb-2">📋 Current Status:</h4>
+                      <div className="space-y-2 text-sm">
+                        {teamMembers.map((member, index) => {
+                          const hasApproval = guidePPTApprovals[index];
+                          return (
+                            <div key={member._id} className="flex items-center justify-between">
+                              <span className="text-red-700">{member.name} ({member.regNo})</span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                                hasApproval 
+                                  ? 'bg-green-100 text-green-700' 
+                                  : 'bg-red-200 text-red-800'
+                              }`}>
+                                {hasApproval ? '✅ Guide Approved' : '❌ Pending Guide Approval'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    <div className="bg-orange-100 border border-orange-300 rounded-lg p-4">
+                      <h4 className="font-semibold text-orange-800 mb-2">⚠️ What needs to be done:</h4>
+                      <ol className="list-decimal list-inside text-orange-700 space-y-1 text-sm">
+                        <li>The project guide needs to log into their dashboard</li>
+                        <li>Navigate to this project's <strong>{reviewType}</strong> review</li>
+                        <li>Review and approve the team's PowerPoint presentation</li>
+                        <li>Submit their approval in the system</li>
+                      </ol>
+                      <p className="text-orange-600 font-medium mt-3 text-sm">
+                        🔒 <strong>Panel evaluation is blocked until all students receive guide PPT approval for this review.</strong>
+                      </p>
+                    </div>
+                    
+                    {someGuidePPTApproved && (
+                      <div className="mt-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
+                        <p className="text-yellow-800 text-sm">
+                          <strong>⚠️ Partial Approval:</strong> Some students have guide approval, but all students must be approved before panel evaluation can proceed.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            );
+          }
+          
+          return null; // Don't show banner if all approved
+        })()}
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
