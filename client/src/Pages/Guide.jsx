@@ -21,255 +21,202 @@ import {
 } from "../api";
 
 // Memoized inner content component to prevent unnecessary re-renders
-const GuideContent = React.memo(
-  ({
-    teams,
-    expandedTeam,
-    setExpandedTeam,
-    requestStatuses,
-    getReviewTypes,
-    getDeadlines,
-    getTeamRequestStatus,
-    isTeamDeadlinePassed,
-    isReviewLocked,
-    getButtonColor,
-    setActivePopup,
-    refreshKey, // This will force re-render when changed,
-  }) => {
-    return (
-      <div className="bg-white shadow-xl rounded-2xl overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-white">
-            My Guided Projects
-          </h2>
-          <p className="text-blue-100 mt-1">
-            Projects under your guidance and mentorship
-          </p>
-        </div>
-
-        {teams.length === 0 ? (
-          <div className="p-8 sm:p-12 text-center">
-            <div className="bg-gray-50 rounded-2xl p-8 max-w-md mx-auto">
-              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <div className="text-lg sm:text-xl text-gray-600 mb-2 font-semibold">
-                No Guided Projects
-              </div>
-              <p className="text-sm sm:text-base text-gray-500">
-                Projects assigned to you as guide will appear here
-              </p>
-            </div>
+const GuideContent = React.memo(({ 
+  teams, 
+  expandedTeam, 
+  setExpandedTeam, 
+  requestStatuses, 
+  getReviewTypes, 
+  getDeadlines,
+  getTeamRequestStatus, 
+  isTeamDeadlinePassed,
+  isReviewLocked,
+  getButtonColor,
+  setActivePopup,
+  refreshKey // This will force re-render when changed
+}) => {
+  console.log('🔄 [GuideContent] Rendering inner content with refreshKey:', refreshKey);
+  
+  return (
+    <div className="bg-white shadow-xl rounded-2xl overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
+        <h2 className="text-xl sm:text-2xl font-bold text-white">My Guided Projects</h2>
+        <p className="text-blue-100 mt-1">Projects under your guidance and mentorship</p>
+      </div>
+      
+      {teams.length === 0 ? (
+        <div className="p-8 sm:p-12 text-center">
+          <div className="bg-gray-50 rounded-2xl p-8 max-w-md mx-auto">
+            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <div className="text-lg sm:text-xl text-gray-600 mb-2 font-semibold">No Guided Projects</div>
+            <p className="text-sm sm:text-base text-gray-500">Projects assigned to you as guide will appear here</p>
           </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {teams.map((team) => {
-              const reviewTypes = getReviewTypes(team.markingSchema);
-              const deadlines = getDeadlines(team.markingSchema);
-
-              if (!reviewTypes.length) {
-                return (
-                  <div
-                    key={team.id}
-                    className="bg-yellow-50 border-l-4 border-yellow-400 p-6 m-4 sm:m-6 rounded-r-xl"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
-                      <div>
-                        <p className="font-semibold text-yellow-800 text-sm sm:text-base">
-                          {team.title}
-                        </p>
-                        <p className="text-xs sm:text-sm text-yellow-700 mt-1">
-                          No marking schema configured for this project
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {teams.map(team => {
+            const reviewTypes = getReviewTypes(team.markingSchema);
+            const deadlines = getDeadlines(team.markingSchema);
+            
+            if (!reviewTypes.length) {
               return (
-                <div
-                  key={team.id}
-                  className="bg-white hover:bg-gray-50 transition-colors duration-200"
-                >
-                  <div className="p-4 sm:p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-3">
-                          <button
-                            onClick={() =>
-                              setExpandedTeam(
-                                expandedTeam === team.id ? null : team.id
-                              )
-                            }
-                            className="flex items-center flex-shrink-0 mt-1 p-1 rounded-lg hover:bg-blue-100 transition-colors"
-                          >
-                            <ChevronRight
-                              className={`w-5 h-5 text-gray-600 transition-transform duration-200 ${
-                                expandedTeam === team.id ? "rotate-90" : ""
-                              }`}
-                            />
-                          </button>
-                          <div className="min-w-0 flex-1">
-                            <h3 className="font-semibold text-gray-900 text-base sm:text-lg lg:text-xl break-words mb-2">
-                              {team.title}
-                            </h3>
-                            <p className="text-sm sm:text-base text-gray-600 mb-3">
-                              {team.description}
-                            </p>
-
-                            <div className="flex items-center gap-4 mb-3">
-                              <div className="flex items-center gap-2 text-blue-600">
-                                <Users className="w-4 h-4" />
-                                <span className="text-sm font-medium">
-                                  {team.students.length} Student
-                                  {team.students.length !== 1 ? "s" : ""}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Status Information */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
-                              {reviewTypes.map((reviewType) => {
-                                const isPassed = isTeamDeadlinePassed(
-                                  reviewType.key,
-                                  team.id
-                                );
-                                const requestStatus = getTeamRequestStatus(
-                                  team,
-                                  reviewType.key
-                                );
-                                return (
-                                  <div
-                                    key={reviewType.key}
-                                    className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"
-                                  >
-                                    <span className="font-medium text-gray-700 truncate">
-                                      {reviewType.name}:
-                                    </span>
-                                    <div className="flex items-center gap-1">
-                                      <span
-                                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                          isPassed
-                                            ? "bg-red-100 text-red-700"
-                                            : "bg-green-100 text-green-700"
-                                        }`}
-                                      >
-                                        {isPassed
-                                          ? "Deadline Passed"
-                                          : "Active"}
-                                      </span>
-                                      {requestStatus === "approved" && (
-                                        <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">
-                                          Extended
-                                        </span>
-                                      )}
-                                      {requestStatus === "pending" && (
-                                        <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">
-                                          Pending
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Review Buttons */}
-                      <div className="flex flex-wrap gap-3 justify-start lg:justify-end">
-                        {reviewTypes.map((reviewType) => {
-                          const isPassed = isTeamDeadlinePassed(
-                            reviewType.key,
-                            team.id
-                          );
-                          const requestStatus = getTeamRequestStatus(
-                            team,
-                            reviewType.key
-                          );
-
-                          return (
-                            <button
-                              key={reviewType.key}
-                              onClick={() =>
-                                setActivePopup({
-                                  type: reviewType.key,
-                                  teamId: team.id,
-                                  teamTitle: team.title,
-                                  students: team.students,
-                                  markingSchema: team.markingSchema,
-                                  // Add review type identification
-                                  isGuideReview:
-                                    reviewType.facultyType === "guide",
-                                  isPanelReview:
-                                    reviewType.facultyType === "panel",
-                                })
-                              }
-                              className={`px-4 py-3 text-white text-sm font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${getButtonColor(
-                                reviewType.key
-                              )} ${
-                                isPassed ? "opacity-75" : ""
-                              } flex items-center gap-2 whitespace-nowrap min-w-0`}
-                            >
-                              <span className="truncate max-w-24 sm:max-w-none">
-                                {reviewType.facultyType === "panel"
-                                  ? `${reviewType.name} (Panel)`
-                                  : reviewType.name}
-                              </span>
-                              {reviewType.requiresPPT && (
-                                <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">
-                                  PPT
-                                </span>
-                              )}
-                              {requestStatus === "approved" && (
-                                <span className="text-xs bg-purple-500 px-2 py-1 rounded-full flex-shrink-0 font-bold">
-                                  EXT
-                                </span>
-                              )}
-                              {isPassed &&
-                                requestStatus !== "approved" &&
-                                reviewType.facultyType === "guide" && (
-                                  <span className="text-xs bg-red-500 px-2 py-1 rounded-full flex-shrink-0">
-                                    ⏰
-                                  </span>
-                                )}
-                            </button>
-                          );
-                        })}
-                      </div>
+                <div key={team.id} className="bg-yellow-50 border-l-4 border-yellow-400 p-6 m-4 sm:m-6 rounded-r-xl">
+                  <div className="flex items-center space-x-3">
+                    <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-yellow-800 text-sm sm:text-base">{team.title}</p>
+                      <p className="text-xs sm:text-sm text-yellow-700 mt-1">No marking schema configured for this project</p>
                     </div>
-
-                    {/* Expanded Content */}
-                    {expandedTeam === team.id && (
-                      <div className="mt-6 -mx-4 sm:-mx-6 bg-gray-50 rounded-xl overflow-hidden">
-                        <div className="p-4 sm:p-6">
-                          <ReviewTable
-                            team={team}
-                            deadlines={deadlines}
-                            requestStatuses={requestStatuses}
-                            isDeadlinePassed={(reviewType) =>
-                              isTeamDeadlinePassed(reviewType, team.id)
-                            }
-                            isReviewLocked={(student, reviewType) =>
-                              isReviewLocked(student, reviewType, team.id)
-                            }
-                            markingSchema={team.markingSchema}
-                            panelMode={false}
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  }
-);
+            }
+            
+            return (
+              <div key={team.id} className="bg-white hover:bg-gray-50 transition-colors duration-200">
+                <div className="p-4 sm:p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-3">
+                        <button
+                          onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
+                          className="flex items-center flex-shrink-0 mt-1 p-1 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          <ChevronRight className={`w-5 h-5 text-gray-600 transition-transform duration-200 ${
+                            expandedTeam === team.id ? 'rotate-90' : ''
+                          }`} />
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-semibold text-gray-900 text-base sm:text-lg lg:text-xl break-words mb-2">
+                            {team.title}
+                          </h3>
+                          <p className="text-sm sm:text-base text-gray-600 mb-3">{team.description}</p>
+                          
+                          <div className="flex items-center gap-4 mb-3">
+                            <div className="flex items-center gap-2 text-blue-600">
+                              <Users className="w-4 h-4" />
+                              <span className="text-sm font-medium">
+                                {team.students.length} Student{team.students.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* ✅ UPDATED: Status Information with Panel Reviews */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                            {reviewTypes.map(reviewType => {
+                              const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
+                              const requestStatus = getTeamRequestStatus(team, reviewType.key);
+                              const isPanelReview = reviewType.isPanelReview || false; // ✅ NEW
+                              
+                              return (
+                                <div key={reviewType.key} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                                  <span className={`font-medium truncate ${isPanelReview ? 'text-purple-700' : 'text-gray-700'}`}>
+                                    {reviewType.name}:
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      isPanelReview 
+                                        ? 'bg-purple-100 text-purple-700' // ✅ NEW: Purple for panel reviews
+                                        : isPassed 
+                                          ? 'bg-red-100 text-red-700' 
+                                          : 'bg-green-100 text-green-700'
+                                    }`}>
+                                      {isPanelReview 
+                                        ? 'Panel Review' // ✅ NEW: Show "Panel Review" instead of deadline status
+                                        : isPassed 
+                                          ? 'Deadline Passed' 
+                                          : 'Active'
+                                      }
+                                    </span>
+                                    {requestStatus === 'approved' && !isPanelReview && (
+                                      <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">Extended</span>
+                                    )}
+                                    {requestStatus === 'pending' && !isPanelReview && (
+                                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">Pending</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* ✅ UPDATED: Review Buttons with Panel Support and PPT Indicator */}
+                    <div className="flex flex-wrap gap-3 justify-start lg:justify-end">
+                      {reviewTypes.map(reviewType => {
+                        const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
+                        const requestStatus = getTeamRequestStatus(team, reviewType.key);
+                        const isPanelReview = reviewType.isPanelReview || false; // ✅ NEW
+                        
+                        // ✅ CHANGED: Get PPT requirement from schema
+                        const schemaReview = team.markingSchema?.reviews?.find(r => r.reviewName === reviewType.key);
+                        const requiresPPT = !!schemaReview?.pptApproved;
+                        
+                        return (
+                          <button
+                            key={reviewType.key}
+                            onClick={() => setActivePopup({ 
+                              type: reviewType.key, 
+                              teamId: team.id,
+                              teamTitle: team.title,
+                              students: team.students,
+                              markingSchema: team.markingSchema
+                            })}
+                            className={`px-4 py-3 text-white text-sm font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
+                              isPanelReview 
+                                ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700' // ✅ NEW: Purple for panel reviews
+                                : getButtonColor(reviewType.key)
+                            } ${
+                              isPassed ? 'opacity-75' : ''
+                            } flex items-center gap-2 whitespace-nowrap min-w-0`}
+                          >
+                            <span className="truncate max-w-24 sm:max-w-none">{reviewType.name}</span>
+                            {requiresPPT && ( // ✅ CHANGED: Use schema-based PPT requirement
+                              <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">PPT</span>
+                            )}
+                            {isPanelReview && ( // ✅ NEW: Panel indicator
+                              <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">👥</span>
+                            )}
+                            {requestStatus === 'approved' && !isPanelReview && (
+                              <span className="text-xs bg-purple-500 px-2 py-1 rounded-full flex-shrink-0 font-bold">EXT</span>
+                            )}
+                            {isPassed && !isPanelReview && (
+                              <span className="text-xs bg-red-500 px-2 py-1 rounded-full flex-shrink-0">🔒</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* ✅ UPDATED: Expanded Content with Panel Reviews Support */}
+                  {expandedTeam === team.id && (
+                    <div className="mt-6 -mx-4 sm:-mx-6 bg-gray-50 rounded-xl overflow-hidden">
+                      <div className="p-4 sm:p-6">
+                        <ReviewTable 
+                          team={team} 
+                          deadlines={deadlines}
+                          requestStatuses={requestStatuses}
+                          isDeadlinePassed={(reviewType) => isTeamDeadlinePassed(reviewType, team.id)}
+                          isReviewLocked={(student, reviewType) => isReviewLocked(student, reviewType, team.id)}
+                          markingSchema={team.markingSchema}
+                          panelMode={false}
+                          showPanelReviews={true} // ✅ NEW: Show panel reviews in table
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+});
 
 const Guide = () => {
   const [teams, setTeams] = useState([]);
@@ -291,32 +238,53 @@ const Guide = () => {
   // Notification system
   const { showNotification, hideNotification } = useNotification();
 
+  // ✅ UPDATED: getReviewTypes to use pptApproved instead of requiresPPT
   const getReviewTypes = useCallback((markingSchema) => {
+    console.log('🔍 [Guide] Getting review types from schema:', markingSchema);
     if (markingSchema?.reviews) {
-      const allReviews = markingSchema.reviews.map((review) => ({
-        key: review.reviewName,
-        name: review.displayName || review.reviewName,
-        components: review.components || [],
-        requiresPPT: review.requiresPPT || false,
-        facultyType: review.facultyType,
-        isGuideReview: review.facultyType === "guide",
-        isPanelReview: review.facultyType === "panel",
-      }));
+      // Get guide reviews (existing functionality)
+      const guideReviews = markingSchema.reviews
+        .filter(review => review.facultyType === 'guide')
+        .map(review => ({
+          key: review.reviewName,
+          name: review.displayName || review.reviewName,
+          components: review.components || [],
+          requiresPPT: !!review.pptApproved, // ✅ CHANGED: Use pptApproved field
+          facultyType: review.facultyType
+        }));
+      
+      // ✅ NEW: Get panel reviews (only PPT approved part)
+      const panelReviews = markingSchema.reviews
+        .filter(review => review.facultyType === 'panel')
+        .map(review => ({
+          key: review.reviewName,
+          name: `${review.displayName || review.reviewName} (Panel)`,
+          components: review.components || [],
+          requiresPPT: !!review.pptApproved, // ✅ CHANGED: Use pptApproved field
+          facultyType: review.facultyType,
+          isPanelReview: true // ✅ NEW: Flag to identify panel reviews
+        }));
+      
+      // ✅ NEW: Combine guide and panel reviews
+      const allReviews = [...guideReviews, ...panelReviews];
+      console.log('✅ [Guide] All reviews found:', allReviews);
       return allReviews;
     }
+    
+    console.log('❌ [Guide] No schema found - returning empty reviews');
     return [];
   }, []);
 
+  // ✅ UPDATED: getDeadlines to handle both guide and panel deadlines
   const getDeadlines = useCallback((markingSchema) => {
     const deadlineData = {};
     if (markingSchema?.reviews) {
-      markingSchema.reviews
-        .filter((review) => review.facultyType === "guide")
-        .forEach((review) => {
-          if (review.deadline) {
-            deadlineData[review.reviewName] = review.deadline;
-          }
-        });
+      // ✅ UPDATED: Include both guide and panel reviews
+      markingSchema.reviews.forEach(review => {
+        if (review.deadline) {
+          deadlineData[review.reviewName] = review.deadline;
+        }
+      });
     }
     return deadlineData;
   }, []);
@@ -391,7 +359,7 @@ const Guide = () => {
 
         setTeams(mappedTeams);
 
-        // Batch check request statuses for all students & reviews
+        // ✅ UPDATED: Batch request handling to include panel reviews
         if (mappedTeams.length > 0) {
           const batchRequests = [];
 
@@ -402,7 +370,7 @@ const Guide = () => {
                 batchRequests.push({
                   regNo: student.regNo,
                   reviewType: reviewType.key,
-                  facultyType: "guide",
+                  facultyType: reviewType.facultyType // ✅ NEW: Use actual faculty type (guide/panel)
                 });
               });
             });
@@ -461,34 +429,43 @@ const Guide = () => {
     [requestStatuses]
   );
 
-  const isTeamDeadlinePassed = useCallback(
-    (reviewType, teamId) => {
-      const team = teams.find((t) => t.id === teamId);
-      if (!team) return false;
-      const teamDeadlines = getDeadlines(team.markingSchema);
-      if (!teamDeadlines || !teamDeadlines[reviewType]) {
-        return false;
-      }
+  // ✅ UPDATED: isTeamDeadlinePassed to handle panel reviews (no deadline locking)
+  const isTeamDeadlinePassed = useCallback((reviewType, teamId) => {
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return false;
 
-      const deadline = teamDeadlines[reviewType];
-      const now = new Date();
-
-      try {
-        if (deadline.from && deadline.to) {
-          const toDate = new Date(deadline.to);
-          return now > toDate;
-        } else if (typeof deadline === "string" || deadline instanceof Date) {
-          const deadlineDate = new Date(deadline);
-          return now > deadlineDate;
-        }
-      } catch (dateError) {
-        return false;
-      }
-
+    // ✅ NEW: Check if this is a panel review
+    const reviewTypes = getReviewTypes(team.markingSchema);
+    const reviewConfig = reviewTypes.find(r => r.key === reviewType);
+    
+    // ✅ NEW: Panel reviews are never deadline locked for guides
+    if (reviewConfig?.isPanelReview) {
       return false;
-    },
-    [teams, getDeadlines]
-  );
+    }
+
+    const teamDeadlines = getDeadlines(team.markingSchema);
+    if (!teamDeadlines || !teamDeadlines[reviewType]) {
+      return false;
+    }
+
+    const deadline = teamDeadlines[reviewType];
+    const now = new Date();
+    
+    try {
+      if (deadline.from && deadline.to) {
+        const toDate = new Date(deadline.to);
+        return now > toDate;
+      } else if (typeof deadline === 'string' || deadline instanceof Date) {
+        const deadlineDate = new Date(deadline);
+        return now > deadlineDate;
+      }
+    } catch (dateError) {
+      console.error('❌ Error parsing deadline:', dateError);
+      return false;
+    }
+    
+    return false;
+  }, [teams, getReviewTypes, getDeadlines]);
 
   const isReviewLocked = useCallback(
     (student, reviewType, teamId) => {
@@ -513,114 +490,143 @@ const Guide = () => {
     [isTeamDeadlinePassed, teams, getTeamRequestStatus]
   );
 
-  // Handle review submission correctly with PAT updates
-  const handleReviewSubmit = useCallback(
-    async (teamId, reviewType, reviewData, pptObj, patUpdates) => {
-      try {
-        const team = teams.find((t) => t.id === teamId);
-        if (!team) {
-          showNotification(
-            "error",
-            "Team Not Found",
-            "Team not found! Please refresh and try again."
-          );
-          return;
-        }
+  // ✅ UPDATED: Handle review submission with proper PPT handling
+// ✅ CORRECTED: Handle review submission with proper payload structure
+const handleReviewSubmit = useCallback(async (teamId, reviewType, reviewData, pptObj, patUpdates) => {
+  try {
+    console.log('=== [FRONTEND] GUIDE REVIEW SUBMIT STARTED ===');
+    
+    const team = teams.find(t => t.id === teamId);
+    if (!team) {
+      console.error('❌ [FRONTEND] Team not found for ID:', teamId);
+      showNotification('error', 'Team Not Found', 'Team not found! Please refresh and try again.');
+      return;
+    }
 
-        const reviewTypes = getReviewTypes(team.markingSchema);
-        const reviewConfig = reviewTypes.find((r) => r.key === reviewType);
+    console.log('✅ [FRONTEND] Team found:', team.title);
+    console.log('📋 [FRONTEND] Review Type:', reviewType);
+    console.log('📋 [FRONTEND] Raw Review Data from popup:', reviewData);
+    console.log('🚫 [FRONTEND] PAT Updates:', patUpdates);
+    console.log('📽️ [FRONTEND] PPT Object:', pptObj);
+    
+    const reviewTypes = getReviewTypes(team.markingSchema);
+    const reviewConfig = reviewTypes.find(r => r.key === reviewType);
+    
+    if (!reviewConfig) {
+      console.error('❌ [FRONTEND] Review config not found for type:', reviewType);
+      showNotification('error', 'Configuration Error', 'Review configuration not found! Please refresh and try again.');
+      return;
+    }
 
-        if (!reviewConfig) {
-          showNotification(
-            "error",
-            "Configuration Error",
-            "Review configuration not found! Please refresh and try again."
-          );
-          return;
-        }
+    // ✅ CHANGED: Check schema for PPT requirement
+    const schemaReview = team.markingSchema?.reviews?.find(r => r.reviewName === reviewType);
+    const requiresPPT = !!schemaReview?.pptApproved;
+    const isPanelReview = reviewConfig?.isPanelReview || false;
+    
+    console.log('📽️ [FRONTEND] PPT Required:', requiresPPT);
+    console.log('📽️ [FRONTEND] Is Panel Review:', isPanelReview);
+    console.log('📽️ [FRONTEND] Schema Review:', schemaReview);
 
-        const studentUpdates = team.students.map((student) => {
-          const studentReviewData = reviewData[student.regNo] || {};
+    // ✅ FIXED: Build student updates with correct structure
+    const studentUpdates = team.students.map(student => {
+      console.log(`🎓 [FRONTEND] Processing student: ${student.name} (${student.regNo})`);
+      
+      const studentReviewData = reviewData[student.regNo] || {};
+      console.log(`📊 [FRONTEND] Student review data for ${student.name}:`, studentReviewData);
+      
+      // Build marks object using component names from schema
+      const marks = {};
+      if (reviewConfig.components && reviewConfig.components.length > 0) {
+        reviewConfig.components.forEach(comp => {
+          const markValue = Number(studentReviewData[comp.name]) || 0;
+          marks[comp.name] = markValue;
+          console.log(`📊 [FRONTEND] Component ${comp.name}: ${markValue} for ${student.name}`);
+        });
+      }
 
-          // Build marks object according to schema components
-          const marks = {};
-          if (reviewConfig.components && reviewConfig.components.length > 0) {
-            reviewConfig.components.forEach((comp) => {
-              const markValue = Number(studentReviewData[comp.name]) || 0;
-              marks[comp.name] = markValue;
-            });
+      // ✅ FIXED: Correct review structure without nested pptApproved
+      const updateData = {
+        studentId: student._id,
+        reviews: {
+          [reviewType]: {
+            marks: marks,
+            attendance: studentReviewData.attendance || { value: false, locked: false },
+            locked: studentReviewData.locked || false,
+            comments: studentReviewData.comments || ''
+            // ✅ REMOVED: pptApproved should NOT be here - it goes at project level
           }
+        }
+      };
 
-          const updateData = {
-            studentId: student._id,
-            reviews: {
-              [reviewType]: {
-                marks: marks,
-                attendance: studentReviewData.attendance || {
-                  value: false,
-                  locked: false,
-                },
-                locked: studentReviewData.locked || false,
-                comments: studentReviewData.comments || "",
-                pptApproved: studentReviewData.pptApproved, // include pptApproved if set
-              },
-            },
-          };
-
-          // Add PAT update if available
-          if (patUpdates && patUpdates[student.regNo] !== undefined) {
-            updateData.PAT = patUpdates[student.regNo];
-          }
+      // ✅ PAT status update (only for guide reviews, not panel)
+      if (patUpdates && patUpdates[student.regNo] !== undefined && !isPanelReview) {
+        updateData.PAT = patUpdates[student.regNo];
+        console.log(`🚫 [FRONTEND] Setting PAT for ${student.name}: ${patUpdates[student.regNo]}`);
+      }
 
           return updateData;
         });
 
-        const updatePayload = {
-          projectId: teamId,
-          studentUpdates,
-        };
+    // ✅ FIXED: Correct payload structure
+    const updatePayload = {
+      projectId: teamId,
+      studentUpdates: studentUpdates
+    };
 
-        // Add project-level pptApproved if supplied (for guide/project level)
-        if (reviewConfig?.requiresPPT && pptObj) {
-          updatePayload.pptApproved = pptObj.pptApproved;
-        }
+    // ✅ CORRECTED: PPT approval goes at PROJECT level, not in student reviews
+    if (requiresPPT && pptObj?.pptApproved) {
+      updatePayload.pptApproved = pptObj.pptApproved;
+      console.log('📽️ [FRONTEND] Adding team PPT approval to project level:', pptObj.pptApproved);
+    }
 
-        const loadingId = showNotification(
-          "info",
-          "Submitting...",
-          "Saving review data...",
-          10000
-        );
-        const response = await updateProject(updatePayload);
-        hideNotification(loadingId);
+    // ✅ NEW: Handle panel reviews with best project data
+    if (isPanelReview && patUpdates?.bestProject !== undefined) {
+      updatePayload.bestProject = patUpdates.bestProject;
+      console.log('🏆 [FRONTEND] Adding best project status:', patUpdates.bestProject);
+    }
 
-        if (response.data?.success || response.data?.updates) {
-          setActivePopup(null);
-          setTimeout(async () => {
-            await handleRefresh();
-            showNotification(
-              "success",
-              "Review Saved",
-              "Guide review submitted and saved successfully!"
-            );
-          }, 300);
-        } else {
-          showNotification(
-            "error",
-            "Submission Failed",
-            "Review submission failed. Please try again."
-          );
-        }
-      } catch (error) {
+    console.log('📤 [FRONTEND] Final corrected update payload:');
+    console.log(JSON.stringify(updatePayload, null, 2));
+    
+    // Show loading notification
+    const loadingId = showNotification('info', 'Submitting...', 'Please wait while we save your review data...', 10000);
+    
+    const response = await updateProject(updatePayload);
+    console.log('📨 [FRONTEND] Backend response received:', response);
+    
+    // Hide loading notification
+    hideNotification(loadingId);
+    
+    if (response.data?.success || response.data?.updates) {
+      setActivePopup(null);
+      
+      setTimeout(async () => {
+        await handleRefresh();
         showNotification(
-          "error",
-          "Submission Error",
-          `Error submitting review: ${error.message}`
+          'success', 
+          'Review Saved', 
+          requiresPPT ? 'Guide review and PPT approval submitted successfully!' : 'Guide review submitted successfully!'
         );
-      }
-    },
-    [teams, getReviewTypes, handleRefresh, showNotification, hideNotification]
-  );
+      }, 300);
+      
+    } else {
+      console.error('❌ [FRONTEND] Backend response indicates failure:', response.data);
+      showNotification(
+        'error', 
+        'Submission Failed', 
+        'Review submission failed. Please try again.'
+      );
+    }
+  } catch (error) {
+    console.error('❌ [FRONTEND] Critical error during submission:', error);
+    showNotification(
+      'error', 
+      'Submission Error', 
+      `Error submitting review: ${error.message}`
+    );
+  }
+}, [teams, getReviewTypes, handleRefresh, showNotification, hideNotification]);
+
 
   // Request edit handling, showing modal and submitting request
   const handleRequestEdit = useCallback(
@@ -824,60 +830,55 @@ const Guide = () => {
               defaultReason="Need to correct marks after deadline"
             />
 
-            {/* Popup Review Modal */}
-            {activePopup &&
-              (() => {
-                const team = teams.find((t) => t.id === activePopup.teamId);
-                const reviewTypes = getReviewTypes(team.markingSchema);
-                const isLocked = isTeamDeadlinePassed(
-                  activePopup.type,
-                  activePopup.teamId
-                );
-                const requestStatus = getTeamRequestStatus(
-                  team,
-                  activePopup.type
-                );
-                const showRequestEdit =
-                  isLocked &&
-                  requestStatus !== "none" &&
-                  requestStatus !== "rejected";
+            {/* ✅ UPDATED: Popup Review Modal with Panel Support and Schema Fix */}
+            {activePopup && (() => {
+              const team = teams.find(t => t.id === activePopup.teamId);
+              const reviewTypes = getReviewTypes(team.markingSchema);
+              const reviewConfig = reviewTypes.find(r => r.key === activePopup.type);
+              const isLocked = isTeamDeadlinePassed(activePopup.type, activePopup.teamId);
+              const requestStatus = getTeamRequestStatus(team, activePopup.type);
+              
+              const showRequestEdit = isLocked && (requestStatus === 'none' || requestStatus === 'rejected');
+              
+              // ✅ NEW: Check if this is a panel review
+              const isPanelReview = reviewConfig?.isPanelReview || false;
+              
+              // ✅ CHANGED: Get PPT requirement from schema's pptApproved field
+              const schemaReview = team.markingSchema?.reviews?.find(r => r.reviewName === activePopup.type);
+              const requiresPPT = !!schemaReview?.pptApproved;
+              
+              return (
+                <PopupReview
+                  title={`${reviewTypes.find(r => r.key === activePopup.type)?.name || activePopup.type} - ${activePopup.teamTitle}`}
+                  teamMembers={activePopup.students}
+                  reviewType={activePopup.type}
+                  isOpen={true}
+                  locked={isLocked}
+                  markingSchema={activePopup.markingSchema}
+                  requestStatus={requestStatus}
+                  onClose={() => setActivePopup(null)}
+                  onSubmit={(data, pptObj, patUpdates) => {
+                    // ✅ UPDATED: Handle both guide and panel reviews
+                    if (isPanelReview) {
+                      // For panel reviews, only handle PPT approval
+                      handleReviewSubmit(activePopup.teamId, activePopup.type, {}, pptObj, {});
+                    } else {
+                      // Normal guide review handling
+                      handleReviewSubmit(activePopup.teamId, activePopup.type, data, pptObj, patUpdates);
+                    }
+                  }}
+                  onRequestEdit={() => handleRequestEdit(activePopup.teamId, activePopup.type)}
+                  requestEditVisible={showRequestEdit && !isPanelReview} // ✅ NEW: No edit requests for panel reviews
+                  requestPending={requestStatus === 'pending'}
+                  requiresPPT={requiresPPT} // ✅ CHANGED: Use schema-based PPT requirement
+                  // ✅ NEW: Panel review props
+                  panelMode={false} // Always false for guide side
+                  isPanelReview={isPanelReview}
+                  isGuideReview={!isPanelReview}
+                />
+              );
+            })()}
 
-                return (
-                  <PopupReview
-                    title={`${
-                      reviewTypes.find((r) => r.key === activePopup.type)
-                        ?.name || activePopup.type
-                    } - ${activePopup.teamTitle}`}
-                    teamMembers={activePopup.students}
-                    reviewType={activePopup.type}
-                    isOpen={true}
-                    locked={isLocked}
-                    markingSchema={activePopup.markingSchema}
-                    requestStatus={requestStatus}
-                    onClose={() => setActivePopup(null)}
-                    onSubmit={(data, pptObj, patUpdates) =>
-                      handleReviewSubmit(
-                        activePopup.teamId,
-                        activePopup.type,
-                        data,
-                        pptObj,
-                        patUpdates
-                      )
-                    }
-                    onRequestEdit={() =>
-                      handleRequestEdit(activePopup.teamId, activePopup.type)
-                    }
-                    requestEditVisible={showRequestEdit}
-                    requestPending={requestStatus === "pending"}
-                    requiresPPT={
-                      reviewTypes.find((r) => r.key === activePopup.type)
-                        ?.requiresPPT || false
-                    }
-                    isGuideReview={activePopup.isGuideReview || false}
-                    isPanelReview={activePopup.isPanelReview || false}
-                  />
-                );
-              })()}
           </div>
         </div>
       </div>
