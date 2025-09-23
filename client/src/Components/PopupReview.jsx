@@ -278,21 +278,58 @@ const PopupReview = ({
     }
 
     // ✅ CHANGED: Initialize PPT approval from schema-based requirement
-    if (requiresPPT) {
-      console.log('📽️ [PopupReview] PPT is required for this review');
-      console.log('📽️ [PopupReview] Team members PPT status:', teamMembers.map(m => ({
-        name: m.name,
-        pptApproved: m.pptApproved
-      })));
+// ✅ COMPLETELY FIXED: Initialize PPT approval from review-specific data or schema requirement
+if (requiresPPT) {
+  console.log('📽️ [PopupReview] PPT is required for this review');
+  
+  // ✅ FIXED: Check if PPT is already approved for this specific review
+  let pptAlreadyApproved = false;
+  
+  if (teamMembers.length > 0) {
+    // ✅ FIXED: Check EACH student for PPT approval in this specific review
+    const pptApprovals = teamMembers.map(member => {
+      let reviewData = null;
       
-      setTeamPptApproved(
-        teamMembers.length > 0 && 
-        teamMembers.every(member => member.pptApproved?.approved === true)
-      );
-    } else {
-      console.log('📽️ [PopupReview] PPT is NOT required for this review');
-      setTeamPptApproved(false);
-    }
+      // Get the review data for this specific review type
+      if (member.reviews?.get) {
+        reviewData = member.reviews.get(reviewType);
+      } else if (member.reviews?.[reviewType]) {
+        reviewData = member.reviews[reviewType];
+      }
+      
+      console.log(`📽️ [PopupReview] Review data for ${member.name} in ${reviewType}:`, reviewData);
+      
+      // Check if PPT is approved in this specific review
+      if (reviewData?.pptApproved) {
+        const isApproved = Boolean(reviewData.pptApproved.approved);
+        console.log(`📽️ [PopupReview] Review-specific PPT for ${member.name}:`, isApproved);
+        return isApproved;
+      }
+      
+      // Fallback to student-level PPT approval
+      if (member.pptApproved) {
+        const isApproved = Boolean(member.pptApproved.approved);
+        console.log(`📽️ [PopupReview] Student-level PPT for ${member.name}:`, isApproved);
+        return isApproved;
+      }
+      
+      console.log(`📽️ [PopupReview] No PPT data found for ${member.name}`);
+      return false;
+    });
+    
+    // ✅ FIXED: PPT is approved if ALL students have it approved
+    pptAlreadyApproved = pptApprovals.length > 0 && pptApprovals.every(approval => approval === true);
+    console.log('📽️ [PopupReview] Individual PPT approvals:', pptApprovals);
+    console.log('📽️ [PopupReview] Final team PPT status:', pptAlreadyApproved);
+  }
+  
+  setTeamPptApproved(pptAlreadyApproved);
+  console.log('📽️ [PopupReview] PPT approval initialized to:', pptAlreadyApproved);
+} else {
+  console.log('📽️ [PopupReview] PPT is NOT required for this review');
+  setTeamPptApproved(false);
+}
+
     
     console.log('✅ [PopupReview] Form data initialized');
     console.log('🏆 [PopupReview] Best project initialized:', currentBestProject);
