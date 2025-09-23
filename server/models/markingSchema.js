@@ -25,7 +25,6 @@ const reviewSchema = new mongoose.Schema(
     deadline: { type: deadlineSchema, required: true },
     pptApproved: {
       approved: { type: Boolean, default: false },
-      locked: { type: Boolean, default: false },
     },
   },
   { _id: false }

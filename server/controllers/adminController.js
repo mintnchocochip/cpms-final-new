@@ -29,7 +29,7 @@ export async function createOrUpdateMarkingSchema(req, res) {
       .json({ success: false, message: "Missing or invalid fields." });
   }
 
-  // Validate each review
+  // VALIDATE EACH REVIEW
   for (const review of reviews) {
     console.log("🔍 Validating review:", review.reviewName);
 
@@ -80,14 +80,11 @@ export async function createOrUpdateMarkingSchema(req, res) {
       });
     }
 
-    if (
-      typeof review.pptApproved.approved !== "boolean" ||
-      typeof review.pptApproved.locked !== "boolean"
-    ) {
+    // Only check for pptApproved.approved as Boolean (no locked anymore)
+    if (typeof review.pptApproved.approved !== "boolean") {
       return res.status(400).json({
         success: false,
-        message:
-          "pptApproved field must have boolean approved and locked values",
+        message: "pptApproved field must have boolean approved value",
       });
     }
   }
@@ -98,7 +95,7 @@ export async function createOrUpdateMarkingSchema(req, res) {
       department,
     });
 
-    const updated = await MarkingSchema.findOneAndUpdate(
+    const updated = await MarkingSchemaModel.findOneAndUpdate(
       { school, department },
       {
         school,
@@ -127,7 +124,6 @@ export async function createOrUpdateMarkingSchema(req, res) {
     });
   }
 }
-
 
 // Updated getDefaultDeadline function
 export async function getDefaultDeadline(req, res) {
