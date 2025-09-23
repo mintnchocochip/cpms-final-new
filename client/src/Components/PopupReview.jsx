@@ -720,37 +720,26 @@ const handlePatToggle = (memberId, isPat) => {
       </label>
       <div className="flex items-center space-x-2">
         <input
-          type="text" // ✅ Changed to text to show "PAT" when needed
-          min="0"
-          max={comp.points}
-          value={
-            patStates[member._id] 
-              ? 'PAT' // ✅ Show "PAT" when PAT is enabled in both guide and panel
-              : marks[member._id]?.[comp.key] || ''
-          }
-          onChange={(e) => handleMarksChange(member._id, e.target.value, comp.key)}
-          onWheel={(e) => e.target.blur()}
-          disabled={
-            finalFormLocked || 
-            (hasAttendance && attendance[member._id] === false) ||
-            patStates[member._id] || // ✅ Disable if PAT in both modes
-            panelMode // ✅ Panel mode - all inputs disabled anyway
-          }
-          className={`w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-blue-500 ${
-            (finalFormLocked || 
-             (hasAttendance && attendance[member._id] === false) ||
-             patStates[member._id] ||
-             panelMode)
-              ? 'bg-gray-100 cursor-not-allowed' 
-              : ''
-          } ${
-            patStates[member._id] 
-              ? 'text-red-600 font-bold' // ✅ Style PAT text differently in both modes
-              : ''
-          }`}
-          placeholder={patStates[member._id] ? 'PAT' : '0'}
-          readOnly={patStates[member._id] || panelMode} // ✅ Read-only when PAT or panel mode
-        />
+  type={patStates[member._id] ? 'text' : 'number'}
+  min="0"
+  max={comp.points}
+  value={patStates[member._id] ? 'PAT' : marks[member._id]?.[comp.key] ?? ''}
+  onChange={(e) => !patStates[member._id] &&
+    handleMarksChange(member._id, e.target.value, comp.key)}
+  onWheel={(e) => e.target.blur()}
+  disabled={
+    finalFormLocked || 
+    (hasAttendance && attendance[member._id] === false) ||
+    patStates[member._id]
+  }
+  readOnly={patStates[member._id]}
+  placeholder={patStates[member._id] ? 'PAT' : '0'}
+  className={`w-16 px-2 py-1 border rounded text-center text-sm focus:ring-2 focus:ring-blue-500 ${
+    (finalFormLocked || (hasAttendance && attendance[member._id] === false))
+      ? 'bg-gray-100 cursor-not-allowed'
+      : ''
+  } ${patStates[member._id] ? 'text-red-600 font-bold' : ''}`}
+/>
         <span className="text-xs text-gray-500 min-w-fit">
           /{comp.points}
         </span>
