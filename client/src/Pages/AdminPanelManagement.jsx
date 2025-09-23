@@ -12,7 +12,7 @@ import {
   autoCreatePanelManual,
 } from "../api";
 
-// ✅ Import extracted components
+
 import TeamPopup from "../Components/TeamPopup";
 import ConfirmPopup from "../Components/ConfirmDialog";
 import Navbar from "../Components/UniversalNavbar";
