@@ -544,6 +544,7 @@ const addPanelReview = () => {
                               type="number"
                               value={component.weight}
                               onChange={(e) => updateComponent(reviewType, review.id, index, 'weight', e.target.value)}
+                              onWheel={(e) => e.target.blur()} // Disable scroll wheel
                               disabled={disabled}
                               placeholder="Weight"
                               min="0"
