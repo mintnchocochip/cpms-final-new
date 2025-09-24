@@ -7,7 +7,7 @@ dotenv.config();
 const EXCEL_PATH = "E:/Desktop/CPMS/BCSE497J Project -Zeroth Review-Marks.xlsx";
 const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:3000/api";
 const AUTH_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4Y2Q4OWYwMmUzMmU2NzZhNTg3OGRhNCIsImVtYWlsSWQiOiJhZG1pbkB2aXQuYWMuaW4iLCJlbXBsb3llZUlkIjoiQURNSU4wMDEiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTg0NjM4OTgsImV4cCI6MTc1ODU1MDI5OH0.SY1Who11rIrWFgNqTg2UztZMmvDyARWJxaYK02X9HhY";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4Y2Q4OWYwMmUzMmU2NzZhNTg3OGRhNCIsImVtYWlsSWQiOiJhZG1pbkB2aXQuYWMuaW4iLCJlbXBsb3llZUlkIjoiQURNSU4wMDEiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTg2NDI5ODMsImV4cCI6MTc1ODcyOTM4M30.OplMOvKATN-jlrkra2_fPOpKc46W88guQKG-aN2-57A";
 
 const SHEET_NAME = " VTOP -Zeroth Review Mark entry";
 const REG_NO_KEY = "Student Register No";
