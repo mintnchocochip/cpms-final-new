@@ -63,7 +63,7 @@ const FacultyEditModal = ({ faculty, onClose, onSave }) => {
   const [error, setError] = useState('');
 
   const schoolOptions = ['SCOPE', 'SENSE', 'SELECT', 'SMEC', 'SCE'];
-  const departmentOptions = ['BTech', 'MTech (Integrated)', 'MCA'];
+  const departmentOptions = ['BTech', 'MIS','MIA','MCA 1st Year','MCA 2nd Year','MCS','MCB','MAI'];
   const specializationOptions = [
     'AI/ML', 'Data Science', 'Cyber Security', 'IoT', 
     'Blockchain', 'Cloud Computing', 'VLSI', 'Software Engineering', 'General'
@@ -722,7 +722,7 @@ const FacultyListView = () => {
   });
 
   const schoolOptions = ['SCOPE', 'SENSE', 'SELECT', 'SMEC', 'SCE'];
-  const departmentOptions = ['BTech', 'MTech (Integrated)', 'MCA'];
+  const departmentOptions = ['BTech', 'MIS','MIA','MCA 1st Year','MCA 2nd Year','MCS','MCB','MAI'];
   const specializationOptions = [
     'AI/ML', 'Data Science', 'Cyber Security', 'IoT', 
     'Blockchain', 'Cloud Computing', 'VLSI', 'Software Engineering', 'General'

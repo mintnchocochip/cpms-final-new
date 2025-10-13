@@ -116,7 +116,7 @@ const FacultyManagement = () => {
   const [fileName, setFileName] = useState('');
 
   const schoolOptions = ['SCOPE', 'SENSE'];
-  const departmentOptions = ['BTech', 'MTech(integrated)', 'MCA'];
+  const departmentOptions = ['BTech', 'MIS','MIA','MCA 1st Year','MCA 2nd Year','MCS','MCB','MAI'];
 
   useEffect(() => {
     if (hasContext) {

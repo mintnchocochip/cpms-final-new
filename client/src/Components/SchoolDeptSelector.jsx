@@ -3,8 +3,13 @@ import React, { useState, useEffect } from "react";
 // Simple departments that apply to all schools
 const DEPARTMENTS = [
   "BTech",
-  "MTech (Integrated)", 
-  "MCA"
+  "MIA",
+  "MIS", 
+  "MCA 1st Year",
+  "MCA 2nd Year",
+  "MCB",
+  "MCS",
+  "MAI"
 ];
 
 // Simple school list
