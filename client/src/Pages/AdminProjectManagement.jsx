@@ -40,6 +40,11 @@ import { saveAs } from 'file-saver';
 
 const AdminProjectManagement = () => {
   const navigate = useNavigate();
+  // Hardcoded department options for edit modal
+const DEPARTMENT_OPTIONS = [
+  'BTech', 'MIS(Mtech Integrated)','MIA(Mtech Integrated)','MCA','MCA 2nd Year','MCS','MCB','MAI(Machine Learning)'
+,'MAI(Data Science)','MCS'];
+
   
   // Core state
   const [projects, setProjects] = useState([]);
