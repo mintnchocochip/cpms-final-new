@@ -1184,26 +1184,28 @@ const applyFilters = useCallback(async () => {
                   </select>
                 </div>
 
-                {/* Department */}
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">
-                    Department
-                  </label>
-                  <select
-                    value={editingProjectData.department || ''}
-                    onChange={(e) => setEditingProjectData(prev => ({
-                      ...prev,
-                      department: e.target.value
-                    }))}
-                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700"
-                    disabled={loading}
-                  >
-                    <option value="">Select Department</option>
-                    {availableDepartments.map(dept => (
-                      <option key={dept} value={dept}>{dept}</option>
-                    ))}
-                  </select>
-                </div>
+               
+          {/* Department */}
+<div>
+  <label className="block text-sm font-semibold text-slate-700 mb-3">
+    Department
+  </label>
+  <select
+    value={editingProjectData.department || ''}
+    onChange={(e) => setEditingProjectData(prev => ({
+      ...prev,
+      department: e.target.value
+    }))}
+    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700"
+    disabled={loading}
+  >
+    <option value="">Select Department</option>
+    {DEPARTMENT_OPTIONS.map(dept => (
+      <option key={dept} value={dept}>{dept}</option>
+    ))}
+  </select>
+</div>
+
 
                 {/* Specialization */}
                 <div>
