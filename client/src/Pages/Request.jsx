@@ -517,7 +517,7 @@ const RequestPage = () => {
                                     }`}
                                   >
                                     <td className="px-3 sm:px-6 py-4">
-                                      <div className="font-medium text-sm text-slate-900 truncate">
+                                      <div className="font-medium text-sm text-slate-900">
                                         {student.name}
                                       </div>
                                     </td>
@@ -533,7 +533,7 @@ const RequestPage = () => {
                                     </td>
                                     <td className="px-3 sm:px-6 py-4">
                                       <div className="text-slate-700 text-xs sm:text-sm leading-relaxed">
-                                        <div className="line-clamp-2" title={student.comments}>
+                                        <div className="break-words" title={student.comments}>
                                           {student.comments}
                                         </div>
                                       </div>
