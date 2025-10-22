@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 
 // Simple departments that apply to all schools
 const DEPARTMENTS =[
-  'BTech', 'MIS(Mtech Integrated)','MIA(Mtech Integrated)','MCA','MCA 2nd Year','MCS','MCB','MAI(Machine Learning)'
-,'MAI(Data Science)','MCS'];
+  'BTech', 'M.Tech Integrated (MIS)','M.Tech Integrated (MIA)','MCA 1st Year','MCA','M.Tech 2yr (MCS, MCB, MAI)'];
 
 // Simple school list
 const SCHOOLS = [
