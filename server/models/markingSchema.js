@@ -20,11 +20,12 @@ const reviewSchema = new mongoose.Schema(
   {
     reviewName: { type: String, required: true },
     displayName: { type: String }, // Optional display name
-    facultyType: { type: String, enum: ["guide", "panel"], required: true }, // ✅ MISSING FIELD
+    facultyType: { type: String, enum: ["guide", "panel"], required: true },
     components: [componentSchema],
     deadline: { type: deadlineSchema, required: true },
     pptApproved: {
       approved: { type: Boolean, default: false },
+      locked: { type: Boolean, default: false },
     },
   },
   { _id: false }
@@ -34,6 +35,12 @@ const markingSchema = new mongoose.Schema({
   school: { type: String, required: true },
   department: { type: String, required: true },
   reviews: [reviewSchema],
+  requiresContribution: { type: Boolean, default: false },
+  contributionType: { 
+    type: String, 
+    enum: ["none", "Patent Filed", "Journal Publication", "Book Chapter Contribution"], 
+    default: "none" 
+  }, 
 });
 
 markingSchema.index({ school: 1, department: 1 }, { unique: true });

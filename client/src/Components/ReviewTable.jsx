@@ -1,5 +1,5 @@
-import React from 'react';
-import { Star } from 'lucide-react'; // ✅ Add Star icon
+import React, { useState } from 'react';
+import { Star, BookOpen, Edit2, Save, X } from 'lucide-react';
 
 const renderMarks = (reviewObj, components = []) => {
   if (!reviewObj) return <span className="text-gray-400">None</span>;
@@ -16,12 +16,11 @@ const renderMarks = (reviewObj, components = []) => {
     return <span className="text-gray-400">None</span>;
   }
 
-  // ✅ FIXED: Use component names directly from schema
   const values = components.map(comp => {
     let value = null;
     
     if (marks && typeof marks === 'object') {
-      value = marks[comp.name]; // ✅ Use comp.name directly
+      value = marks[comp.name];
     }
     
     return (value != null && value !== '') ? value : null;
@@ -46,6 +45,124 @@ const renderComments = (comments) => {
   );
 };
 
+// ✅ NEW: Contribution Type Cell Component
+const ContributionTypeCell = ({ student, onUpdate }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedType, setSelectedType] = useState(student.contributionType || 'none');
+  const [saving, setSaving] = useState(false);
+
+  const contributionTypes = [
+    'none',
+    'Patent Filed',
+    'Journal Publication',
+    'Book Chapter Contribution'
+  ];
+
+  const handleSave = async () => {
+    if (selectedType === student.contributionType) {
+      setIsEditing(false);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onUpdate(student.regNo, { contributionType: selectedType });
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating contribution type:', error);
+      alert('Failed to update contribution type');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setSelectedType(student.contributionType || 'none');
+    setIsEditing(false);
+  };
+
+  if (!student.requiresContribution) {
+    return (
+      <div className="flex flex-col items-center justify-center space-y-2">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 bg-gray-50 border-gray-300">
+          <BookOpen className="w-5 h-5 text-gray-400" />
+          <span className="font-semibold text-sm text-gray-600">
+            Not Required
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isEditing) {
+    return (
+      <div className="flex flex-col items-center justify-center space-y-2 p-2">
+        <select
+          value={selectedType}
+          onChange={(e) => setSelectedType(e.target.value)}
+          className="w-full px-2 py-1 border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+          disabled={saving}
+        >
+          {contributionTypes.map(type => (
+            <option key={type} value={type}>
+              {type === 'none' ? 'None' : type}
+            </option>
+          ))}
+        </select>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-xs"
+          >
+            <Save className="w-3 h-3" />
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+          <button
+            onClick={handleCancel}
+            disabled={saving}
+            className="flex items-center gap-1 px-3 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 text-xs"
+          >
+            <X className="w-3 h-3" />
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center space-y-2">
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 ${
+        selectedType !== 'none'
+          ? 'bg-purple-50 border-purple-300'
+          : 'bg-yellow-50 border-yellow-300'
+      }`}>
+        <BookOpen className={`w-5 h-5 ${
+          selectedType !== 'none' ? 'text-purple-600' : 'text-yellow-600'
+        }`} />
+        <span className={`font-semibold text-sm ${
+          selectedType !== 'none' ? 'text-purple-800' : 'text-yellow-800'
+        }`}>
+          {selectedType === 'none' ? 'Required - Not Set' : selectedType}
+        </span>
+      </div>
+      {selectedType !== 'none' && (
+        <div className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded">
+          {selectedType}
+        </div>
+      )}
+      <button
+        onClick={() => setIsEditing(true)}
+        className="flex items-center gap-1 px-2 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-xs"
+      >
+        <Edit2 className="w-3 h-3" />
+        Edit
+      </button>
+    </div>
+  );
+};
+
 const ReviewTable = ({
   team,
   deadlines = {},
@@ -54,11 +171,17 @@ const ReviewTable = ({
   isReviewLocked,
   markingSchema = null,
   panelMode = false,
+  onUpdateStudent, // ✅ NEW: Callback function for updating student
 }) => {
   console.log('=== [ReviewTable] REVIEW TABLE RENDER ===');
   console.log('📋 [ReviewTable] Team:', team?.title);
   console.log('📋 [ReviewTable] Team Marking Schema:', team?.markingSchema);
   console.log('🏆 [ReviewTable] Team Best Project Status:', team?.bestProject);
+  
+  team?.students?.forEach(student => {
+    console.log(`📝 [ReviewTable] Student ${student.name} requiresContribution:`, student.requiresContribution);
+    console.log(`📝 [ReviewTable] Student ${student.name} contributionType:`, student.contributionType);
+  });
 
   const teamMarkingSchema = team?.markingSchema || markingSchema;
 
@@ -115,7 +238,6 @@ const ReviewTable = ({
   const checkReviewLocked = isReviewLocked || ((student, reviewType) => {
     let studentReview = null;
     
-    // ✅ FIXED: Handle both Map and plain object
     if (student.reviews && typeof student.reviews.get === 'function') {
       studentReview = student.reviews.get(reviewType);
     } else if (student.reviews && student.reviews[reviewType]) {
@@ -156,7 +278,6 @@ const ReviewTable = ({
       <div className="mt-1 p-4 bg-gray-50 rounded-lg">
         <h3 className="font-semibold text-lg mb-3">Team Summary</h3>
         
-        {/* ✅ NEW: Best Project Status Display - ONLY for Panel Mode */}
         {panelMode && (
           <div className="mb-4">
             <div className="flex items-center gap-3 p-3 rounded-lg border-2" style={{
@@ -188,7 +309,6 @@ const ReviewTable = ({
           </div>
         )}
         
-        {/* ✅ Rest of the Team Summary remains unchanged */}
         {Object.keys(deadlines).length > 0 && (
           <div>
             <div className="font-medium mb-2">Review Deadlines:</div>
@@ -222,7 +342,6 @@ const ReviewTable = ({
         )}
       </div>
       
-      {/* ✅ Rest of the table remains exactly the same */}
       <table className="min-w-full bg-white border border-gray-200">
         <thead className="bg-gray-100">
           <tr>
@@ -267,6 +386,13 @@ const ReviewTable = ({
             ))}
             <th className="px-4 py-3 border text-center min-w-[120px]">Comments</th>
             <th className="px-4 py-3 border text-center min-w-[120px]">PPT Status</th>
+            {/* ✅ UPDATED: Contribution Type Column */}
+            <th className="px-4 py-3 border text-center min-w-[200px]">
+              <div className="flex flex-col items-center space-y-1">
+                <BookOpen className="w-5 h-5 text-purple-600" />
+                <span className="font-semibold text-sm">Contribution Type</span>
+              </div>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -353,6 +479,13 @@ const ReviewTable = ({
                     </span>
                   </div>
                 </div>
+              </td>
+              {/* ✅ UPDATED: Contribution Type Cell with Edit Functionality */}
+              <td className="px-4 py-3 border align-middle">
+                <ContributionTypeCell 
+                  student={student} 
+                  onUpdate={onUpdateStudent}
+                />
               </td>
             </tr>
           ))}

@@ -1,28 +1,28 @@
-import mongoose from "mongoose";
-import Project from "../models/projectSchema.js";
-import Student from "../models/studentSchema.js"; // Ensure this path is correct
-import Faculty from "../models/facultySchema.js";
-// Import Panel model at the top of your file
-import Panel from "../models/panelSchema.js";
-import MarkingSchema from "../models/markingSchema.js";
-/**
- * Create a new project.
- * Expected req.body:
- * {
- *   name: "Project Name", // Unique identifier for the project
- *   students: [ { regNo, name, emailId, draftReview, review0, review1, review2, review3, pptApproved, attendance }, ... ],
- *   guideFacultyEmpId: "guide faculty employee id"
- * }
- */
-/**
- * Create a new project.
- * Expected req.body:
- * {
- *   name: "Project Name", // Unique identifier for the project
- *   students: [ { regNo, name, emailId, draftReview, review0, review1, review2, review3, review3, pptApproved, deadline }, ... ],
- *   guideFacultyEmpId: "guide faculty employee id"
- * }
- */
+  import mongoose from "mongoose";
+  import Project from "../models/projectSchema.js";
+  import Student from "../models/studentSchema.js"; // Ensure this path is correct
+  import Faculty from "../models/facultySchema.js";
+  // Import Panel model at the top of your file
+  import Panel from "../models/panelSchema.js";
+  import MarkingSchema from "../models/markingSchema.js";
+  /**
+   * Create a new project.
+   * Expected req.body:
+   * {
+   *   name: "Project Name", // Unique identifier for the project
+   *   students: [ { regNo, name, emailId, draftReview, review0, review1, review2, review3, pptApproved, attendance }, ... ],
+   *   guideFacultyEmpId: "guide faculty employee id"
+   * }
+   */
+  /**
+   * Create a new project.
+   * Expected req.body:
+   * {
+   *   name: "Project Name", // Unique identifier for the project
+   *   students: [ { regNo, name, emailId, draftReview, review0, review1, review2, review3, review3, pptApproved, deadline }, ... ],
+   *   guideFacultyEmpId: "guide faculty employee id"
+   * }
+   */
 
 export async function createProject(req, res, next) {
   const session = await mongoose.startSession();
@@ -65,7 +65,7 @@ export async function createProject(req, res, next) {
       });
     }
 
-    if (!type || !["hardware", "software"].includes(type)) {
+    if (!type || !["hardware", "software"].includes(type.toLowerCase())) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
@@ -77,6 +77,7 @@ export async function createProject(req, res, next) {
       school,
       department,
     }).session(session);
+    
     if (!markingSchema) {
       await session.abortTransaction();
       return res.status(400).json({
@@ -88,6 +89,7 @@ export async function createProject(req, res, next) {
     const guideFacultyDoc = await Faculty.findOne({
       employeeId: guideFacultyEmpId,
     }).session(session);
+    
     if (!guideFacultyDoc) {
       await session.abortTransaction();
       throw new Error(
@@ -95,8 +97,15 @@ export async function createProject(req, res, next) {
       );
     }
 
+    // ✅ Extract both requiresContribution and contributionType from marking schema
+    const schemaRequiresContribution = markingSchema.requiresContribution || false;
+    const schemaContributionType = markingSchema.contributionType || 'none';
+
+    console.log(`📝 Schema contribution settings: requiresContribution=${schemaRequiresContribution}, contributionType=${schemaContributionType}`);
+
     const reviewKeys = markingSchema.reviews.map((review) => review.reviewName);
     const defaultDeadlinesMap = new Map();
+    
     markingSchema.reviews.forEach((review) => {
       if (review.deadline && review.deadline.from && review.deadline.to) {
         defaultDeadlinesMap.set(review.reviewName, {
@@ -119,6 +128,8 @@ export async function createProject(req, res, next) {
           deadline,
           school: studSchool,
           department: studDept,
+          requiresContribution, // Allow override from request body
+          contributionType, // ✅ NEW: Allow override from request body
         } = studentObj;
 
         if (studSchool !== school || studDept !== department) {
@@ -130,11 +141,13 @@ export async function createProject(req, res, next) {
         const existingStudent = await Student.findOne({ regNo }).session(
           session
         );
+        
         if (existingStudent) {
           throw new Error(`Student already exists with regNo ${regNo}`);
         }
 
         const reviewsMap = new Map();
+        
         for (const reviewKey of reviewKeys) {
           const reviewDef = markingSchema.reviews.find(
             (rev) => rev.reviewName === reviewKey
@@ -172,6 +185,25 @@ export async function createProject(req, res, next) {
           studentDeadlineMap = new Map(defaultDeadlinesMap);
         }
 
+        // ✅ Use student-specific requiresContribution if provided, otherwise use schema default
+        const studentRequiresContribution = 
+          requiresContribution !== undefined 
+            ? requiresContribution 
+            : schemaRequiresContribution;
+
+        // ✅ NEW: Use student-specific contributionType if provided, otherwise use schema default
+        const studentContributionType = contributionType || schemaContributionType;
+
+        // ✅ Validate contributionType
+        const validContributionTypes = ['none', 'Patent Filed', 'Journal Publication', 'Book Chapter Contribution'];
+        if (!validContributionTypes.includes(studentContributionType)) {
+          throw new Error(
+            `Invalid contribution type "${studentContributionType}" for student ${regNo}. Must be one of: ${validContributionTypes.join(', ')}`
+          );
+        }
+
+        console.log(`👤 Creating student ${regNo}: requiresContribution=${studentRequiresContribution}, contributionType=${studentContributionType}`);
+
         const student = new Student({
           regNo,
           name: studentName,
@@ -181,15 +213,17 @@ export async function createProject(req, res, next) {
           deadline: studentDeadlineMap,
           school,
           department,
-          PAT: false, // Explicitly set to false on creation
+          PAT: false,
+          requiresContribution: studentRequiresContribution, // ✅ Added field
+          contributionType: studentContributionType, // ✅ NEW: Added field
         });
 
         await student.save({ session });
+        console.log(`✅ Student ${regNo} created successfully with contributionType: ${studentContributionType}`);
         return student._id;
       })
     );
 
-    // Create project in DB including the new type field
     const newProject = new Project({
       name,
       students: studentIds,
@@ -198,12 +232,13 @@ export async function createProject(req, res, next) {
       school,
       department,
       specialization,
-      type, // <----- added here
+      type: type.toLowerCase(),
     });
 
     await newProject.save({ session });
-
     await session.commitTransaction();
+
+    console.log(`🎉 Project created successfully: ${newProject._id}`);
 
     return res.status(201).json({
       success: true,
@@ -212,11 +247,13 @@ export async function createProject(req, res, next) {
         projectId: newProject._id,
         name: newProject.name,
         studentsCount: studentIds.length,
+        requiresContribution: schemaRequiresContribution,
+        contributionType: schemaContributionType, // ✅ NEW: Include in response
       },
     });
   } catch (error) {
     await session.abortTransaction();
-    console.error("Error creating project:", error);
+    console.error("❌ Error creating project:", error);
 
     if (error.code === 11000) {
       const duplicateField = Object.keys(error.keyValue)[0];
@@ -241,7 +278,8 @@ export async function createProject(req, res, next) {
     if (
       error.message.includes("Student already exists") ||
       error.message.includes("Guide faculty") ||
-      error.message.includes("mismatched school")
+      error.message.includes("mismatched school") ||
+      error.message.includes("Invalid contribution type")
     ) {
       return res.status(400).json({
         success: false,
@@ -261,115 +299,117 @@ export async function createProject(req, res, next) {
   }
 }
 
-export async function getAllProjects(req, res) {
-  try {
-    const { school, department } = req.query;
 
-    // Build filter object for optional filtering
-    const filter = {};
-    if (school) filter.school = school;
-    if (department) filter.department = department;
 
-    // Fetch all projects with populated references
-    const projects = await Project.find(filter)
-      .populate({
-        path: "students",
-        model: "Student",
-        select:
-          "regNo name emailId reviews pptApproved deadline school department PAT", // <--- included pptApproved and PAT
-      })
-      .populate({
-        path: "guideFaculty",
-        model: "Faculty",
-        select: "name emailId employeeId school department specialization",
-      })
-      .populate({
-        path: "panel",
-        model: "Panel",
-        select: "school department",
-        populate: {
-          path: "members",
+  export async function getAllProjects(req, res) {
+    try {
+      const { school, department } = req.query;
+
+      // Build filter object for optional filtering
+      const filter = {};
+      if (school) filter.school = school;
+      if (department) filter.department = department;
+
+      // Fetch all projects with populated references
+      const projects = await Project.find(filter)
+        .populate({
+          path: "students",
+          model: "Student",
+          select:
+            "regNo name emailId reviews pptApproved deadline school department PAT", // <--- included pptApproved and PAT
+        })
+        .populate({
+          path: "guideFaculty",
           model: "Faculty",
-          select: "name emailId employeeId",
-        },
-      })
-      .lean();
+          select: "name emailId employeeId school department specialization",
+        })
+        .populate({
+          path: "panel",
+          model: "Panel",
+          select: "school department",
+          populate: {
+            path: "members",
+            model: "Faculty",
+            select: "name emailId employeeId",
+          },
+        })
+        .lean();
 
-    console.log(`Found ${projects.length} projects`);
+      console.log(`Found ${projects.length} projects`);
 
-    // Process projects to convert Maps to Objects (if using Maps in Student schema)
-    const processedProjects = projects.map((project) => {
-      const processedStudents = project.students.map((student) => {
-        // Convert MongoDB Map to plain object for reviews
-        let processedReviews = {};
-        if (student.reviews) {
-          if (student.reviews instanceof Map) {
-            processedReviews = Object.fromEntries(student.reviews);
-          } else if (typeof student.reviews === "object") {
-            processedReviews = { ...student.reviews };
+      // Process projects to convert Maps to Objects (if using Maps in Student schema)
+      const processedProjects = projects.map((project) => {
+        const processedStudents = project.students.map((student) => {
+          // Convert MongoDB Map to plain object for reviews
+          let processedReviews = {};
+          if (student.reviews) {
+            if (student.reviews instanceof Map) {
+              processedReviews = Object.fromEntries(student.reviews);
+            } else if (typeof student.reviews === "object") {
+              processedReviews = { ...student.reviews };
+            }
           }
-        }
 
-        // Convert deadline Map to plain object
-        let processedDeadlines = {};
-        if (student.deadline) {
-          if (student.deadline instanceof Map) {
-            processedDeadlines = Object.fromEntries(student.deadline);
-          } else if (typeof student.deadline === "object") {
-            processedDeadlines = { ...student.deadline };
+          // Convert deadline Map to plain object
+          let processedDeadlines = {};
+          if (student.deadline) {
+            if (student.deadline instanceof Map) {
+              processedDeadlines = Object.fromEntries(student.deadline);
+            } else if (typeof student.deadline === "object") {
+              processedDeadlines = { ...student.deadline };
+            }
           }
-        }
+
+          return {
+            _id: student._id,
+            regNo: student.regNo,
+            name: student.name,
+            emailId: student.emailId,
+            reviews: processedReviews,
+
+            // Always return pptApproved object with fields and fallback
+            pptApproved: {
+              approved: student.pptApproved?.approved ?? false,
+              locked: student.pptApproved?.locked ?? false,
+              // Add any other pptApproved nested fields here if needed
+            },
+
+            deadline: processedDeadlines,
+            school: student.school,
+            department: student.department,
+            PAT: student.PAT, // include PAT in returned student object
+          };
+        });
 
         return {
-          _id: student._id,
-          regNo: student.regNo,
-          name: student.name,
-          emailId: student.emailId,
-          reviews: processedReviews,
-
-          // Always return pptApproved object with fields and fallback
-          pptApproved: {
-            approved: student.pptApproved?.approved ?? false,
-            locked: student.pptApproved?.locked ?? false,
-            // Add any other pptApproved nested fields here if needed
-          },
-
-          deadline: processedDeadlines,
-          school: student.school,
-          department: student.department,
-          PAT: student.PAT, // include PAT in returned student object
+          _id: project._id,
+          name: project.name,
+          school: project.school,
+          department: project.department,
+          specialization: project.specialization,
+          type: project.type,
+          bestProject: !!project.bestProject,
+          students: processedStudents,
+          guideFaculty: project.guideFaculty,
+          panel: project.panel,
         };
       });
 
-      return {
-        _id: project._id,
-        name: project.name,
-        school: project.school,
-        department: project.department,
-        specialization: project.specialization,
-        type: project.type,
-        bestProject: !!project.bestProject,
-        students: processedStudents,
-        guideFaculty: project.guideFaculty,
-        panel: project.panel,
-      };
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: processedProjects,
-      message: "All projects retrieved successfully",
-      count: processedProjects.length,
-    });
-  } catch (error) {
-    console.error("Error in getAllProjects:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Error retrieving projects",
-      error: error.message,
-    });
+      return res.status(200).json({
+        success: true,
+        data: processedProjects,
+        message: "All projects retrieved successfully",
+        count: processedProjects.length,
+      });
+    } catch (error) {
+      console.error("Error in getAllProjects:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Error retrieving projects",
+        error: error.message,
+      });
+    }
   }
-}
 
 export async function createProjectsBulk(req, res) {
   console.log(
@@ -385,9 +425,8 @@ export async function createProjectsBulk(req, res) {
   const transactionStart = Date.now();
 
   try {
-    // Start transaction with timeout configuration
     session.startTransaction({
-      maxTimeMS: 50000, // 50-second timeout (less than default 60s)
+      maxTimeMS: 50000,
       readConcern: { level: "majority" },
       writeConcern: { w: "majority", j: true },
     });
@@ -398,7 +437,6 @@ export async function createProjectsBulk(req, res) {
       `📋 [VALIDATION] School: ${school}, Department: ${department}, Projects count: ${projects?.length}, Guide: ${guideFacultyEmpId}`
     );
 
-    // Enhanced validation with logging
     if (!school || !department) {
       console.log("❌ [VALIDATION ERROR] Missing school or department");
       await session.abortTransaction();
@@ -435,7 +473,6 @@ export async function createProjectsBulk(req, res) {
 
     console.log("✅ [VALIDATION] All basic validations passed");
 
-    // Database operations with detailed logging
     console.log(
       `🔍 [DB QUERY] Searching for marking schema: ${school}-${department}`
     );
@@ -460,6 +497,10 @@ export async function createProjectsBulk(req, res) {
       "📊 [SCHEMA INFO] Reviews:",
       markingSchema.reviews?.map((r) => r.reviewName)
     );
+    
+    // Extract requiresContribution from marking schema
+    const schemaRequiresContribution = markingSchema.requiresContribution || false;
+    console.log("📝 [SCHEMA INFO] requiresContribution:", schemaRequiresContribution);
 
     console.log(
       `🔍 [DB QUERY] Searching for guide faculty: ${guideFacultyEmpId}`
@@ -486,12 +527,11 @@ export async function createProjectsBulk(req, res) {
       guideFacultyDoc.name
     );
 
-    // Process reviews and deadlines - FIXED: Using plain objects instead of Map
     const reviewKeys = markingSchema.reviews.map((review) => review.reviewName);
     console.log("📝 [PROCESSING] Review keys:", reviewKeys);
 
     console.log(
-      "✅ [FIXED] Using plain object for defaultDeadlinesMap instead of Map()"
+      "✅ [FIXED] Using plain object for defaultDeadlinesObj instead of Map()"
     );
     const defaultDeadlinesObj = {};
     markingSchema.reviews.forEach((review) => {
@@ -507,8 +547,7 @@ export async function createProjectsBulk(req, res) {
     console.log("🏗️  [PROCESSING] Starting project creation loop");
     const results = { created: 0, errors: 0, details: [] };
 
-    // Process in smaller batches to avoid transaction limits - OPTIMIZED: Reduced batch size
-    const batchSize = 2; // Reduced from 5 to 2 for better transaction management
+    const batchSize = 2;
     console.log(
       `📦 [BATCH INFO] Processing ${projects.length} projects in batches of ${batchSize}`
     );
@@ -528,10 +567,8 @@ export async function createProjectsBulk(req, res) {
         }-${Math.min(batchStart + batchSize, projects.length)}`
       );
 
-      // Check transaction timeout before processing each batch
       const elapsedTime = Date.now() - transactionStart;
       if (elapsedTime > 45000) {
-        // 45 seconds warning
         console.log(
           `⚠️ [TIMEOUT WARNING] Transaction running for ${elapsedTime}ms, approaching timeout`
         );
@@ -548,7 +585,6 @@ export async function createProjectsBulk(req, res) {
         console.log(`📊 [PROJECT DATA]`, JSON.stringify(project, null, 2));
 
         try {
-          // Project validation with detailed logging
           if (
             !project.name ||
             !Array.isArray(project.students) ||
@@ -567,7 +603,6 @@ export async function createProjectsBulk(req, res) {
             continue;
           }
 
-          // Type validation with detailed logging - FIXED: Case insensitive
           console.log(
             `🔍 [TYPE CHECK] Project type: "${project.type}", Valid types: ["hardware", "software"]`
           );
@@ -586,7 +621,6 @@ export async function createProjectsBulk(req, res) {
             continue;
           }
 
-          // Check existing project
           console.log(
             `🔍 [DUPLICATE CHECK] Searching for existing project: ${project.name}`
           );
@@ -613,10 +647,10 @@ export async function createProjectsBulk(req, res) {
           );
           const studentIds = [];
 
-          // Process students with detailed logging
           console.log(
             `👥 [STUDENTS] Processing ${project.students.length} students`
           );
+          
           for (let j = 0; j < project.students.length; j++) {
             const studentObj = project.students[j];
             console.log(
@@ -630,9 +664,9 @@ export async function createProjectsBulk(req, res) {
               emailId,
               school: studSchool,
               department: studDepartment,
+              requiresContribution, // Allow override from request body
             } = studentObj;
 
-            // Student validation
             if (!regNo || !studentName || !emailId) {
               console.log(
                 `  ❌ [STUDENT ERROR] Missing fields - regNo: ${!!regNo}, name: ${!!studentName}, email: ${!!emailId}`
@@ -651,7 +685,6 @@ export async function createProjectsBulk(req, res) {
               );
             }
 
-            // Check existing student
             console.log(
               `  🔍 [STUDENT CHECK] Searching for existing student: ${regNo}`
             );
@@ -665,7 +698,6 @@ export async function createProjectsBulk(req, res) {
               throw new Error(`Student already exists with regNo ${regNo}`);
             }
 
-            // Create reviews object - FIXED: Using plain object instead of Map
             console.log(
               `  ✅ [FIXED] Using plain object for reviewsObj instead of Map()`
             );
@@ -698,12 +730,20 @@ export async function createProjectsBulk(req, res) {
                 locked: false,
               };
 
-              reviewsObj[reviewKey] = reviewData; // Plain object assignment
+              reviewsObj[reviewKey] = reviewData;
               console.log(
                 `    ✅ [REVIEW SET] ${reviewKey}:`,
                 Object.keys(marks)
               );
             }
+
+            // Use student-specific requiresContribution if provided, otherwise use schema default
+            const studentRequiresContribution = 
+              requiresContribution !== undefined 
+                ? requiresContribution 
+                : schemaRequiresContribution;
+            
+            console.log(`  📝 [CONTRIBUTION] Setting requiresContribution: ${studentRequiresContribution}`);
 
             console.log(`  🏗️  [STUDENT CREATE] Creating student document`);
             console.log(
@@ -714,12 +754,13 @@ export async function createProjectsBulk(req, res) {
               regNo,
               name: studentName,
               emailId,
-              reviews: reviewsObj, // ✅ FIXED: Plain object instead of Map
+              reviews: reviewsObj,
               pptApproved: { approved: false, locked: false },
-              deadline: { ...defaultDeadlinesObj }, // ✅ FIXED: Plain object instead of Map
+              deadline: { ...defaultDeadlinesObj },
               PAT: false,
               school,
               department,
+              requiresContribution: studentRequiresContribution, // Added field
             });
 
             console.log(
@@ -727,12 +768,11 @@ export async function createProjectsBulk(req, res) {
             );
             await student.save({ session });
             console.log(
-              `  ✅ [STUDENT SUCCESS] Student saved: ${regNo} -> ${student._id}`
+              `  ✅ [STUDENT SUCCESS] Student saved: ${regNo} -> ${student._id} with requiresContribution: ${studentRequiresContribution}`
             );
             studentIds.push(student._id);
           }
 
-          // Create project with detailed logging
           console.log(
             `\n🏗️  [PROJECT CREATE] Creating project document with ${studentIds.length} students`
           );
@@ -744,7 +784,7 @@ export async function createProjectsBulk(req, res) {
             school,
             department,
             specialization: project.specialization || "",
-            type: project.type.toLowerCase(), // Normalize case
+            type: project.type.toLowerCase(),
           };
           console.log(
             `📊 [PROJECT DATA]`,
@@ -775,13 +815,11 @@ export async function createProjectsBulk(req, res) {
         }
       }
 
-      // Brief pause between batches to avoid overwhelming the database
       if (batchStart + batchSize < projects.length) {
         console.log(`⏸️  [BATCH PAUSE] Pausing 200ms between batches...`);
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
 
-      // Log progress
       const progress = (
         ((batchStart + batchSize) / projects.length) *
         100
@@ -794,7 +832,6 @@ export async function createProjectsBulk(req, res) {
       );
     }
 
-    // CRITICAL FIX: Commit transaction with proper timeout and error handling
     const transactionDuration = Date.now() - transactionStart;
     console.log(
       `\n🔄 [TRANSACTION] Attempting to commit transaction after ${transactionDuration}ms`
@@ -810,7 +847,6 @@ export async function createProjectsBulk(req, res) {
         `✅ [TRANSACTION SUCCESS] Transaction committed successfully in ${transactionDuration}ms`
       );
 
-      // Prepare response after successful commit
       const response = {
         success: true,
         message: `Bulk project creation completed. ${results.created} created, ${results.errors} errors.`,
@@ -820,11 +856,11 @@ export async function createProjectsBulk(req, res) {
           projects: projects.length,
           averagePerProject: Math.round(transactionDuration / projects.length),
         },
+        requiresContribution: schemaRequiresContribution,
       };
 
       console.log(`🎉 [FINAL SUCCESS]`, JSON.stringify(response, null, 2));
 
-      // End session and send response in success path
       await session.endSession();
       console.log(`✅ [SESSION END] Session ended successfully`);
 
@@ -836,9 +872,8 @@ export async function createProjectsBulk(req, res) {
       );
       console.log(`📊 [COMMIT DETAILS]`, commitError);
 
-      // Don't try to abort here - transaction is already aborted by MongoDB
       transactionCommitted = false;
-      throw commitError; // Re-throw to be caught by outer catch block
+      throw commitError;
     }
   } catch (error) {
     const errorDuration = Date.now() - transactionStart;
@@ -848,11 +883,9 @@ export async function createProjectsBulk(req, res) {
     );
     console.log(`📊 [FULL ERROR STACK]`, error.stack);
 
-    // CRITICAL FIX: Only abort if transaction hasn't been committed yet
     if (!transactionCommitted) {
       console.log(`🔄 [CLEANUP] Attempting to abort transaction`);
       try {
-        // Check if session still has an active transaction before aborting
         if (session.inTransaction()) {
           await session.abortTransaction();
           console.log(`🚫 [ABORT SUCCESS] Transaction aborted`);
@@ -863,7 +896,6 @@ export async function createProjectsBulk(req, res) {
         }
       } catch (abortError) {
         console.log(`❌ [ABORT ERROR]`, abortError.message);
-        // MongoDB likely already aborted the transaction automatically
       }
     } else {
       console.log(
@@ -871,7 +903,6 @@ export async function createProjectsBulk(req, res) {
       );
     }
 
-    // Always try to end session
     try {
       await session.endSession();
       console.log(`✅ [SESSION END] Session ended successfully`);
@@ -900,33 +931,34 @@ export async function createProjectsBulk(req, res) {
   }
 }
 
-export async function deleteProject(req, res) {
-  try {
-    const { projectId } = req.params;
 
-    const deletedProject = await Project.findByIdAndDelete(projectId);
+  export async function deleteProject(req, res) {
+    try {
+      const { projectId } = req.params;
 
-    if (!deletedProject) {
-      return res.status(404).json({ message: "Project not found" });
+      const deletedProject = await Project.findByIdAndDelete(projectId);
+
+      if (!deletedProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Project deleted successfully",
+      });
+    } catch (error) {
+      return res
+        .status(500)
+        .json({ message: "Error deleting project", error: error.message });
     }
-
-    return res.status(200).json({
-      success: true,
-      message: "Project deleted successfully",
-    });
-  } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Error deleting project", error: error.message });
   }
-}
 
-/**
- * Get all projects where the logged-in faculty is the guide.
- * Relies on req.user.id (set by authMiddleware).
- */
-// This is for adding ppt approvoal for
-// This is for adding PPT approval for each review
+  /**
+   * Get all projects where the logged-in faculty is the guide.
+   * Relies on req.user.id (set by authMiddleware).
+   */
+  // This is for adding ppt approvoal for
+  // This is for adding PPT approval for each review
 export async function getAllGuideProjects(req, res) {
   try {
     const userId = req.user.id;
@@ -936,7 +968,7 @@ export async function getAllGuideProjects(req, res) {
       .populate({
         path: "students",
         model: "Student",
-        select: "regNo name emailId reviews pptApproved deadline school department PAT",
+        select: "regNo name emailId reviews pptApproved deadline school department PAT requiresContribution contributionType", // ✅ Added contributionType
       })
       .populate({
         path: "guideFaculty",
@@ -968,12 +1000,12 @@ export async function getAllGuideProjects(req, res) {
           }
         }
 
-        // ✅ FIXED: Process each review and preserve PPT approval data
+        // ✅ Process each review and preserve PPT approval data
         Object.keys(processedReviews).forEach(reviewKey => {
           const review = processedReviews[reviewKey];
           
           if (review && typeof review === 'object') {
-            // ✅ FIXED: Handle marks properly (convert Map to Object if needed)
+            // ✅ Handle marks properly (convert Map to Object if needed)
             if (review.marks) {
               if (review.marks instanceof Map) {
                 review.marks = Object.fromEntries(review.marks);
@@ -982,7 +1014,7 @@ export async function getAllGuideProjects(req, res) {
               }
             }
             
-            // ✅ FIXED: Preserve PPT approval structure in each review
+            // ✅ Preserve PPT approval structure in each review
             if (review.pptApproved) {
               review.pptApproved = {
                 approved: Boolean(review.pptApproved.approved || false),
@@ -991,7 +1023,7 @@ export async function getAllGuideProjects(req, res) {
               console.log(`📽️ [Backend] PPT approval found in review ${reviewKey} for ${student.name}:`, review.pptApproved);
             }
 
-            // ✅ FIXED: Ensure other review properties are properly structured
+            // ✅ Ensure other review properties are properly structured
             review.comments = review.comments || '';
             review.attendance = review.attendance || { value: false, locked: false };
             review.locked = Boolean(review.locked || false);
@@ -1007,12 +1039,15 @@ export async function getAllGuideProjects(req, res) {
           }
         }
 
+        // ✅ Log requiresContribution and contributionType for debugging
+        console.log(`👤 Student ${student.name}: requiresContribution = ${student.requiresContribution}, contributionType = ${student.contributionType}`);
+
         return {
           _id: student._id,
           regNo: student.regNo,
           name: student.name,
           emailId: student.emailId,
-          reviews: processedReviews, // ✅ Now includes PPT approval data in each review
+          reviews: processedReviews,
           pptApproved: student.pptApproved || {
             approved: false,
             locked: false,
@@ -1021,6 +1056,8 @@ export async function getAllGuideProjects(req, res) {
           school: student.school,
           department: student.department,
           PAT: student.PAT,
+          requiresContribution: Boolean(student.requiresContribution || false),
+          contributionType: student.contributionType || 'none', // ✅ Added contributionType
         };
       });
 
@@ -1033,11 +1070,11 @@ export async function getAllGuideProjects(req, res) {
 
     console.log("✅ All projects processed with full population and PPT data");
 
-    // ✅ Enhanced logging to verify PPT data processing
+    // ✅ Enhanced logging to verify PPT data, requiresContribution, and contributionType
     processedProjects.forEach((project) => {
       console.log(`\n🔍 [Backend] Project: ${project.name}`);
       project.students.forEach((student) => {
-        console.log(`  👤 Student: ${student.name}`);
+        console.log(`  👤 Student: ${student.name} (requiresContribution: ${student.requiresContribution}, contributionType: ${student.contributionType})`);
         Object.keys(student.reviews || {}).forEach(reviewKey => {
           const review = student.reviews[reviewKey];
           if (review.pptApproved) {
@@ -1070,10 +1107,10 @@ export async function getAllGuideProjects(req, res) {
             console.log(
               `✅ Found schema for ${school}-${department} with ${
                 schema.reviews?.length || 0
-              } reviews`
+              } reviews (requiresContribution: ${schema.requiresContribution}, contributionType: ${schema.contributionType || 'none'})`
             );
             
-            // ✅ Enhanced logging for schema PPT requirements
+            // ✅ Enhanced logging for schema PPT requirements and contribution type
             if (schema.reviews) {
               schema.reviews.forEach(review => {
                 console.log(`  📋 Schema Review ${review.reviewName}: PPT Required = ${!!review.pptApproved}`);
@@ -1104,6 +1141,9 @@ export async function getAllGuideProjects(req, res) {
           `📋 Schema reviews for ${project.name}:`,
           projectSchema.reviews?.map((r) => `${r.reviewName} (PPT: ${!!r.pptApproved})`) || []
         );
+        console.log(
+          `📝 Contribution Type: ${projectSchema.contributionType || 'none'}`
+        );
       }
 
       return {
@@ -1113,7 +1153,7 @@ export async function getAllGuideProjects(req, res) {
       };
     });
 
-    console.log("✅ Final response prepared with schemas, full population, and PPT data");
+    console.log("✅ Final response prepared with schemas, full population, PPT data, requiresContribution, and contributionType");
 
     // ✅ Enhanced final data structure logging
     projectsWithSchemas.forEach((project) => {
@@ -1124,7 +1164,7 @@ export async function getAllGuideProjects(req, res) {
           student.reviews[key]?.pptApproved
         ).length;
         console.log(
-          `  - ${student.name}: ${Object.keys(student.reviews || {}).length} reviews, ${reviewsWithPPT} with PPT data`
+          `  - ${student.name}: ${Object.keys(student.reviews || {}).length} reviews, ${reviewsWithPPT} with PPT data, requiresContribution: ${student.requiresContribution}, contributionType: ${student.contributionType}`
         );
       });
       console.log(`📋 Schema: ${project.markingSchema ? "YES" : "NO"}`);
@@ -1133,12 +1173,15 @@ export async function getAllGuideProjects(req, res) {
         console.log(
           `📋 Schema Reviews: ${project.markingSchema.reviews?.length || 0} total, ${schemaWithPPT} require PPT`
         );
+        console.log(
+          `📝 Schema requiresContribution: ${project.markingSchema.requiresContribution}, contributionType: ${project.markingSchema.contributionType || 'none'}`
+        );
       }
     });
 
     return res.status(200).json({
       success: true,
-      data: projectsWithSchemas, // ✅ Now includes complete PPT approval data
+      data: projectsWithSchemas,
       message: "Guide projects fetched successfully",
     });
   } catch (error) {
@@ -1150,6 +1193,9 @@ export async function getAllGuideProjects(req, res) {
     });
   }
 }
+
+
+
 
 
 export async function getAllPanelProjects(req, res) {
@@ -1180,7 +1226,7 @@ export async function getAllPanelProjects(req, res) {
       .populate({
         path: "students",
         model: "Student",
-        select: "regNo name emailId reviews pptApproved deadline school department PAT",
+        select: "regNo name emailId reviews pptApproved deadline school department PAT requiresContribution contributionType", // ✅ Added contributionType
       })
       .populate({
         path: "guideFaculty",
@@ -1201,7 +1247,7 @@ export async function getAllPanelProjects(req, res) {
 
     console.log("Found panel projects:", panelProjects.length);
 
-    // ✅ FIXED: Process each project and students with PPT data
+    // ✅ Process each project and students with PPT data, requiresContribution, and contributionType
     const processedProjects = panelProjects.map((project) => {
       console.log(`🔄 Processing panel project: ${project.name}`);
       const processedStudents = project.students.map((student) => {
@@ -1216,12 +1262,12 @@ export async function getAllPanelProjects(req, res) {
           }
         }
 
-        // ✅ FIXED: Process each review and preserve PPT approval data
+        // ✅ Process each review and preserve PPT approval data
         Object.keys(processedReviews).forEach(reviewKey => {
           const review = processedReviews[reviewKey];
           
           if (review && typeof review === 'object') {
-            // ✅ FIXED: Handle marks properly
+            // ✅ Handle marks properly
             if (review.marks) {
               if (review.marks instanceof Map) {
                 review.marks = Object.fromEntries(review.marks);
@@ -1230,7 +1276,7 @@ export async function getAllPanelProjects(req, res) {
               }
             }
             
-            // ✅ FIXED: Preserve PPT approval structure in each review
+            // ✅ Preserve PPT approval structure in each review
             if (review.pptApproved) {
               review.pptApproved = {
                 approved: Boolean(review.pptApproved.approved || false),
@@ -1239,7 +1285,7 @@ export async function getAllPanelProjects(req, res) {
               console.log(`📽️ [Panel Backend] PPT approval found in review ${reviewKey} for ${student.name}:`, review.pptApproved);
             }
 
-            // ✅ FIXED: Ensure other review properties are properly structured
+            // ✅ Ensure other review properties are properly structured
             review.comments = review.comments || '';
             review.attendance = review.attendance || { value: false, locked: false };
             review.locked = Boolean(review.locked || false);
@@ -1257,13 +1303,15 @@ export async function getAllPanelProjects(req, res) {
 
         console.log(`📊 Panel student ${student.name} reviews:`, Object.keys(processedReviews));
         console.log(`📅 Panel student ${student.name} deadlines:`, Object.keys(processedDeadlines));
+        console.log(`📝 Panel student ${student.name} requiresContribution:`, student.requiresContribution);
+        console.log(`📝 Panel student ${student.name} contributionType:`, student.contributionType);
 
         return {
           _id: student._id,
           regNo: student.regNo,
           name: student.name,
           emailId: student.emailId,
-          reviews: processedReviews, // ✅ Now includes PPT approval data
+          reviews: processedReviews,
           pptApproved: student.pptApproved || {
             approved: false,
             locked: false,
@@ -1272,6 +1320,8 @@ export async function getAllPanelProjects(req, res) {
           school: student.school,
           department: student.department,
           PAT: student.PAT,
+          requiresContribution: Boolean(student.requiresContribution || false),
+          contributionType: student.contributionType || 'none', // ✅ Added contributionType
         };
       });
 
@@ -1282,13 +1332,13 @@ export async function getAllPanelProjects(req, res) {
       };
     });
 
-    console.log("✅ All panel projects processed with full population and PPT data");
+    console.log("✅ All panel projects processed with full population, PPT data, requiresContribution, and contributionType");
 
-    // ✅ Enhanced logging to verify PPT data processing
+    // ✅ Enhanced logging to verify PPT data, requiresContribution, and contributionType processing
     processedProjects.forEach((project) => {
       console.log(`\n🔍 [Panel Backend] Project: ${project.name}`);
       project.students.forEach((student) => {
-        console.log(`  👤 Student: ${student.name}`);
+        console.log(`  👤 Student: ${student.name} (requiresContribution: ${student.requiresContribution}, contributionType: ${student.contributionType})`);
         Object.keys(student.reviews || {}).forEach(reviewKey => {
           const review = student.reviews[reviewKey];
           if (review.pptApproved) {
@@ -1322,10 +1372,10 @@ export async function getAllPanelProjects(req, res) {
             console.log(
               `✅ Found panel schema for ${school}-${department} with ${
                 schema.reviews?.length || 0
-              } reviews`
+              } reviews (requiresContribution: ${schema.requiresContribution}, contributionType: ${schema.contributionType || 'none'})`
             );
             
-            // ✅ Enhanced logging for schema PPT requirements
+            // ✅ Enhanced logging for schema PPT requirements and contribution type
             if (schema.reviews) {
               schema.reviews.forEach(review => {
                 console.log(`  📋 Panel Schema Review ${review.reviewName}: PPT Required = ${!!review.pptApproved}`);
@@ -1356,6 +1406,9 @@ export async function getAllPanelProjects(req, res) {
           `📋 Panel schema reviews for ${project.name}:`,
           projectSchema.reviews?.map((r) => `${r.reviewName} (PPT: ${!!r.pptApproved})`) || []
         );
+        console.log(
+          `📝 Contribution Type: ${projectSchema.contributionType || 'none'}`
+        );
       }
 
       return {
@@ -1364,7 +1417,7 @@ export async function getAllPanelProjects(req, res) {
       };
     });
 
-    console.log("✅ Final panel response prepared with schemas, full population, and PPT data");
+    console.log("✅ Final panel response prepared with schemas, full population, PPT data, requiresContribution, and contributionType");
 
     // ✅ Enhanced final data structure logging
     projectsWithSchemas.forEach((project) => {
@@ -1375,7 +1428,7 @@ export async function getAllPanelProjects(req, res) {
           student.reviews[key]?.pptApproved
         ).length;
         console.log(
-          `  - ${student.name}: ${Object.keys(student.reviews || {}).length} reviews, ${reviewsWithPPT} with PPT data`
+          `  - ${student.name}: ${Object.keys(student.reviews || {}).length} reviews, ${reviewsWithPPT} with PPT data, requiresContribution: ${student.requiresContribution}, contributionType: ${student.contributionType}`
         );
       });
       console.log(`📋 Schema: ${project.markingSchema ? "YES" : "NO"}`);
@@ -1384,12 +1437,15 @@ export async function getAllPanelProjects(req, res) {
         console.log(
           `📋 Panel Schema Reviews: ${project.markingSchema.reviews?.length || 0} total, ${schemaWithPPT} require PPT`
         );
+        console.log(
+          `📝 Panel Schema requiresContribution: ${project.markingSchema.requiresContribution}, contributionType: ${project.markingSchema.contributionType || 'none'}`
+        );
       }
     });
 
     return res.status(200).json({
       success: true,
-      data: projectsWithSchemas, // ✅ Now includes complete PPT approval data
+      data: projectsWithSchemas,
       message: "Panel projects fetched successfully",
     });
   } catch (error) {
@@ -1402,241 +1458,258 @@ export async function getAllPanelProjects(req, res) {
   }
 }
 
-/**
- * Update project details with review data
- */
 
-export const updateProjectDetails = async (req, res) => {
-  const session = await mongoose.startSession();
 
-  try {
-    session.startTransaction();
 
-    const { projectId, projectUpdates, studentUpdates, pptApproved } = req.body;
 
-    console.log("=== [BACKEND] UPDATE PROJECT STARTED ===");
-    console.log("📋 [BACKEND] Project ID:", projectId);
-    console.log(
-      "📋 [BACKEND] Project Updates:",
-      JSON.stringify(projectUpdates, null, 2)
-    );
-    console.log(
-      "📋 [BACKEND] Student Updates:",
-      JSON.stringify(studentUpdates, null, 2)
-    );
+  /**
+   * Update project details with review data
+   */
 
-    // Find the project with session
-    const project = await Project.findById(projectId).session(session);
-    if (!project) {
-      await session.abortTransaction();
-      return res.status(404).json({
-        success: false,
-        message: "Project not found",
-      });
-    }
+  // const mongoose = require('mongoose');
+  // const Project = require('../models/Project'); // Adjust path as needed
+  // const Student = require('../models/Student'); // Adjust path as needed
 
-    console.log("✅ [BACKEND] Project found:", project.name);
+  export const updateProjectDetails = async (req, res) => {
+    const session = await mongoose.startSession();
 
-    // Update project fields (excluding immutable ones)
-    if (projectUpdates && typeof projectUpdates === "object") {
-      const immutableFields = ["_id", "students", "guideFaculty", "panel"];
-      const updatableFields = [
-        "name",
-        "school",
-        "department",
-        "specialization",
-        "type",
-        "bestProject",
-      ];
+    try {
+      session.startTransaction();
 
-      for (const key of Object.keys(projectUpdates)) {
-        if (!immutableFields.includes(key) && updatableFields.includes(key)) {
-          project[key] = projectUpdates[key];
-          console.log(`📋 [BACKEND] Updated ${key}:`, projectUpdates[key]);
-        }
-      }
-      await project.save({ session });
-      console.log("📋 [BACKEND] Project updated:", project.name);
-    }
+      const { projectId, projectUpdates, studentUpdates, pptApproved } = req.body;
 
-    // Process each student update sequentially (avoid parallel operations in transaction)
-    for (const update of studentUpdates || []) {
-      const {
-        studentId,
-        reviews: reviewsToUpdate,
-        PAT, // Extract PAT status (no need to handle student-level pptApproved any more!)
-      } = update;
+      console.log("=== [BACKEND] UPDATE PROJECT STARTED ===");
+      console.log("📋 [BACKEND] Project ID:", projectId);
+      console.log(
+        "📋 [BACKEND] Project Updates:",
+        JSON.stringify(projectUpdates, null, 2)
+      );
+      console.log(
+        "📋 [BACKEND] Student Updates:",
+        JSON.stringify(studentUpdates, null, 2)
+      );
 
-      const student = await Student.findById(studentId).session(session);
-      if (!student) {
-        console.error("❌ [BACKEND] Student not found:", studentId);
-        continue;
+      // Find the project with session
+      const project = await Project.findById(projectId).session(session);
+      if (!project) {
+        await session.abortTransaction();
+        return res.status(404).json({
+          success: false,
+          message: "Project not found",
+        });
       }
 
-      console.log("✅ [BACKEND] Processing student:", student.name);
-      console.log("🚫 [BACKEND] PAT status for student:", PAT);
+      console.log("✅ [BACKEND] Project found:", project.name);
 
-      // Merge updates into existing reviews Map
-      for (const [reviewType, reviewData] of Object.entries(
-        reviewsToUpdate || {}
-      )) {
-        if (!student.reviews) {
-          student.reviews = new Map();
+      // Update project fields (excluding immutable ones)
+      if (projectUpdates && typeof projectUpdates === "object") {
+        const immutableFields = ["_id", "students", "guideFaculty", "panel"];
+        const updatableFields = [
+          "name",
+          "school",
+          "department",
+          "specialization",
+          "type",
+          "bestProject",
+        ];
+
+        for (const key of Object.keys(projectUpdates)) {
+          if (!immutableFields.includes(key) && updatableFields.includes(key)) {
+            project[key] = projectUpdates[key];
+            console.log(`📋 [BACKEND] Updated ${key}:`, projectUpdates[key]);
+          }
         }
-
-        const newReviewData = {
-          marks: new Map(Object.entries(reviewData.marks || {})),
-          comments: reviewData.comments || "",
-          attendance: reviewData.attendance || { value: false, locked: false },
-          locked: reviewData.locked || false,
-        };
-
-        if ("pptApproved" in reviewData) {
-          newReviewData.pptApproved = reviewData.pptApproved;
-        }
-
-        if (typeof student.reviews.set === "function") {
-          student.reviews.set(reviewType, newReviewData);
-        } else {
-          student.reviews[reviewType] = newReviewData;
-        }
+        await project.save({ session });
+        console.log("📋 [BACKEND] Project updated:", project.name);
       }
 
-      // ✅ Update PAT status if provided
-      if (PAT !== undefined) {
-        student.PAT = Boolean(PAT); // Ensure boolean type
+      // Process each student update sequentially (avoid parallel operations in transaction)
+      for (const update of studentUpdates || []) {
+        const {
+          studentId,
+          reviews: reviewsToUpdate,
+          PAT, // Extract PAT status
+        } = update;
+
+        const student = await Student.findById(studentId).session(session);
+        if (!student) {
+          console.error("❌ [BACKEND] Student not found:", studentId);
+          continue;
+        }
+
+        console.log("✅ [BACKEND] Processing student:", student.name);
+        console.log("🚫 [BACKEND] PAT status for student:", PAT);
+
+        // Merge updates into existing reviews Map
+        for (const [reviewType, reviewData] of Object.entries(
+          reviewsToUpdate || {}
+        )) {
+          if (!student.reviews) {
+            student.reviews = new Map();
+          }
+
+          const newReviewData = {
+            marks: new Map(Object.entries(reviewData.marks || {})),
+            comments: reviewData.comments || "",
+            attendance: reviewData.attendance || { value: false, locked: false },
+            locked: reviewData.locked || false,
+            // ✅ NEW: Store contribution if provided
+            ...(reviewData.contribution !== undefined && {
+              contribution: String(reviewData.contribution), // Ensure string type
+            }),
+          };
+
+          if ("pptApproved" in reviewData) {
+            newReviewData.pptApproved = reviewData.pptApproved;
+          }
+
+          console.log(
+            `📋 [BACKEND] Updating review ${reviewType} for ${student.name}:`,
+            newReviewData
+          );
+
+          if (typeof student.reviews.set === "function") {
+            student.reviews.set(reviewType, newReviewData);
+          } else {
+            student.reviews[reviewType] = newReviewData;
+          }
+        }
+
+        // Update PAT status if provided
+        if (PAT !== undefined) {
+          student.PAT = Boolean(PAT); // Ensure boolean type
+          console.log(
+            `🚫 [BACKEND] Updated PAT status for ${student.name}:`,
+            student.PAT
+          );
+        }
+
+        await student.save({ session });
+        console.log("✅ [BACKEND] Student saved:", student.name);
+      }
+
+      // Update project-level PPT approval if provided
+      if (pptApproved !== undefined) {
+        project.pptApproved = pptApproved;
+        await project.save({ session });
         console.log(
-          `🚫 [BACKEND] Updated PAT status for ${student.name}:`,
-          student.PAT
+          "📋 [BACKEND] Updated project-level PPT approval:",
+          pptApproved
         );
       }
 
-      await student.save({ session });
-      console.log("✅ [BACKEND] Student saved:", student.name);
+      await session.commitTransaction();
+      console.log("✅ [BACKEND] All updates completed successfully");
+
+      res.status(200).json({
+        success: true,
+        message: `Successfully updated project "${project.name}" and ${
+          (studentUpdates || []).length
+        } students`,
+        projectId: project._id,
+        updates: (studentUpdates || []).length,
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      console.error("❌ [BACKEND] Error updating project:", error);
+
+      res.status(500).json({
+        success: false,
+        message: "Server error during project update",
+        error: error.message,
+      });
+    } finally {
+      session.endSession();
     }
+  };
 
-    // Update project-level PPT approval if provided
-    if (pptApproved !== undefined) {
-      project.pptApproved = pptApproved;
-      await project.save({ session });
-      console.log(
-        "📋 [BACKEND] Updated project-level PPT approval:",
-        pptApproved
-      );
-    }
+  // Export other existing functions...
 
-    await session.commitTransaction();
-    console.log("✅ [BACKEND] All updates completed successfully");
+  export async function getProjectDetails(req, res) {
+    try {
+      const { projectId } = req.params;
 
-    res.status(200).json({
-      success: true,
-      message: `Successfully updated project "${project.name}" and ${
-        (studentUpdates || []).length
-      } students`,
-      projectId: project._id,
-      updates: (studentUpdates || []).length,
-    });
-  } catch (error) {
-    await session.abortTransaction();
-    console.error("❌ [BACKEND] Error updating project:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Server error during project update",
-      error: error.message,
-    });
-  } finally {
-    session.endSession();
-  }
-};
-
-// Export other existing functions...
-
-export async function getProjectDetails(req, res) {
-  try {
-    const { projectId } = req.params;
-
-    // Fetch project with fully populated nested documents
-    const requiredProject = await Project.findOne({ _id: projectId })
-      .populate({
-        path: "students",
-        model: "Student",
-        select:
-          "regNo name emailId reviews pptApproved deadline school department",
-      })
-      .populate({
-        path: "guideFaculty",
-        model: "Faculty",
-        select: "name emailId employeeId school department specialization",
-      })
-      .populate({
-        path: "panel",
-        model: "Panel",
-        populate: {
-          path: "members",
+      // Fetch project with fully populated nested documents
+      const requiredProject = await Project.findOne({ _id: projectId })
+        .populate({
+          path: "students",
+          model: "Student",
+          select:
+            "regNo name emailId reviews pptApproved deadline school department",
+        })
+        .populate({
+          path: "guideFaculty",
           model: "Faculty",
-          select: "name emailId employeeId",
-        },
+          select: "name emailId employeeId school department specialization",
+        })
+        .populate({
+          path: "panel",
+          model: "Panel",
+          populate: {
+            path: "members",
+            model: "Faculty",
+            select: "name emailId employeeId",
+          },
+        });
+
+      if (!requiredProject) {
+        return res.status(404).send({
+          message: "No project found with this ID.",
+        });
+      }
+
+      // Process students: convert Maps for reviews and deadline to plain objects
+      const processedStudents = requiredProject.students.map((student) => {
+        let processedReviews = {};
+        if (student.reviews) {
+          if (student.reviews instanceof Map) {
+            processedReviews = Object.fromEntries(student.reviews);
+          } else if (typeof student.reviews === "object") {
+            processedReviews = { ...student.reviews };
+          }
+        }
+
+        let processedDeadlines = {};
+        if (student.deadline) {
+          if (student.deadline instanceof Map) {
+            processedDeadlines = Object.fromEntries(student.deadline);
+          } else if (typeof student.deadline === "object") {
+            processedDeadlines = { ...student.deadline };
+          }
+        }
+
+        return {
+          _id: student._id,
+          regNo: student.regNo,
+          name: student.name,
+          emailId: student.emailId,
+          reviews: processedReviews,
+          pptApproved: student.pptApproved || { approved: false, locked: false },
+          deadline: processedDeadlines,
+          school: student.school,
+          department: student.department,
+        };
       });
 
-    if (!requiredProject) {
-      return res.status(404).send({
-        message: "No project found with this ID.",
+      // Construct the response including the 'type' attribute
+      const projectData = {
+        _id: requiredProject._id,
+        name: requiredProject.name,
+        school: requiredProject.school,
+        department: requiredProject.department,
+        specialization: requiredProject.specialization,
+        type: requiredProject.type, // include type attribute
+        students: processedStudents,
+        guideFaculty: requiredProject.guideFaculty,
+        panel: requiredProject.panel,
+      };
+
+      return res.status(200).send({ results: projectData });
+    } catch (error) {
+      console.error("Error fetching project details: ", error);
+      return res.status(500).json({
+        message: "Error fetching project details",
+        error: error.message,
       });
     }
-
-    // Process students: convert Maps for reviews and deadline to plain objects
-    const processedStudents = requiredProject.students.map((student) => {
-      let processedReviews = {};
-      if (student.reviews) {
-        if (student.reviews instanceof Map) {
-          processedReviews = Object.fromEntries(student.reviews);
-        } else if (typeof student.reviews === "object") {
-          processedReviews = { ...student.reviews };
-        }
-      }
-
-      let processedDeadlines = {};
-      if (student.deadline) {
-        if (student.deadline instanceof Map) {
-          processedDeadlines = Object.fromEntries(student.deadline);
-        } else if (typeof student.deadline === "object") {
-          processedDeadlines = { ...student.deadline };
-        }
-      }
-
-      return {
-        _id: student._id,
-        regNo: student.regNo,
-        name: student.name,
-        emailId: student.emailId,
-        reviews: processedReviews,
-        pptApproved: student.pptApproved || { approved: false, locked: false },
-        deadline: processedDeadlines,
-        school: student.school,
-        department: student.department,
-      };
-    });
-
-    // Construct the response including the 'type' attribute
-    const projectData = {
-      _id: requiredProject._id,
-      name: requiredProject.name,
-      school: requiredProject.school,
-      department: requiredProject.department,
-      specialization: requiredProject.specialization,
-      type: requiredProject.type, // include type attribute
-      students: processedStudents,
-      guideFaculty: requiredProject.guideFaculty,
-      panel: requiredProject.panel,
-    };
-
-    return res.status(200).send({ results: projectData });
-  } catch (error) {
-    console.error("Error fetching project details: ", error);
-    return res.status(500).json({
-      message: "Error fetching project details",
-      error: error.message,
-    });
   }
-}

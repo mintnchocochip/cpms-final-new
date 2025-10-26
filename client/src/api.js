@@ -10,18 +10,38 @@ const API = axios.create({
 // Add these to your existing api.js file
 
 // Update student (keep existing but ensure it only sends basic fields)
+// ✅ FIXED: Update student with contributionType support
+// Update student (FIXED to include contributionType)
 export const updateStudent = async (regNo, studentData) => {
-  // Filter to only send editable fields that match your schema
-  const allowedData = {
-    name: studentData.name,
-    emailId: studentData.emailId,
-    school: studentData.school,
-    department: studentData.department
-    // Note: reviews, pptApproved, deadline typically managed by backend
-  };
+  try {
+    // Filter to only send editable fields that match your schema
+    const allowedData = {};
 
-  return API.put(`/student/${regNo}`, allowedData);
+    // Only include fields that are actually provided
+    if (studentData.name !== undefined) allowedData.name = studentData.name;
+    if (studentData.emailId !== undefined) allowedData.emailId = studentData.emailId;
+    if (studentData.school !== undefined) allowedData.school = studentData.school;
+    if (studentData.department !== undefined) allowedData.department = studentData.department;
+    if (studentData.requiresContribution !== undefined) allowedData.requiresContribution = studentData.requiresContribution;
+    if (studentData.contributionType !== undefined) allowedData.contributionType = studentData.contributionType; // ✅ NEW
+    if (studentData.PAT !== undefined) allowedData.PAT = studentData.PAT;
+
+    console.log('📤 [API] Sending update request for student:', regNo);
+    console.log('📤 [API] Update data:', JSON.stringify(allowedData, null, 2));
+
+    const response = await API.put(`/student/${regNo}`, allowedData);
+    
+    console.log('✅ [API] Student updated successfully:', response.data);
+    return response;
+
+  } catch (error) {
+    console.error('❌ [API] Error updating student:', error);
+    console.error('❌ [API] Error response:', error.response?.data);
+    throw error;
+  }
 };
+
+
 
 // Add this to your existing api.js file
 export const getMarkingSchema = async (school, department) => {

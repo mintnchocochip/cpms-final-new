@@ -18,7 +18,6 @@ const PopupReview = ({
   panelMode = false,
   currentBestProject = false,
   teamId = null,
-  // ✅ NEW: Added props for Guide viewing Panel reviews
   isGuideReview = false,
   isPanelReview = false,
 }) => {
@@ -33,8 +32,10 @@ const PopupReview = ({
   const [hasAttendance, setHasAttendance] = useState(true);
   const [sub, setSub] = useState("Locked");
   const [patStates, setPatStates] = useState({});
+  // ✅ NEW: State for contribution requirement and values
+  const [requiresContribution, setRequiresContribution] = useState(false);
+  const [contributions, setContributions] = useState({}); // { memberId: percentage }
 
-  // ✅ NEW: Deadline states
   const [deadlineInfo, setDeadlineInfo] = useState({
     hasDeadline: false,
     fromDate: null,
@@ -45,18 +46,15 @@ const PopupReview = ({
     timeUntilEnd: "",
   });
 
-  // ✅ NEW: Determine if this is a guide viewing a panel review (can only approve PPT)
   const isGuideViewingPanel = !panelMode && isPanelReview;
   const showOnlyPPTApproval = isGuideViewingPanel;
 
-  // Determine if form is locked
   const isFormLocked = locked && requestStatus !== "approved";
   const isDeadlineLocked =
     (deadlineInfo.isBeforeStart || deadlineInfo.isAfterEnd) &&
     requestStatus !== "approved";
   const finalFormLocked = isFormLocked || isDeadlineLocked;
 
-  // ✅ NEW: Deadline calculation function
   const calculateDeadlineStatus = (reviewConfig) => {
     if (!reviewConfig?.deadline) {
       return {
@@ -85,7 +83,7 @@ const PopupReview = ({
         toDate = new Date(deadline.to);
       } else if (typeof deadline === "string" || deadline instanceof Date) {
         toDate = new Date(deadline);
-        fromDate = new Date(0); // Beginning of time
+        fromDate = new Date(0);
       }
 
       const fromIST = fromDate
@@ -129,7 +127,6 @@ const PopupReview = ({
     }
   };
 
-  // ✅ NEW: Time difference helper
   const getTimeDifference = (from, to) => {
     const diffMs = to - from;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -189,9 +186,15 @@ const PopupReview = ({
           }));
           console.log("📊 [PopupReview] Processed components:", components);
         }
+
+        // ✅ NEW: Set requiresContribution from schema
+        setRequiresContribution(reviewConfig?.requiresContribution || false);
+        console.log(
+          `📋 [PopupReview] requiresContribution:`,
+          reviewConfig?.requiresContribution
+        );
       }
 
-      // ✅ Calculate deadline status (skip for guide viewing panel)
       const deadlineStatus = showOnlyPPTApproval
         ? {
             hasDeadline: false,
@@ -246,11 +249,12 @@ const PopupReview = ({
     const initialComments = {};
     const initialAttendance = {};
     const initialPatStates = {};
+    // ✅ NEW: Initialize contribution states
+    const initialContributions = {};
 
     teamMembers.forEach((member) => {
       console.log(`📋 [PopupReview] Processing member: ${member.name}`);
 
-      // Get existing review data
       let reviewData = null;
       if (member.reviews?.get) {
         reviewData = member.reviews.get(reviewType);
@@ -263,7 +267,6 @@ const PopupReview = ({
         reviewData
       );
 
-      // ✅ Only initialize marks/attendance if not guide viewing panel
       if (!showOnlyPPTApproval) {
         const componentMarks = {};
         componentLabels.forEach((comp) => {
@@ -284,9 +287,16 @@ const PopupReview = ({
           initialAttendance[member._id] =
             reviewData?.attendance?.value ?? false;
         }
+
+        // ✅ NEW: Initialize contribution percentage
+        initialContributions[member._id] =
+          reviewData?.contribution || "0"; // Default to "0" if not set
+        console.log(
+          `📊 [PopupReview] Contribution for ${member.name}:`,
+          initialContributions[member._id]
+        );
       }
 
-      // ✅ FIXED: Better PAT initialization with fallback and debugging
       const patStatus =
         member.PAT === true || member.PAT === "true" || member.PAT === 1;
       console.log(
@@ -300,6 +310,7 @@ const PopupReview = ({
     console.log("- Comments:", initialComments);
     console.log("- Attendance:", initialAttendance);
     console.log("- PAT States:", initialPatStates);
+    console.log("- Contributions:", initialContributions);
 
     setMarks(initialMarks);
     setComments(initialComments);
@@ -307,24 +318,32 @@ const PopupReview = ({
       setAttendance(initialAttendance);
     }
     setPatStates(initialPatStates);
+    setContributions(initialContributions);
     setBestProject(currentBestProject || false);
 
-    // ✅ Update submission readiness based on comments for normal reviews, always unlocked for PPT-only
     if (showOnlyPPTApproval) {
       setSub("Unlocked");
     } else {
       const allCommentsFilled = teamMembers.every(
         (member) => initialComments[member._id]?.trim() !== ""
       );
-      setSub(allCommentsFilled ? "Unlocked" : "Locked");
+      // ✅ NEW: Check if contributions are set when required
+      const allContributionsFilled = !requiresContribution
+        ? true
+        : teamMembers.every(
+            (member) =>
+              contributions[member._id] !== undefined &&
+              contributions[member._id] !== ""
+          );
+      const isSubReady = allCommentsFilled && allContributionsFilled;
+      setSub(isSubReady ? "Unlocked" : "Locked");
       console.log(
-        `📝 [PopupReview] Comments check - All filled: ${allCommentsFilled}, Sub status: ${
-          allCommentsFilled ? "Unlocked" : "Locked"
+        `📝 [PopupReview] Comments filled: ${allCommentsFilled}, Contributions filled: ${allContributionsFilled}, Sub status: ${
+          isSubReady ? "Unlocked" : "Locked"
         }`
       );
     }
 
-    // ✅ IMPROVED: Initialize PPT approval state with review-specific data
     if (requiresPPT) {
       let pptAlreadyApproved = false;
 
@@ -332,19 +351,16 @@ const PopupReview = ({
         const pptApprovals = teamMembers.map((member) => {
           let reviewData = null;
 
-          // Get review-specific data
           if (member.reviews?.get) {
             reviewData = member.reviews.get(reviewType);
           } else if (member.reviews?.[reviewType]) {
             reviewData = member.reviews[reviewType];
           }
 
-          // Check review-specific PPT approval first
           if (reviewData?.pptApproved) {
             return Boolean(reviewData.pptApproved.approved);
           }
 
-          // Fallback to student-level PPT approval
           if (member.pptApproved) {
             return Boolean(member.pptApproved.approved);
           }
@@ -381,10 +397,8 @@ const PopupReview = ({
   const handleMarksChange = (memberId, value, componentKey) => {
     if (finalFormLocked || showOnlyPPTApproval) return;
 
-    // Don't allow marks entry if student is absent
     if (hasAttendance && attendance[memberId] === false) return;
 
-    // Don't allow marks entry if PAT is selected
     if (patStates[memberId]) return;
 
     const componentInfo = componentLabels.find(
@@ -417,7 +431,6 @@ const PopupReview = ({
 
     setAttendance((prev) => ({ ...prev, [memberId]: isPresent }));
 
-    // Zero out marks if student is marked absent
     if (!isPresent) {
       const zeroedMarks = {};
       componentLabels.forEach((comp) => {
@@ -426,11 +439,18 @@ const PopupReview = ({
       setMarks((prev) => ({ ...prev, [memberId]: zeroedMarks }));
     }
 
-    // Update submission readiness
     const allCommentsFilled = teamMembers.every(
       (member) => comments[member._id]?.trim() !== ""
     );
-    setSub(allCommentsFilled ? "Unlocked" : "Locked");
+    // ✅ NEW: Check contributions for submission readiness
+    const allContributionsFilled = !requiresContribution
+      ? true
+      : teamMembers.every(
+          (member) =>
+            contributions[member._id] !== undefined &&
+            contributions[member._id] !== ""
+        );
+    setSub(allCommentsFilled && allContributionsFilled ? "Unlocked" : "Locked");
   };
 
   const handleCommentsChange = (memberId, value) => {
@@ -438,13 +458,58 @@ const PopupReview = ({
 
     setComments((prev) => ({ ...prev, [memberId]: value }));
 
-    // Update submission readiness
     const allCommentsFilled = teamMembers.every((member) =>
       member._id === memberId
         ? value.trim() !== ""
         : comments[member._id]?.trim() !== ""
     );
-    setSub(allCommentsFilled ? "Unlocked" : "Locked");
+    const allContributionsFilled = !requiresContribution
+      ? true
+      : teamMembers.every(
+          (member) =>
+            contributions[member._id] !== undefined &&
+            contributions[member._id] !== ""
+        );
+    setSub(allCommentsFilled && allContributionsFilled ? "Unlocked" : "Locked");
+  };
+
+  // ✅ NEW: Handle contribution percentage change
+  const handleContributionChange = (memberId, value) => {
+    if (finalFormLocked || showOnlyPPTApproval) return;
+
+    setContributions((prev) => ({ ...prev, [memberId]: value }));
+
+    const allCommentsFilled = teamMembers.every(
+      (member) => comments[member._id]?.trim() !== ""
+    );
+    const allContributionsFilled = teamMembers.every((member) =>
+      member._id === memberId
+        ? value !== ""
+        : contributions[member._id] !== undefined &&
+          contributions[member._id] !== ""
+    );
+    setSub(allCommentsFilled && allContributionsFilled ? "Unlocked" : "Locked");
+  };
+
+  const handlePatToggle = (memberId, isPat) => {
+    if (finalFormLocked || panelMode || showOnlyPPTApproval) return;
+
+    console.log(`🚫 [PopupReview] PAT toggle for ${memberId}: ${isPat}`);
+    setPatStates((prev) => ({ ...prev, [memberId]: isPat }));
+
+    if (isPat) {
+      const patMarks = {};
+      componentLabels.forEach((comp) => {
+        patMarks[comp.key] = "PAT";
+      });
+      setMarks((prev) => ({ ...prev, [memberId]: patMarks }));
+    } else {
+      const resetMarks = {};
+      componentLabels.forEach((comp) => {
+        resetMarks[comp.key] = 0;
+      });
+      setMarks((prev) => ({ ...prev, [memberId]: resetMarks }));
+    }
   };
 
   const handleSubmit = () => {
@@ -456,28 +521,29 @@ const PopupReview = ({
     console.log("👥 [PopupReview] Current attendance:", attendance);
     console.log("📽️ [PopupReview] PPT approved:", teamPptApproved);
     console.log("⭐ [PopupReview] Best project:", bestProject);
+    console.log("📊 [PopupReview] Contributions:", contributions);
 
     const submission = {};
     const patUpdates = {};
 
-    // ✅ Only process marks/comments for non-PPT-only reviews
     if (!showOnlyPPTApproval) {
       teamMembers.forEach((member) => {
         const memberMarks = marks[member._id] || {};
         const submissionData = {
           comments: comments[member._id] || "",
+          // ✅ NEW: Include contribution if required
+          ...(requiresContribution && {
+            contribution: contributions[member._id] || "0",
+          }),
         };
 
-        // Add component marks
         componentLabels.forEach((comp) => {
           const markValue = memberMarks[comp.key];
-          // PAT students get -1, absent students get 0, others get their marks
           submissionData[comp.name] = patStates[member._id]
             ? -1
             : Number(markValue) || 0;
         });
 
-        // Add attendance if applicable
         if (hasAttendance) {
           submissionData.attendance = {
             value: attendance[member._id] || false,
@@ -487,7 +553,6 @@ const PopupReview = ({
 
         submission[member.regNo] = submissionData;
 
-        // ✅ Only add PAT updates for non-panel reviews
         if (!panelMode) {
           patUpdates[member.regNo] = patStates[member._id] || false;
         }
@@ -502,9 +567,7 @@ const PopupReview = ({
     console.log("📦 [PopupReview] Final submission object:", submission);
     console.log("🚫 [PopupReview] PAT updates:", patUpdates);
 
-    // ✅ Handle different submission scenarios
     if (showOnlyPPTApproval) {
-      // Guide viewing panel - only PPT approval
       const teamPptObj = requiresPPT
         ? {
             pptApproved: {
@@ -516,7 +579,6 @@ const PopupReview = ({
       console.log("📽️ [PopupReview] PPT-only submission:", teamPptObj);
       onSubmit({}, teamPptObj, {});
     } else if (requiresPPT && panelMode) {
-      // Panel review with PPT
       const teamPptObj = {
         pptApproved: {
           approved: teamPptApproved,
@@ -526,11 +588,9 @@ const PopupReview = ({
       console.log("👥📽️ [PopupReview] Panel + PPT submission");
       onSubmit(submission, teamPptObj, { bestProject });
     } else if (panelMode) {
-      // Panel review without PPT
       console.log("👥 [PopupReview] Panel submission");
       onSubmit(submission, null, { bestProject });
     } else if (requiresPPT) {
-      // Guide review with PPT
       const teamPptObj = {
         pptApproved: {
           approved: teamPptApproved,
@@ -540,37 +600,11 @@ const PopupReview = ({
       console.log("👨‍🏫📽️ [PopupReview] Guide + PPT submission");
       onSubmit(submission, teamPptObj, patUpdates);
     } else {
-      // Regular guide review
       console.log("👨‍🏫 [PopupReview] Guide submission");
       onSubmit(submission, null, patUpdates);
     }
   };
 
-  // ✅ NEW: Handle PAT toggle for guide reviews
-  const handlePatToggle = (memberId, isPat) => {
-    if (finalFormLocked || panelMode || showOnlyPPTApproval) return;
-
-    console.log(`🚫 [PopupReview] PAT toggle for ${memberId}: ${isPat}`);
-    setPatStates((prev) => ({ ...prev, [memberId]: isPat }));
-
-    if (isPat) {
-      // Set marks to 'PAT' for display, but will be converted to -1 on submit
-      const patMarks = {};
-      componentLabels.forEach((comp) => {
-        patMarks[comp.key] = "PAT";
-      });
-      setMarks((prev) => ({ ...prev, [memberId]: patMarks }));
-    } else {
-      // Reset to 0
-      const resetMarks = {};
-      componentLabels.forEach((comp) => {
-        resetMarks[comp.key] = 0;
-      });
-      setMarks((prev) => ({ ...prev, [memberId]: resetMarks }));
-    }
-  };
-
-  // Check guide PPT approval status for panel blocking
   let guidePPTApprovals = [];
   let allGuidePPTApproved = true;
 
@@ -580,19 +614,16 @@ const PopupReview = ({
     guidePPTApprovals = teamMembers.map((member) => {
       let reviewData = null;
 
-      // Get the review data for this specific review type
       if (member.reviews?.get) {
         reviewData = member.reviews.get(reviewType);
       } else if (member.reviews?.[reviewType]) {
         reviewData = member.reviews[reviewType];
       }
 
-      // Check if guide approved PPT in this specific review
       if (reviewData?.pptApproved) {
         return Boolean(reviewData.pptApproved.approved);
       }
 
-      // Fallback to student-level PPT approval
       if (member.pptApproved) {
         return Boolean(member.pptApproved.approved);
       }
@@ -613,7 +644,6 @@ const PopupReview = ({
 
   if (!isOpen) return null;
 
-  // Show loading spinner
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -632,9 +662,6 @@ const PopupReview = ({
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="relative bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] flex flex-col border-2 border-blue-100">
-        {/* ========================================= */}
-        {/*           FULLSCREEN ERROR OVERLAY       */}
-        {/* ========================================= */}
         {error && (
           <div className="absolute inset-0 bg-white bg-opacity-95 z-50 flex flex-col items-center justify-center p-10">
             <div className="max-w-lg w-full bg-red-100 border-2 border-red-500 rounded-2xl shadow-2xl p-8 flex flex-col items-center">
@@ -653,9 +680,6 @@ const PopupReview = ({
           </div>
         )}
 
-        {/* ========================================= */}
-        {/*    FULLSCREEN PANEL REVIEW BLOCKED       */}
-        {/* ========================================= */}
         {panelMode && requiresPPT && !allGuidePPTApproved && (
           <div className="absolute inset-0 bg-white bg-opacity-95 z-50 flex flex-col items-center justify-center p-8">
             <div className="max-w-xl w-full bg-red-100 border-2 border-red-500 rounded-2xl shadow-2xl p-8 flex flex-col items-center">
@@ -742,6 +766,12 @@ const PopupReview = ({
                     PPT Required
                   </span>
                 )}
+                {/* ✅ NEW: Contribution Required Tag */}
+                {requiresContribution && (
+                  <span className="bg-green-400/30 px-3 py-1 rounded-full">
+                    Contribution Required
+                  </span>
+                )}
                 {panelMode && (
                   <span className="bg-purple-400/30 px-3 py-1 rounded-full">
                     👥 Panel Review
@@ -790,7 +820,6 @@ const PopupReview = ({
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-          {/* ✅ NEW: Deadline Information Banner */}
           {!showOnlyPPTApproval && deadlineInfo.hasDeadline && (
             <div
               className={`mb-6 p-4 rounded-xl border-2 ${
@@ -892,7 +921,6 @@ const PopupReview = ({
             </div>
           )}
 
-          {/* ✅ NEW: Best Project Selection - Panel Only */}
           {panelMode && !showOnlyPPTApproval && (
             <div className="mb-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl">
               <label className="flex items-center space-x-3 cursor-pointer">
@@ -917,38 +945,77 @@ const PopupReview = ({
             </div>
           )}
 
-          {/* Team PPT Approval Section */}
-          {requiresPPT && (
+          {/* Team PPT Approval and Contribution Section */}
+          {(requiresPPT || requiresContribution) && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-blue-800 flex items-center gap-2">
                   <span>📽️</span>
-                  Team PPT Approval Required
+                  Team Review Requirements
                 </h3>
                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
                   Schema Required
                 </span>
               </div>
-              <label className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  checked={teamPptApproved}
-                  onChange={(e) => setTeamPptApproved(e.target.checked)}
-                  disabled={finalFormLocked}
-                  className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="font-semibold text-blue-800">
-                  Approve Team PPT for this review
-                </span>
-              </label>
+              {requiresPPT && (
+                <label className="flex items-center space-x-3 mb-3">
+                  <input
+                    type="checkbox"
+                    checked={teamPptApproved}
+                    onChange={(e) => setTeamPptApproved(e.target.checked)}
+                    disabled={finalFormLocked}
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="font-semibold text-blue-800">
+                    Approve Team PPT for this review
+                  </span>
+                </label>
+              )}
+              {requiresContribution && (
+                <div>
+                  <h4 className="font-semibold text-blue-800 mb-2">
+                    Contribution Assessment
+                  </h4>
+                  {teamMembers.map((member) => (
+                    <div key={member._id} className="mb-2">
+                      <label className="flex items-center space-x-3">
+                        {/* <span className="text-sm font-medium text-gray-700">
+                          {member.name} ({member.regNo})
+                        </span> */}
+                        <select
+                          value={contributions[member._id] || ""}
+                          onChange={(e) =>
+                            handleContributionChange(member._id, e.target.value)
+                          }
+                          disabled={finalFormLocked}
+                          className={`px-3 py-1 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 ${
+                            finalFormLocked
+                              ? "bg-gray-100 cursor-not-allowed"
+                              : ""
+                          }`}
+                        >
+                          <option value="" >
+                            Select Contribution
+                          </option>
+                          <option value="Book_Chapter_Contribution">Book Chapter Contribution</option>
+                          <option value="Patent_filing">Patent filing</option>
+                          <option value="Journal_Publication">Journal Publication</option>
+                        </select>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              )}
               <p className="text-sm text-blue-600 mt-2">
-                This review requires PPT approval as configured in the marking
-                schema.
+                {requiresPPT && requiresContribution
+                  ? "This review requires both PPT approval and contribution assessment as configured in the marking schema."
+                  : requiresPPT
+                  ? "This review requires PPT approval as configured in the marking schema."
+                  : "This review requires contribution assessment as configured in the marking schema."}
               </p>
             </div>
           )}
 
-          {/* ✅ NEW: Guide viewing Panel Review - PPT Only */}
           {showOnlyPPTApproval && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
               <h3 className="text-lg font-bold text-blue-800 mb-4">
@@ -998,7 +1065,6 @@ const PopupReview = ({
             </div>
           )}
 
-          {/* Students Grid */}
           {!showOnlyPPTApproval && (
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {teamMembers.map((member) => (
@@ -1006,7 +1072,6 @@ const PopupReview = ({
                   key={member._id}
                   className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
                 >
-                  {/* Student Header */}
                   <div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-100">
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
@@ -1023,7 +1088,6 @@ const PopupReview = ({
                       </div>
                       <p className="text-sm text-gray-500">{member.regNo}</p>
 
-                      {/* ✅ NEW: PAT Toggle - Guide only */}
                       {!panelMode && (
                         <div className="mt-2">
                           <label className="flex items-center space-x-2 cursor-pointer">
@@ -1044,7 +1108,6 @@ const PopupReview = ({
                       )}
                     </div>
 
-                    {/* Attendance */}
                     {hasAttendance && (
                       <div className="ml-3">
                         <select
@@ -1073,7 +1136,6 @@ const PopupReview = ({
                     )}
                   </div>
 
-                  {/* Components */}
                   <div className="space-y-3 mb-4">
                     {componentLabels.map((comp) => (
                       <div
@@ -1130,7 +1192,6 @@ const PopupReview = ({
                     ))}
                   </div>
 
-                  {/* Comments */}
                   <textarea
                     value={comments[member._id] || ""}
                     onChange={(e) =>
@@ -1152,7 +1213,6 @@ const PopupReview = ({
           )}
         </div>
 
-        {/* Footer */}
         <div className="bg-white border-t border-gray-200 px-6 py-4 flex justify-between items-center rounded-b-2xl">
           <div className="flex space-x-3">
             {requestEditVisible && !requestPending && !showOnlyPPTApproval && (
@@ -1209,7 +1269,7 @@ const PopupReview = ({
                 : finalFormLocked && !showOnlyPPTApproval
                 ? "Locked"
                 : sub === "Locked" && !showOnlyPPTApproval
-                ? "Comments Required"
+                ? "Comments/Contributions Required"
                 : showOnlyPPTApproval && !requiresPPT
                 ? "No PPT Required by Schema"
                 : showOnlyPPTApproval && requiresPPT

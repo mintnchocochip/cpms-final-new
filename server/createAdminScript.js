@@ -1,17 +1,27 @@
+// adminc.js
+import dotenv from "dotenv";
+// If you run from server/ directory, this is sufficient:
+dotenv.config({path:"D:/BTECH_CSEcore/Projects/pj2/cpms-final/server/.env"});
+// Or, if you run from a different directory, use an absolute path:
+// dotenv.config({ path: "d:/BTECH_CSEcore/Projects/pj2/cpms-final/server/.env" });
+
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
-import dotenv from "dotenv";
 import connectDB from "./utils/db.js";
 import Faculty from "./models/facultySchema.js";
 
-dotenv.config();
+// Quick sanity check
+if (!process.env.MONGOOSE_CONNECTION_STRING) {
+  console.error("MONGOOSE_CONNECTION_STRING missing. Check .env and path.");
+  process.exit(1);
+}
 
 const ADMIN_EMAIL = "admin@vit.ac.in";
-const ADMIN_PASSWORD = "admin";
+const ADMIN_PASSWORD = "VITadmin@123";
 const ADMIN_NAME = "Main Admin";
 const ADMIN_EMPLOYEE_ID = "ADMIN001";
-const ADMIN_SCHOOL = "School of Computing"; // Adjust as necessary
-const ADMIN_DEPARTMENT = "CSE"; // Adjust as necessary
+const ADMIN_SCHOOL = "School of Computing";
+const ADMIN_DEPARTMENT = "CSE";
 
 const createAdmin = async () => {
   console.log("Connecting to database...");
@@ -26,9 +36,6 @@ const createAdmin = async () => {
       return;
     }
 
-    console.log(`Admin user ${ADMIN_EMAIL} not found. Creating...`);
-
-    // Hash password (consider enforcing password policy in real use)
     console.log("Hashing admin password...");
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, salt);
@@ -39,17 +46,15 @@ const createAdmin = async () => {
       password: hashedPassword,
       employeeId: ADMIN_EMPLOYEE_ID,
       role: "admin",
-      school: [ADMIN_SCHOOL], // must be array as per schema
-      department: [ADMIN_DEPARTMENT], // must be array as per schema
-      phoneNumber: "9940573903", // change this to a valid indian phone number to work
+      school: [ADMIN_SCHOOL],
+      department: [ADMIN_DEPARTMENT],
+      phoneNumber: "9940573903",
       imageUrl: "",
-      specialization: [], // empty array for admin allowed
+      specialization: []
     });
 
     await adminUser.save();
-    console.log(
-      `Successfully created admin user: ${ADMIN_NAME} (${ADMIN_EMAIL})`
-    );
+    console.log(`Successfully created admin user: ${ADMIN_NAME} (${ADMIN_EMAIL})`);
   } catch (error) {
     console.error("Error creating admin user:", error);
   } finally {

@@ -25,49 +25,47 @@ import {
   X
 } from "lucide-react";
 
-
-
 function Schedule() {
   const defaultDate = setHours(setMinutes(new Date(), 30), 16);
   
   // School and Department options
   const schoolOptions = ['SCOPE', 'SENSE', 'SELECT', 'SMEC', 'SCE'];
   const departmentOptions = [
-  'BTech', 'MIS(Mtech Integrated)','MIA(Mtech Integrated)','MCA','MCA 2nd Year','MCS','MCB','MAI(Machine Learning)'
-,'MAI(Data Science)','MCS']
+    'BTech', 'M.Tech Integrated (MIS)', 'M.Tech Integrated (MIA)', 'MCA 1st Year', 
+    'MCA', 'M.Tech 2yr (MCS,MCB,MAI)'
+  ];
 
   const [selectedSchool, setSelectedSchool] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
+  
+  // NEW: Department-level requiresContribution
+  const [requiresContribution, setRequiresContribution] = useState(false);
 
-  // State for Guide Reviews
- // State for Guide Reviews  
-const [guideReviews, setGuideReviews] = useState([
-  {
-    id: 'guide-draftReview',
-    reviewName: 'draftReview',
-    displayName: 'Draft Review',
-    facultyType: 'guide',
-    from: defaultDate,
-    to: defaultDate,
-    components: [{ name: '', weight: '' }],
-    // REMOVED: requiresPPT: false
-  }
-]);
+  // State for Guide Reviews - REMOVED requiresContribution from each review
+  const [guideReviews, setGuideReviews] = useState([
+    {
+      id: 'guide-draftReview',
+      reviewName: 'draftReview',
+      displayName: 'Draft Review',
+      facultyType: 'guide',
+      from: defaultDate,
+      to: defaultDate,
+      components: [{ name: '', weight: '' }],
+    }
+  ]);
 
-// State for Panel Reviews
-const [panelReviews, setPanelReviews] = useState([
-  {
-    id: 'panel-review0', 
-    reviewName: 'review0',
-    displayName: 'Review 0',
-    facultyType: 'panel',
-    from: defaultDate,
-    to: defaultDate,
-    components: [{ name: '', weight: '' }],
-    // REMOVED: requiresPPT: false
-  }
-]);
-
+  // State for Panel Reviews - REMOVED requiresContribution from each review
+  const [panelReviews, setPanelReviews] = useState([
+    {
+      id: 'panel-review0', 
+      reviewName: 'review0',
+      displayName: 'Review 0',
+      facultyType: 'panel',
+      from: defaultDate,
+      to: defaultDate,
+      components: [{ name: '', weight: '' }],
+    }
+  ]);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -129,50 +127,45 @@ const [panelReviews, setPanelReviews] = useState([
     }, 0);
   }, 0);
 
-  // Add new guide review
-  // Add new guide review
-const addGuideReview = () => {
-  if (!canAddReview) {
-    showNotification('error', 'Cannot Add Review', 'Total weight would exceed 100 marks.');
-    return;
-  }
+  // Add new guide review - REMOVED requiresContribution
+  const addGuideReview = () => {
+    if (!canAddReview) {
+      showNotification('error', 'Cannot Add Review', 'Total weight would exceed 100 marks.');
+      return;
+    }
 
-  const newReview = {
-    id: `guide-${Date.now()}`,
-    reviewName: `guideReview${guideReviews.length}`,
-    displayName: `Guide Review ${guideReviews.length + 1}`,
-    facultyType: 'guide',
-    from: defaultDate,
-    to: defaultDate,
-    components: [{ name: '', weight: '' }],
-    // REMOVED: requiresPPT: false
+    const newReview = {
+      id: `guide-${Date.now()}`,
+      reviewName: `guideReview${guideReviews.length}`,
+      displayName: `Guide Review ${guideReviews.length + 1}`,
+      facultyType: 'guide',
+      from: defaultDate,
+      to: defaultDate,
+      components: [{ name: '', weight: '' }],
+    };
+
+    setGuideReviews([...guideReviews, newReview]);
   };
 
-  setGuideReviews([...guideReviews, newReview]);
-};
+  // Add new panel review - REMOVED requiresContribution
+  const addPanelReview = () => {
+    if (!canAddReview) {
+      showNotification('error', 'Cannot Add Review', 'Total weight would exceed 100 marks.');
+      return;
+    }
 
-  // Add new panel review
-  // Add new panel review
-const addPanelReview = () => {
-  if (!canAddReview) {
-    showNotification('error', 'Cannot Add Review', 'Total weight would exceed 100 marks.');
-    return;
-  }
+    const newReview = {
+      id: `panel-${Date.now()}`,
+      reviewName: `panelReview${panelReviews.length}`, 
+      displayName: `Panel Review ${panelReviews.length + 1}`,
+      facultyType: 'panel',
+      from: defaultDate,
+      to: defaultDate,
+      components: [{ name: '', weight: '' }],
+    };
 
-  const newReview = {
-    id: `panel-${Date.now()}`,
-    reviewName: `panelReview${panelReviews.length}`, 
-    displayName: `Panel Review ${panelReviews.length + 1}`,
-    facultyType: 'panel',
-    from: defaultDate,
-    to: defaultDate,
-    components: [{ name: '', weight: '' }],
-    // REMOVED: requiresPPT: false
+    setPanelReviews([...panelReviews, newReview]);
   };
-
-  setPanelReviews([...panelReviews, newReview]);
-};
-
 
   // Remove guide review
   const removeGuideReview = (reviewId) => {
@@ -279,37 +272,42 @@ const addPanelReview = () => {
         const data = res.data.data;
         console.log('Processing data:', data);
 
+        // NEW: Set department-level requiresContribution
+        if (data.requiresContribution !== undefined) {
+          setRequiresContribution(Boolean(data.requiresContribution));
+          console.log('Set requiresContribution:', data.requiresContribution);
+        }
+
         if (data.reviews && Array.isArray(data.reviews)) {
           console.log("Processing reviews:", data.reviews);
           
           const newGuideReviews = [];
           const newPanelReviews = [];
           
-        data.reviews.forEach(review => {
-  const reviewData = {
-    id: `${review.facultyType}-${review.reviewName}`,
-    reviewName: review.reviewName,
-    displayName: review.displayName || review.reviewName,
-    facultyType: review.facultyType || 'guide',
-    from: review.deadline ? new Date(review.deadline.from) : defaultDate,
-    to: review.deadline ? new Date(review.deadline.to) : defaultDate,
-    components: review.components && review.components.length > 0 
-      ? review.components.map(comp => ({ 
-          name: comp.name || '', 
-          weight: comp.weight ? comp.weight.toString() : '' 
-        }))
-      : [{ name: '', weight: '' }],
-    // REMOVED: requiresPPT: Boolean(review.requiresPPT)
-  };
-  
-  if (review.facultyType === 'panel') {
-    newPanelReviews.push(reviewData);
-  } else {
-    newGuideReviews.push(reviewData);
-  }
-});
+          data.reviews.forEach(review => {
+            const reviewData = {
+              id: `${review.facultyType}-${review.reviewName}`,
+              reviewName: review.reviewName,
+              displayName: review.displayName || review.reviewName,
+              facultyType: review.facultyType || 'guide',
+              from: review.deadline ? new Date(review.deadline.from) : defaultDate,
+              to: review.deadline ? new Date(review.deadline.to) : defaultDate,
+              components: review.components && review.components.length > 0 
+                ? review.components.map(comp => ({ 
+                    name: comp.name || '', 
+                    weight: comp.weight ? comp.weight.toString() : '' 
+                  }))
+                : [{ name: '', weight: '' }],
+              // REMOVED: requiresContribution from review level
+            };
+            
+            if (review.facultyType === 'panel') {
+              newPanelReviews.push(reviewData);
+            } else {
+              newGuideReviews.push(reviewData);
+            }
+          });
 
-          
           if (newGuideReviews.length > 0) setGuideReviews(newGuideReviews);
           if (newPanelReviews.length > 0) setPanelReviews(newPanelReviews);
           
@@ -331,82 +329,85 @@ const addPanelReview = () => {
   };
 
   // Save marking schema
-  const handleSaveDeadlines = async () => {
-    if (!selectedSchool || !selectedDepartment) {
-      showNotification("error", "Missing Selection", "Please select both school and department.");
-      return;
-    }
-
-    if (!canSave) {
-      showNotification("error", "Invalid Weight", `Total weight must be exactly 100. Current total: ${totalWeight}`);
-      return;
-    }
-
-    setSaving(true);
-    setValidationErrors({});
-
-    try {
-      console.log("=== SAVING COMPLETE MARKING SCHEMA ===");
-
-      const allReviews = [...guideReviews, ...panelReviews];
-      
-      const reviews = allReviews.map(review => ({
-  reviewName: review.reviewName,
-  displayName: review.displayName,
-  facultyType: review.facultyType,
-  components: review.components
-    .filter(comp => comp.name && comp.name.trim())
-    .map(comp => ({
-      name: comp.name.trim(),
-      weight: parseInt(comp.weight) || 0
-    })),
-  deadline: {
-    from: review.from.toISOString(),
-    to: review.to.toISOString()
-  },
-  // ALWAYS include pptApproved for all reviews
-  pptApproved: {
-    approved: false,
-    locked: false
+// Save marking schema
+const handleSaveDeadlines = async () => {
+  if (!selectedSchool || !selectedDepartment) {
+    showNotification("error", "Missing Selection", "Please select both school and department.");
+    return;
   }
-}));
 
+  if (!canSave) {
+    showNotification("error", "Invalid Weight", `Total weight must be exactly 100. Current total: ${totalWeight}`);
+    return;
+  }
 
-      console.log("Final reviews payload:", JSON.stringify(reviews, null, 2));
+  setSaving(true);
+  setValidationErrors({});
 
-      const response = await createOrUpdateMarkingSchema({ 
-        school: selectedSchool, 
-        department: selectedDepartment, 
-        reviews 
-      });
+  try {
+    console.log("=== SAVING COMPLETE MARKING SCHEMA ===");
 
-      if (response.data?.success) {
-        // Show success state on button
-        setSaving(false);
-        setJustSaved(true);
-        
-        showNotification("success", "Schema Saved", `Complete marking schema saved successfully for ${selectedSchool} - ${selectedDepartment}!`);
-        
-        // Reset success state after 2 seconds
-        setTimeout(() => {
-          setJustSaved(false);
-        }, 2000);
-        
-        setTimeout(() => {
-          fetchDeadlines(selectedSchool, selectedDepartment);
-        }, 1000);
-      } else {
-        throw new Error(response.data?.message || "Failed to save");
+    const allReviews = [...guideReviews, ...panelReviews];
+    
+    const reviews = allReviews.map(review => ({
+      reviewName: review.reviewName,
+      displayName: review.displayName,
+      facultyType: review.facultyType,
+      components: review.components
+        .filter(comp => comp.name && comp.name.trim())
+        .map(comp => ({
+          name: comp.name.trim(),
+          weight: parseInt(comp.weight) || 0
+        })),
+      deadline: {
+        from: review.from.toISOString(),
+        to: review.to.toISOString()
+      },
+      pptApproved: {
+        approved: false,
+        locked: false
       }
+    }));
 
-    } catch (error) {
-      console.error("Save error:", error);
-      showNotification("error", "Save Failed", error.response?.data?.message || "Failed to save marking schema. Please try again.");
+    // FIXED: Build the payload correctly at the root level
+    const payload = {
+      school: selectedSchool,
+      department: selectedDepartment,
+      reviews: reviews,
+      requiresContribution: requiresContribution // ✅ At root level, not nested
+    };
+
+    console.log("Final payload to API:", JSON.stringify(payload, null, 2));
+
+    // FIXED: Send the payload directly, not wrapped in a data object
+    const response = await createOrUpdateMarkingSchema(payload);
+
+    if (response.data?.success) {
       setSaving(false);
+      setJustSaved(true);
+      
+      showNotification("success", "Schema Saved", `Complete marking schema saved successfully for ${selectedSchool} - ${selectedDepartment}!`);
+      
+      setTimeout(() => {
+        setJustSaved(false);
+      }, 2000);
+      
+      setTimeout(() => {
+        fetchDeadlines(selectedSchool, selectedDepartment);
+      }, 1000);
+    } else {
+      throw new Error(response.data?.message || "Failed to save");
     }
-  };
 
-  // Render review section
+  } catch (error) {
+    console.error("Save error:", error);
+    showNotification("error", "Save Failed", error.response?.data?.message || "Failed to save marking schema. Please try again.");
+    setSaving(false);
+  }
+};
+
+
+  // Render review section - REMOVED requiresContribution checkbox
   const renderReviewSection = (reviews, reviewType, addFunction, removeFunction, title, icon, sectionWeight) => {
     const disabled = !selectedSchool || !selectedDepartment;
 
@@ -469,16 +470,7 @@ const addPanelReview = () => {
                         className="text-base sm:text-lg font-bold text-slate-800 border-2 border-slate-200 px-3 sm:px-4 py-2 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all w-full sm:w-auto"
                         placeholder="Review Name"
                       />
-                      {/* <div className="flex items-center space-x-3 bg-slate-50 px-3 sm:px-4 py-2 rounded-lg">
-                        <input
-                          type="checkbox"
-                          checked={review.requiresPPT}
-                          onChange={(e) => updateReview(reviewType, review.id, 'requiresPPT', e.target.checked)}
-                          disabled={disabled}
-                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
-                        />
-                        <span className="text-xs sm:text-sm font-medium text-slate-700">PPT Required</span>
-                      </div> */}
+                      {/* REMOVED: Contribution Required checkbox from review level */}
                     </div>
                     <button
                       onClick={() => removeFunction(review.id)}
@@ -546,7 +538,7 @@ const addPanelReview = () => {
                               type="number"
                               value={component.weight}
                               onChange={(e) => updateComponent(reviewType, review.id, index, 'weight', e.target.value)}
-                              onWheel={(e) => e.target.blur()} // Disable scroll wheel
+                              onWheel={(e) => e.target.blur()}
                               disabled={disabled}
                               placeholder="Weight"
                               min="0"
@@ -654,7 +646,7 @@ const addPanelReview = () => {
           </div>
         </div>
 
-        {/* School/Department Selector */}
+        {/* School/Department Selector with Department-level requiresContribution */}
         <div className="mx-4 sm:mx-8 mb-6 sm:mb-8">
           <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-8">
             <div className="flex items-center space-x-3 mb-4 sm:mb-6">
@@ -698,6 +690,30 @@ const addPanelReview = () => {
                 </select>
               </div>
             </div>
+            
+            {/* NEW: Department-level Contribution Required checkbox */}
+            {selectedSchool && selectedDepartment && (
+              <div className="mt-6 pt-6 border-t-2 border-slate-200">
+                <div className="flex items-center space-x-4 bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-xl border-2 border-purple-200">
+                  <input
+                    type="checkbox"
+                    id="dept-contribution"
+                    checked={requiresContribution}
+                    onChange={(e) => setRequiresContribution(e.target.checked)}
+                    className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 focus:ring-2"
+                  />
+                  <label htmlFor="dept-contribution" className="flex-1 cursor-pointer">
+                    <div className="font-semibold text-slate-800 text-base">Contribution Required for This Department</div>
+                    <div className="text-sm text-slate-600 mt-1">
+                      Enable this to require contribution section for all students in {selectedDepartment}
+                    </div>
+                  </label>
+                  <div className="bg-purple-100 p-2 rounded-lg">
+                    <BookOpen className="h-5 w-5 text-purple-600" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -839,7 +855,7 @@ const addPanelReview = () => {
                     </div>
                     <div className="flex items-start space-x-3">
                       <div className="w-2 h-2 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>
-                      {/* <div><strong>PPT Required:</strong> Enable PPT approval section for specific reviews</div> */}
+                      <div><strong>Contribution Required:</strong> Applies to ALL students in the selected department</div>
                     </div>
                     <div className="flex items-start space-x-3">
                       <div className="w-2 h-2 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>
@@ -924,6 +940,6 @@ const addPanelReview = () => {
       </div>
     </>
   );
-};
+}
 
 export default Schedule;

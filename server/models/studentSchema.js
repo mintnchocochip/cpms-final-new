@@ -1,51 +1,61 @@
 import mongoose from "mongoose";
 
-const reviewComponentSchema = new mongoose.Schema(
-  {
-    marks: {
-      type: Map,
-      of: Number,
-      default: {},
-    },
-    comments: { type: String, default: "" },
-    attendance: {
-      value: { type: Boolean, default: false },
-      locked: { type: Boolean, default: false },
-    },
-    locked: { type: Boolean, default: false },
-    pptApproved: {
-      approved: { type: Boolean, default: false },
-      locked: { type: Boolean, default: false },
-    },
-  },
-  { _id: false }
-);
-
 const studentSchema = new mongoose.Schema({
-  regNo: String,
-  name: String,
-  emailId: String,
-  reviews: {
-    type: Map,
-    of: reviewComponentSchema,
-    default: {},
+  regNo: { 
+    type: String, 
+    required: true, 
+    unique: true 
   },
-  deadline: {
-    type: Map,
-    of: {
-      from: { type: Date },
-      to: { type: Date },
-    },
-    default: {},
+  name: { 
+    type: String, 
+    required: true 
   },
-  PAT: {
-    type: Boolean,
-    default: false,
-    required: true,
+  emailId: { 
+    type: String, 
+    required: true 
   },
-  school: String,
-  department: String,
+  reviews: { 
+    type: Map, 
+    of: Object 
+  },
+  pptApproved: {
+    approved: { type: Boolean, default: false },
+    locked: { type: Boolean, default: false },
+  },
+  deadline: { 
+    type: Map, 
+    of: Object 
+  },
+  PAT: { 
+    type: Boolean, 
+    default: false 
+  },
+  school: { 
+    type: String, 
+    required: true 
+  },
+  department: { 
+    type: String, 
+    required: true 
+  },
+  requiresContribution: { 
+    type: Boolean, 
+    default: false 
+  },
+  // ✅ NEW: Added contributionType field
+  contributionType: { 
+    type: String, 
+    enum: ["none", "Patent Filed", "Journal Publication", "Book Chapter Contribution"], 
+    default: "none" 
+  },
+}, {
+  timestamps: true // Optional: adds createdAt and updatedAt
 });
 
+// Index for faster queries
+studentSchema.index({ regNo: 1 });
+studentSchema.index({ school: 1, department: 1 });
+
 const Student = mongoose.model("Student", studentSchema);
+
 export default Student;

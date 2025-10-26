@@ -10,7 +10,24 @@ import {
   updateProject,
   createReviewRequest,
   batchCheckRequestStatuses,
+  updateStudent 
 } from '../api';
+
+  const handleUpdateStudent = async (regNo, updateData) => {
+  try {
+    console.log('🔵 [Parent] Updating student:', regNo, updateData);
+    const response = await updateStudent(regNo, updateData);
+    console.log('✅ [Parent] Update successful:', response.data);
+    
+    // Refresh the data after update
+    await fetchProjects(); // Or whatever your data fetching function is called
+    
+    return response;
+  } catch (error) {
+    console.error('❌ [Parent] Update failed:', error);
+    throw error;
+  }
+};
 
 // Memoized inner content component to prevent unnecessary re-renders
 const GuideContent = React.memo(({ 
@@ -101,12 +118,12 @@ const GuideContent = React.memo(({
                               const isPanelReview = reviewType.isPanelReview || false; // ✅ NEW
                               
                               return (
-                                <div key={reviewType.key} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                                  <span className={`font-medium truncate ${isPanelReview ? 'text-purple-700' : 'text-gray-700'}`}>
+                                <div key={reviewType.key} className="flex items-center gap-2 bg-gray-50 rounded-lg">
+                                  <span className={`font-medium ${isPanelReview ? 'text-purple-700' : 'text-gray-700'}`}>
                                     {reviewType.name}:
                                   </span>
                                   <div className="flex items-center gap-1">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
                                       isPanelReview 
                                         ? 'bg-purple-100 text-purple-700' // ✅ NEW: Purple for panel reviews
                                         : isPassed 
@@ -121,10 +138,10 @@ const GuideContent = React.memo(({
                                       }
                                     </span>
                                     {requestStatus === 'approved' && !isPanelReview && (
-                                      <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">Extended</span>
+                                      <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-lg text-xs font-medium">Extended</span>
                                     )}
                                     {requestStatus === 'pending' && !isPanelReview && (
-                                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">Pending</span>
+                                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-lg text-xs font-medium">Pending</span>
                                     )}
                                   </div>
                                 </div>
@@ -189,6 +206,7 @@ const GuideContent = React.memo(({
                       <div className="p-4 sm:p-6">
                         <ReviewTable 
                           team={team} 
+                          onUpdateStudent={handleUpdateStudent} 
                           deadlines={deadlines}
                           requestStatuses={requestStatuses}
                           isDeadlinePassed={(reviewType) => isTeamDeadlinePassed(reviewType, team.id)}
@@ -831,6 +849,9 @@ const fetchData = useCallback(async () => {
       );
     }
   }, [teams, getTeamRequestStatus, showNotification]);
+
+
+
 
   // ✅ NEW: Handle edit request submission from modal
   const handleEditRequestSubmit = useCallback(async (reason) => {

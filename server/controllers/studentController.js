@@ -37,6 +37,7 @@ export const getMarkingSchema = async (req, res) => {
     });
   }
 };
+
 // Fetch students based on optional school, department, specialization filters
 export async function getFilteredStudents(req, res) {
   try {
@@ -203,6 +204,10 @@ export const updateStudentDetails = async (req, res) => {
     const { regNo } = req.params;
     const updateFields = req.body;
 
+    console.log("📝 Updating student details for:", regNo);
+    console.log("📥 Update fields received:", JSON.stringify(updateFields, null, 2));
+
+    // Allowed fields for direct update
     const allowedFields = [
       "name",
       "emailId",
@@ -210,8 +215,11 @@ export const updateStudentDetails = async (req, res) => {
       "department",
       "pptApproved",
       "deadline",
-      "PAT", 
+      "PAT",
+      "requiresContribution",
+      "contributionType", // ✅ NEW: Added contributionType
     ];
+
     const updates = {};
     for (const field of allowedFields) {
       if (updateFields[field] !== undefined) {
@@ -219,70 +227,292 @@ export const updateStudentDetails = async (req, res) => {
       }
     }
 
+    // Validate requiresContribution if provided
+    if (
+      updateFields.requiresContribution !== undefined &&
+      typeof updateFields.requiresContribution !== "boolean"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "requiresContribution must be a boolean value",
+      });
+    }
+
+    // ✅ NEW: Validate contributionType if provided
+    if (updateFields.contributionType !== undefined) {
+      const validContributionTypes = [
+        'none',
+        'Patent Filed',
+        'Journal Publication',
+        'Book Chapter Contribution'
+      ];
+
+      if (!validContributionTypes.includes(updateFields.contributionType)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid contribution type. Must be one of: ${validContributionTypes.join(', ')}`,
+          allowedValues: validContributionTypes,
+        });
+      }
+
+      console.log(`📝 Updating contributionType to: ${updateFields.contributionType}`);
+    }
+
+    // ✅ NEW: Logic validation - if requiresContribution is false, contributionType should be 'none'
+    if (updateFields.requiresContribution === false && updateFields.contributionType && updateFields.contributionType !== 'none') {
+      console.warn(`⚠️  Warning: Setting requiresContribution to false but contributionType is not 'none'. Forcing contributionType to 'none'.`);
+      updates.contributionType = 'none';
+    }
+
+    // Validate school and department change
+    if (updateFields.school || updateFields.department) {
+      const student = await Student.findOne({ regNo });
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: "Student not found.",
+        });
+      }
+
+      const newSchool = updateFields.school || student.school;
+      const newDepartment = updateFields.department || student.department;
+
+      // Check if marking schema exists for new school/department
+      const markingSchema = await MarkingSchema.findOne({
+        school: newSchool,
+        department: newDepartment,
+      });
+
+      if (!markingSchema) {
+        return res.status(400).json({
+          success: false,
+          message: `No marking schema found for school: ${newSchool}, department: ${newDepartment}`,
+        });
+      }
+
+      console.log(
+        `✅ Marking schema found for ${newSchool}/${newDepartment} (requiresContribution: ${markingSchema.requiresContribution}, contributionType: ${markingSchema.contributionType})`
+      );
+
+      // ✅ NEW: Optionally inherit contribution settings from new schema if not explicitly provided
+      if (updateFields.requiresContribution === undefined && updateFields.contributionType === undefined) {
+        console.log(`📝 Inheriting contribution settings from new schema`);
+        updates.requiresContribution = markingSchema.requiresContribution || false;
+        updates.contributionType = markingSchema.contributionType || 'none';
+      }
+    }
+
+    // Handle marks, comments, and attendance updates
     let marksUpdateOps = {};
     if (Array.isArray(updateFields.marksUpdate)) {
+      console.log(
+        `📊 Processing ${updateFields.marksUpdate.length} review updates`
+      );
+
       for (const reviewUpdate of updateFields.marksUpdate) {
-        const { reviewName, marks, comments, attendance } = reviewUpdate;
+        const { reviewName, marks, comments, attendance, locked } =
+          reviewUpdate;
+
+        if (!reviewName) {
+          return res.status(400).json({
+            success: false,
+            message: "reviewName is required in marksUpdate array",
+          });
+        }
+
+        console.log(`  🔄 Updating review: ${reviewName}`);
 
         // Add marks updates
-        for (const [componentName, markValue] of Object.entries(marks || {})) {
-          marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] =
-            markValue;
+        if (marks && typeof marks === "object") {
+          for (const [componentName, markValue] of Object.entries(marks)) {
+            if (typeof markValue !== "number") {
+              return res.status(400).json({
+                success: false,
+                message: `Mark value for ${componentName} must be a number`,
+              });
+            }
+            marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] =
+              markValue;
+          }
         }
+
         // Add comments if present
         if (comments !== undefined) {
+          if (typeof comments !== "string") {
+            return res.status(400).json({
+              success: false,
+              message: "Comments must be a string",
+            });
+          }
           marksUpdateOps[`reviews.${reviewName}.comments`] = comments;
         }
+
         // Add attendance if present
         if (attendance !== undefined) {
+          if (
+            typeof attendance !== "object" ||
+            typeof attendance.value !== "boolean"
+          ) {
+            return res.status(400).json({
+              success: false,
+              message:
+                "Attendance must be an object with a boolean 'value' property",
+            });
+          }
           marksUpdateOps[`reviews.${reviewName}.attendance`] = attendance;
+        }
+
+        // Add locked status if present
+        if (locked !== undefined) {
+          if (typeof locked !== "boolean") {
+            return res.status(400).json({
+              success: false,
+              message: "Locked must be a boolean value",
+            });
+          }
+          marksUpdateOps[`reviews.${reviewName}.locked`] = locked;
         }
       }
     } else if (updateFields.marksUpdate) {
       // For backward compatibility (single review update)
-      const { reviewName, marks, comments, attendance } =
+      console.log("📊 Processing single review update (backward compatibility)");
+
+      const { reviewName, marks, comments, attendance, locked } =
         updateFields.marksUpdate;
-      for (const [componentName, markValue] of Object.entries(marks || {})) {
-        marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] =
-          markValue;
+
+      if (!reviewName) {
+        return res.status(400).json({
+          success: false,
+          message: "reviewName is required in marksUpdate",
+        });
       }
+
+      console.log(`  🔄 Updating review: ${reviewName}`);
+
+      // Add marks updates
+      if (marks && typeof marks === "object") {
+        for (const [componentName, markValue] of Object.entries(marks)) {
+          if (typeof markValue !== "number") {
+            return res.status(400).json({
+              success: false,
+              message: `Mark value for ${componentName} must be a number`,
+            });
+          }
+          marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] =
+            markValue;
+        }
+      }
+
       if (comments !== undefined) {
+        if (typeof comments !== "string") {
+          return res.status(400).json({
+            success: false,
+            message: "Comments must be a string",
+          });
+        }
         marksUpdateOps[`reviews.${reviewName}.comments`] = comments;
       }
+
       if (attendance !== undefined) {
+        if (
+          typeof attendance !== "object" ||
+          typeof attendance.value !== "boolean"
+        ) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Attendance must be an object with a boolean 'value' property",
+        });
+        }
         marksUpdateOps[`reviews.${reviewName}.attendance`] = attendance;
+      }
+
+      if (locked !== undefined) {
+        if (typeof locked !== "boolean") {
+          return res.status(400).json({
+            success: false,
+            message: "Locked must be a boolean value",
+          });
+        }
+        marksUpdateOps[`reviews.${reviewName}.locked`] = locked;
       }
     }
 
+    // Combine all update operations
     const updateOps = Object.keys(updates).length > 0 ? { ...updates } : {};
     if (Object.keys(marksUpdateOps).length > 0) {
       Object.assign(updateOps, marksUpdateOps);
     }
 
+    // Check if there are any updates to apply
+    if (Object.keys(updateOps).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fields to update",
+      });
+    }
+
+    console.log("💾 Applying updates:", JSON.stringify(updateOps, null, 2));
+
+    // Perform the update with validation
     const updatedStudent = await Student.findOneAndUpdate(
       { regNo },
       { $set: updateOps },
-      { new: true }
+      {
+        new: true,
+        runValidators: true, // Enable schema validation
+      }
     );
 
     if (!updatedStudent) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Student not found." });
+      return res.status(404).json({
+        success: false,
+        message: "Student not found.",
+      });
     }
+
+    console.log("✅ Student updated successfully:", updatedStudent._id);
+    console.log(`📝 Updated contribution settings: requiresContribution=${updatedStudent.requiresContribution}, contributionType=${updatedStudent.contributionType}`);
 
     return res.status(200).json({
       success: true,
       message: "Student details updated successfully.",
       student: updatedStudent,
+      updatedFields: Object.keys(updateOps),
     });
   } catch (error) {
-    console.error("Error updating student details:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: error.message });
+    console.error("❌ Error updating student details:", error);
+
+    // Handle validation errors
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        error: error.message,
+        details: Object.keys(error.errors).map((key) => ({
+          field: key,
+          message: error.errors[key].message,
+        })),
+      });
+    }
+
+    // Handle cast errors (invalid data types)
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid value for field: ${error.path}`,
+        error: error.message,
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
+
 
 
 export const deleteStudent = async (req, res) => {

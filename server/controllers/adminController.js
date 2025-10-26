@@ -1,21 +1,33 @@
+
 import mongoose from "mongoose";
+
 import Faculty from "../models/facultySchema.js";
+
 import bcrypt from "bcryptjs";
+
 import Student from "../models/studentSchema.js";
+
 import Request from "../models/requestSchema.js";
+
 import Project from "../models/projectSchema.js";
+
 import Panel from "../models/panelSchema.js";
-import MarkingSchema from "../models/markingSchema.js"
+
+import MarkingSchema from "../models/markingSchema.js";
+
+
 
 // for updating the structure of the marks
 
 export async function createOrUpdateMarkingSchema(req, res) {
-  const { school, department, reviews } = req.body;
+  const { school, department, reviews, requiresContribution } = req.body;
 
   console.log("📝 Received marking schema request:", {
     school,
     department,
     reviewCount: reviews?.length,
+    requiresContribution,
+    rawBody: JSON.stringify(req.body, null, 2),
   });
 
   if (
@@ -29,7 +41,18 @@ export async function createOrUpdateMarkingSchema(req, res) {
       .json({ success: false, message: "Missing or invalid fields." });
   }
 
-  // VALIDATE EACH REVIEW
+  // Validate requiresContribution at schema level (optional, defaults to false)
+  if (requiresContribution !== undefined && typeof requiresContribution !== "boolean") {
+    return res.status(400).json({
+      success: false,
+      message: "requiresContribution must be a boolean value",
+    });
+  }
+
+  // VALIDATE AND CLEAN EACH REVIEW
+  const cleanedReviews = [];
+  let totalWeightAcrossAllReviews = 0;
+
   for (const review of reviews) {
     console.log("🔍 Validating review:", review.reviewName);
 
@@ -54,7 +77,26 @@ export async function createOrUpdateMarkingSchema(req, res) {
       });
     }
 
+    // Validate deadline dates
+    const fromDate = new Date(review.deadline.from);
+    const toDate = new Date(review.deadline.to);
+    
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid date format in deadline for review: ${review.reviewName}`,
+      });
+    }
+
+    if (fromDate >= toDate) {
+      return res.status(400).json({
+        success: false,
+        message: `Deadline 'from' date must be before 'to' date for review: ${review.reviewName}`,
+      });
+    }
+
     // Components validation (optional but if provided must be valid)
+    let reviewTotalWeight = 0;
     if (review.components) {
       if (!Array.isArray(review.components)) {
         return res.status(400).json({
@@ -62,6 +104,14 @@ export async function createOrUpdateMarkingSchema(req, res) {
           message: "Components must be an array if provided",
         });
       }
+
+      if (review.components.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Review ${review.reviewName} has empty components array`,
+        });
+      }
+
       for (const comp of review.components) {
         if (!comp.name || typeof comp.weight !== "number") {
           return res.status(400).json({
@@ -69,10 +119,22 @@ export async function createOrUpdateMarkingSchema(req, res) {
             message: "Each component must have a name and numeric weight",
           });
         }
+
+        if (comp.weight <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Component ${comp.name} must have a positive weight`,
+          });
+        }
+
+        reviewTotalWeight += comp.weight;
       }
     }
 
-    // PPT Approved validation (should always be present now)
+    totalWeightAcrossAllReviews += reviewTotalWeight;
+    console.log(`📊 Review ${review.reviewName} weight: ${reviewTotalWeight}`);
+
+    // PPT Approved validation (should always be present)
     if (!review.pptApproved) {
       return res.status(400).json({
         success: false,
@@ -80,13 +142,59 @@ export async function createOrUpdateMarkingSchema(req, res) {
       });
     }
 
-    // Only check for pptApproved.approved as Boolean (no locked anymore)
+    // Check for pptApproved.approved as Boolean
     if (typeof review.pptApproved.approved !== "boolean") {
       return res.status(400).json({
         success: false,
         message: "pptApproved field must have boolean approved value",
       });
     }
+
+    // Validate pptApproved.locked if provided
+    if (
+      review.pptApproved.locked !== undefined &&
+      typeof review.pptApproved.locked !== "boolean"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "pptApproved.locked must be a boolean value if provided",
+      });
+    }
+
+    // CRITICAL: Strip requiresContribution from individual reviews if present
+    // This field should only exist at schema level, not per review
+    const cleanedReview = {
+      reviewName: review.reviewName,
+      displayName: review.displayName || review.reviewName,
+      facultyType: review.facultyType,
+      components: review.components || [],
+      deadline: {
+        from: review.deadline.from,
+        to: review.deadline.to,
+      },
+      pptApproved: {
+        approved: review.pptApproved.approved,
+        locked: review.pptApproved.locked !== undefined ? review.pptApproved.locked : false,
+      },
+    };
+
+    // Log if requiresContribution was present at review level (for debugging)
+    if (review.requiresContribution !== undefined) {
+      console.warn(
+        `⚠️  WARNING: Review ${review.reviewName} contains requiresContribution field. This should only be at schema level. Stripping it from review.`
+      );
+    }
+
+    cleanedReviews.push(cleanedReview);
+  }
+
+  // Validate total weight across all reviews equals 100
+  console.log(`📊 Total weight across all reviews: ${totalWeightAcrossAllReviews}`);
+  if (Math.abs(totalWeightAcrossAllReviews - 100) > 0.01) {
+    return res.status(400).json({
+      success: false,
+      message: `Total weight across all reviews must equal 100. Current total: ${totalWeightAcrossAllReviews}`,
+    });
   }
 
   try {
@@ -95,32 +203,96 @@ export async function createOrUpdateMarkingSchema(req, res) {
       department,
     });
 
+    // Check if updating existing schema
+    const existingSchema = await MarkingSchema.findOne({ school, department });
+    
+    if (existingSchema) {
+      console.log("📝 Updating existing marking schema:", existingSchema._id);
+    } else {
+      console.log("🆕 Creating new marking schema");
+    }
+
+    // Prepare the update object with cleaned reviews
+    const updateData = {
+      school,
+      department,
+      reviews: cleanedReviews,
+      requiresContribution: requiresContribution !== undefined ? requiresContribution : false,
+    };
+
+    console.log("💾 Final update data:", JSON.stringify(updateData, null, 2));
+
     const updated = await MarkingSchema.findOneAndUpdate(
       { school, department },
-      {
-        school,
-        department,
-        reviews,
-      },
+      updateData,
       {
         new: true,
         upsert: true,
+        runValidators: true, // Enable schema validation on update
       }
     );
 
     console.log("✅ Marking schema saved successfully with _id:", updated._id);
+    console.log("📊 Schema details:", {
+      reviewCount: updated.reviews.length,
+      requiresContribution: updated.requiresContribution,
+      totalWeight: totalWeightAcrossAllReviews,
+      reviews: updated.reviews.map(r => ({
+        name: r.reviewName,
+        displayName: r.displayName,
+        facultyType: r.facultyType,
+        componentsCount: r.components?.length || 0,
+        componentWeight: r.components?.reduce((sum, c) => sum + c.weight, 0) || 0,
+      })),
+    });
 
     res.status(200).json({
       success: true,
-      message: "Marking schema saved successfully.",
+      message: existingSchema 
+        ? "Marking schema updated successfully."
+        : "Marking schema created successfully.",
       data: updated,
     });
   } catch (error) {
     console.error("❌ Error saving marking schema:", error);
+    console.error("❌ Error stack:", error.stack);
+    
+    // Handle duplicate key error
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "A marking schema with this school and department already exists",
+        error: error.message,
+      });
+    }
+
+    // Handle validation errors
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: "Schema validation failed",
+        error: error.message,
+        details: Object.keys(error.errors).map(key => ({
+          field: key,
+          message: error.errors[key].message,
+        })),
+      });
+    }
+
+    // Handle cast errors
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid data type for field: ${error.path}`,
+        error: error.message,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Server error while saving marking schema",
       error: error.message,
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
     });
   }
 }
@@ -137,39 +309,54 @@ export async function getDefaultDeadline(req, res) {
       });
     }
 
+    console.log(`📥 Fetching marking schema for ${school} - ${department}`);
+
     const markingSchema = await MarkingSchema.findOne({ school, department });
 
     if (!markingSchema) {
+      console.log(`❌ No marking schema found for ${school} - ${department}`);
       return res.status(404).json({
         success: false,
         message: "No marking schema found for this school and department.",
       });
     }
 
+    console.log(`✅ Found marking schema for ${school} - ${department}`);
+    console.log(`📊 requiresContribution: ${markingSchema.requiresContribution}`);
+
+    // FIXED: Return requiresContribution at schema level, not per review
     res.status(200).json({
       success: true,
       data: {
         school: markingSchema.school,
         department: markingSchema.department,
+        requiresContribution: markingSchema.requiresContribution || false, // ✅ At schema level
         reviews: markingSchema.reviews.map((review) => ({
           reviewName: review.reviewName,
           displayName: review.displayName || review.reviewName,
           facultyType: review.facultyType || "guide",
           components: review.components || [],
           deadline: review.deadline || null,
-          requiresPPT: review.requiresPPT || false,
+          pptApproved: review.pptApproved || { approved: false, locked: false },
+          // ❌ REMOVED: requiresContribution from individual reviews
         })),
       },
     });
+
+    console.log(`📤 Returned ${markingSchema.reviews.length} reviews for ${school} - ${department}`);
+
   } catch (error) {
-    console.error("Error in getDefaultDeadline:", error);
+    console.error("❌ Error in getDefaultDeadline:", error);
+    console.error("❌ Error stack:", error.stack);
     res.status(500).json({
       success: false,
       message: "Server error",
       error: error.message,
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
     });
   }
 }
+
 
 export async function createFaculty(req, res) {
   try {
