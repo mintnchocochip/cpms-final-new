@@ -3,6 +3,7 @@ import {
   getFacultyDetails,
   getFacultyProjects,
   getMarkingSchema,
+  getFacultyBroadcasts,
 } from "../controllers/facultyController.js";
 import jwtAuthMiddleware from "../middlewares/juwAuthMiddleware.js";
 
@@ -12,6 +13,8 @@ facultyRouter.get("/getFacultyDetails/:employeeId", jwtAuthMiddleware, getFacult
 
 // here school and department are query parameter
 facultyRouter.get("/getMarkingSchema", jwtAuthMiddleware, getMarkingSchema);
+
+facultyRouter.get("/broadcasts", jwtAuthMiddleware, getFacultyBroadcasts);
 
 facultyRouter.get("/:employeeId/projects", getFacultyProjects);
 

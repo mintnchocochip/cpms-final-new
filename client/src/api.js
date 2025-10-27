@@ -175,6 +175,14 @@ export const getAllPanels = (school = null, department = null) => {
   return API.get(`/admin/getAllPanels${queryString ? `?${queryString}` : ''}`);
 };
 
+export const createBroadcastMessage = (payload) => API.post("/admin/broadcasts", payload);
+
+export const getAdminBroadcastMessages = (params = {}) =>
+  API.get("/admin/broadcasts", { params });
+
+export const getFacultyBroadcastMessages = (params = {}) =>
+  API.get("/faculty/broadcasts", { params });
+
 export const createPanelManual = (data) => API.post("/admin/createPanel", data);
 export const autoCreatePanelManual = (payload) => API.post("/admin/autoCreatePanels", payload);
 

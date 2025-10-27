@@ -11,7 +11,8 @@ import {
   Users, 
   Settings, 
   Calendar,
-  Database
+  Database,
+  Megaphone
 } from 'lucide-react';
 
 function Leftmenu() {
@@ -60,6 +61,17 @@ function Leftmenu() {
               >
                 <div className="flex justify-center items-center gap-2">
                   Request
+                </div>
+              </button>
+
+              <button 
+                onClick={() => active('admin/broadcasts')}
+                className={`h-16 w-32 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
+                  isactive === 'admin/broadcasts' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                }`}
+              >
+                <div className="flex justify-center items-center gap-2">
+                  Broadcasts
                 </div>
               </button>
               
@@ -166,6 +178,20 @@ function Leftmenu() {
                 </button>
                 <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
                   Request
+                </span>
+              </div>
+
+              <div className="relative group">
+                <button 
+                  onClick={() => active('admin/broadcasts')}
+                  className={`flex justify-center items-center h-10 w-10 transition ease-in-out delay-150 hover:-translate-y-1 hover:text-xl font-semibold font-roboto rounded-lg hover:scale-110 duration-300 hover:bg-[#22C55E] hover:text-white ${
+                    isactive === 'admin/broadcasts' ? "bg-[#22C55E] text-white" : "bg-gray-100 text-black"
+                  }`}
+                >
+                  <Megaphone className="h-5 w-5"/>
+                </button>
+                <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  Broadcasts
                 </span>
               </div>
               

@@ -20,6 +20,8 @@ import {
   createOrUpdateMarkingSchema,
   updateFaculty,
   deleteFacultyByEmployeeId,
+  createBroadcastMessage,
+  getBroadcastMessages,
 } from "../controllers/adminController.js";
 import { adminMiddleware } from "../middlewares/adminMiddleware.js";
 
@@ -66,5 +68,9 @@ adminRouter.get("/getAllPanels", adminMiddleware, getAllPanels);
 // Panel assignment routes
 adminRouter.post("/assignPanel", adminMiddleware, assignPanelToProject);
 adminRouter.post("/autoAssignPanel", adminMiddleware, autoAssignPanelsToProjects);
+
+// Broadcast routes
+adminRouter.post("/broadcasts", adminMiddleware, createBroadcastMessage);
+adminRouter.get("/broadcasts", adminMiddleware, getBroadcastMessages);
 
 export default adminRouter;

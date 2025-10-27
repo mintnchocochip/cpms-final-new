@@ -2,6 +2,7 @@ import Faculty from "../models/facultySchema.js";
 import Project from "../models/projectSchema.js";
 import Panel from "../models/panelSchema.js";
 import MarkingSchema from "../models/markingSchema.js";
+import BroadcastMessage from "../models/broadcastMessageSchema.js";
 
 // Get details of a faculty by employee ID
 export async function getFacultyDetails(req, res) {
@@ -185,5 +186,92 @@ export async function getFacultyProjects(req, res) {
   } catch (error) {
     console.error("Error in getFacultyProjects:", error);
     res.status(500).json({ message: error.message });
+  }
+}
+
+export async function getFacultyBroadcasts(req, res) {
+  try {
+    const facultyId = req.user.id;
+
+    const faculty = await Faculty.findById(facultyId).select(
+      "school department"
+    );
+
+    if (!faculty) {
+      return res.status(404).json({
+        success: false,
+        message: "Faculty not found",
+      });
+    }
+
+    const facultySchools = Array.isArray(faculty.school)
+      ? faculty.school.filter(Boolean)
+      : [];
+    const facultyDepartments = Array.isArray(faculty.department)
+      ? faculty.department.filter(Boolean)
+      : [];
+
+    const {
+      since,
+      limit = 20,
+      includeExpired = "false",
+    } = req.query;
+
+    const parsedLimit = Math.min(Number(limit) || 20, 50);
+    const now = new Date();
+
+    const audienceFilter = [
+      {
+        $or: [
+          { targetSchools: { $exists: false } },
+          { targetSchools: { $size: 0 } },
+          { targetSchools: { $in: facultySchools } },
+        ],
+      },
+      {
+        $or: [
+          { targetDepartments: { $exists: false } },
+          { targetDepartments: { $size: 0 } },
+          { targetDepartments: { $in: facultyDepartments } },
+        ],
+      },
+    ];
+
+    const filters = {
+      isActive: true,
+      $and: audienceFilter,
+    };
+
+    if (since) {
+      const sinceDate = new Date(since);
+      if (!Number.isNaN(sinceDate.getTime())) {
+        filters.createdAt = { $gt: sinceDate };
+      }
+    }
+
+    if (includeExpired !== "true") {
+      filters.$or = [{ expiresAt: null }, { expiresAt: { $gt: now } }];
+    }
+
+    const messages = await BroadcastMessage.find(filters)
+      .sort({ createdAt: -1 })
+      .limit(parsedLimit)
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      data: messages,
+      meta: {
+        count: messages.length,
+        limit: parsedLimit,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error fetching faculty broadcasts:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch broadcast messages.",
+      error: error.message,
+    });
   }
 }

@@ -15,6 +15,8 @@ import Panel from "../models/panelSchema.js";
 
 import MarkingSchema from "../models/markingSchema.js";
 
+import BroadcastMessage from "../models/broadcastMessageSchema.js";
+
 
 
 // for updating the structure of the marks
@@ -1997,6 +1999,153 @@ export async function autoAssignPanelsToProjects(req, res) {
     return res.status(500).json({
       success: false,
       message: "Server error",
+      error: error.message,
+    });
+  }
+}
+
+export async function createBroadcastMessage(req, res) {
+  try {
+    const {
+      title = "",
+      message,
+      targetSchools,
+      targetDepartments,
+      expiresAt,
+      isActive,
+    } = req.body;
+
+    if (!message || typeof message !== "string" || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Message content is required.",
+      });
+    }
+
+    if (targetSchools && !Array.isArray(targetSchools)) {
+      return res.status(400).json({
+        success: false,
+        message: "targetSchools must be an array of strings.",
+      });
+    }
+
+    if (targetDepartments && !Array.isArray(targetDepartments)) {
+      return res.status(400).json({
+        success: false,
+        message: "targetDepartments must be an array of strings.",
+      });
+    }
+
+    const admin = await Faculty.findById(req.user.id).select(
+      "_id name employeeId"
+    );
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin context not found.",
+      });
+    }
+
+    const normalizeAudience = (list) => {
+      if (!Array.isArray(list)) return [];
+      const uniqueValues = [...new Set(list.filter(Boolean))];
+      return uniqueValues.map((value) => String(value).trim()).filter(Boolean);
+    };
+
+    const normalizedSchools = normalizeAudience(targetSchools);
+    const normalizedDepartments = normalizeAudience(targetDepartments);
+
+    let expiryDate = null;
+    if (expiresAt) {
+      const parsedExpiry = new Date(expiresAt);
+      if (Number.isNaN(parsedExpiry.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "expiresAt must be a valid date string.",
+        });
+      }
+      expiryDate = parsedExpiry;
+    }
+
+    const payload = {
+      title: title?.trim?.() || "",
+      message: message.trim(),
+      targetSchools: normalizedSchools,
+      targetDepartments: normalizedDepartments,
+      createdBy: admin._id,
+      createdByEmployeeId: admin.employeeId,
+      createdByName: admin.name || "",
+      expiresAt: expiryDate,
+    };
+
+    if (typeof isActive === "boolean") {
+      payload.isActive = isActive;
+    }
+
+    const broadcast = await BroadcastMessage.create(payload);
+
+    return res.status(201).json({
+      success: true,
+      message: "Broadcast message sent successfully.",
+      data: broadcast,
+    });
+  } catch (error) {
+    console.error("❌ Error creating broadcast message:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create broadcast message.",
+      error: error.message,
+    });
+  }
+}
+
+export async function getBroadcastMessages(req, res) {
+  try {
+    const {
+      limit = 25,
+      skip = 0,
+      includeExpired = "false",
+      activeOnly = "false",
+    } = req.query;
+
+    const parsedLimit = Math.min(Number(limit) || 25, 100);
+    const parsedSkip = Number(skip) || 0;
+    const now = new Date();
+
+    const filters = {};
+
+    if (activeOnly === "true") {
+      filters.isActive = true;
+    }
+
+    if (includeExpired !== "true") {
+      filters.$or = [{ expiresAt: null }, { expiresAt: { $gt: now } }];
+    }
+
+    const broadcasts = await BroadcastMessage.find(filters)
+      .sort({ createdAt: -1 })
+      .skip(parsedSkip)
+      .limit(parsedLimit)
+      .lean();
+
+    const total = await BroadcastMessage.countDocuments(filters);
+
+    return res.status(200).json({
+      success: true,
+      data: broadcasts,
+      meta: {
+        count: broadcasts.length,
+        total,
+        limit: parsedLimit,
+        skip: parsedSkip,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error fetching broadcast messages:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch broadcast messages.",
       error: error.message,
     });
   }

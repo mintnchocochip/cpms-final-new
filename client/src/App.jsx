@@ -17,6 +17,7 @@ import ProjectCreationPage from "./Pages/ProjectCreationPage";
 import AdminFacultyCreate from "./Pages/AdminFacultyCreation";
 import AdminSchoolSelection from "./Pages/AdminSchoolSelection";
 import NotificationProvider from './Components/NotificationProvider';
+import AdminBroadcast from './Pages/AdminBroadcast';
 
 // Import the new AdminStudentManagement component
 import AdminStudentManagement from './Pages/AdminStudentManagement';
@@ -336,6 +337,11 @@ const App = () => {
           <Route path="/admin/panel-management" element={
             <AdminRoute>
               <AdminPanelManagement />
+            </AdminRoute>
+          } />
+          <Route path="/admin/broadcasts" element={
+            <AdminRoute>
+              <AdminBroadcast />
             </AdminRoute>
           } />
           <Route path="/admin/addProject" element={

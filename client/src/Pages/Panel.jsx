@@ -11,6 +11,7 @@ import {
   createReviewRequest, // ✅ ADDED: Import createReviewRequest
   batchCheckRequestStatuses,
 } from '../api';
+import FacultyBroadcastFeed from '../Components/FacultyBroadcastFeed';
 
 // ✅ FIXED: Normalize student data function moved outside component
 function normalizeStudentData(student) {
@@ -767,6 +768,8 @@ const Panel = () => {
               </button>
             </div>
             
+            <FacultyBroadcastFeed />
+
             <PanelContent
               key={refreshKey}
               teams={teams}
