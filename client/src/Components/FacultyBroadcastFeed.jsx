@@ -147,10 +147,6 @@ const FacultyBroadcastFeed = ({ pollInterval = DEFAULT_POLL_INTERVAL, maxItems =
                 subtitleParts.push("Departments: All");
               }
 
-              if (item.expiresAt) {
-                subtitleParts.push(`Active till ${formatTimestamp(item.expiresAt)}`);
-              }
-
               const subtitle = subtitleParts.join(" • ");
 
               return (
