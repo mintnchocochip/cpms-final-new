@@ -45,7 +45,8 @@ const broadcastMessageSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-broadcastMessageSchema.index({ targetSchools: 1, targetDepartments: 1 });
+broadcastMessageSchema.index({ targetSchools: 1 });
+broadcastMessageSchema.index({ targetDepartments: 1 });
 broadcastMessageSchema.index({ expiresAt: 1 });
 broadcastMessageSchema.index({ createdAt: -1 });
 
