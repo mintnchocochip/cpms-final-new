@@ -753,6 +753,31 @@ const downloadExcelWithSplit = useCallback(async () => {
           const reviewSchema = schema?.reviews?.find(r => r.reviewName === selectedReview);
           const reviewDisplayName = reviewSchema?.displayName || selectedReview;
 
+          // ✅ ADD COMPONENT-WISE MARKS
+          if (reviewData.marks && reviewSchema?.components) {
+            reviewSchema.components.forEach(component => {
+              const componentDisplayName = component.displayName || component.name;
+              const markValue = reviewData.marks[component.name];
+              
+              // Handle PAT marks (-1 or "PAT")
+              if (markValue === -1 || markValue === "PAT") {
+                row[`${reviewDisplayName}_${componentDisplayName}`] = "PAT";
+              } else {
+                row[`${reviewDisplayName}_${componentDisplayName}`] = markValue ?? "N/A";
+              }
+            });
+          } else if (reviewData.marks) {
+            // Fallback: if no schema components, add raw marks
+            Object.entries(reviewData.marks).forEach(([markKey, markValue]) => {
+              if (markValue === -1 || markValue === "PAT") {
+                row[`${reviewDisplayName}_${markKey}`] = "PAT";
+              } else {
+                row[`${reviewDisplayName}_${markKey}`] = markValue ?? "N/A";
+              }
+            });
+          }
+
+          // Calculate totals
           let totalMarks = 0;
           let patAdjustedMarks = 0;
           
@@ -843,6 +868,7 @@ const downloadExcelWithSplit = useCallback(async () => {
     showNotification("error", "Download Failed", "Failed to download Excel file. Please try again.");
   }
 }, [filteredStudents, adminContext, showNotification, studentSchemas, getMarkingSchema, setStudentSchemas, selectedReviewFilter]);
+
 
 
 
