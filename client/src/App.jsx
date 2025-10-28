@@ -62,6 +62,53 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+// Enhanced ProtectedRoute that checks for admin 'block' broadcasts and
+// displays a blocking notice to faculty users if one is active.
+const FacultyProtectedRoute = ({ children }) => {
+  const { isAuthenticated } = useContext(AuthContext);
+  const [blockedBroadcast, setBlockedBroadcast] = useState(null);
+  const role = sessionStorage.getItem('role') || (sessionStorage.getItem('faculty') ? 'faculty' : null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const checkBroadcast = async () => {
+      try {
+        if (!isAuthenticated) return;
+        if (role === 'admin') return; // admins are not blocked by this
+
+        // call faculty broadcasts (limit 5) and look for action==='block'
+        const res = await (await import('./api')).getFacultyBroadcastMessages({ limit: 5 });
+        const messages = res?.data || [];
+        const blocking = messages.find(m => m.action === 'block' && m.isActive);
+        if (!cancelled && blocking) setBlockedBroadcast(blocking);
+      } catch (err) {
+        // ignore errors - treat as not blocked
+        console.error('Error checking broadcasts', err);
+      }
+    };
+
+    checkBroadcast();
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+
+  if (blockedBroadcast) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
+        <div className="max-w-3xl w-full bg-white shadow-lg rounded-lg p-8">
+          <h2 className="text-2xl font-bold mb-4">Administrator Notice</h2>
+          {blockedBroadcast.title && <h3 className="text-lg font-semibold mb-2">{blockedBroadcast.title}</h3>}
+          <p className="text-gray-700 mb-4" style={{ whiteSpace: 'pre-wrap' }}>{blockedBroadcast.message}</p>
+          <p className="text-sm text-gray-500">Access to the faculty portal has been temporarily restricted by the administrator.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return children;
+};
+
 const AdminRoute = ({ children }) => {
   const { isAuthenticated, role } = useContext(AuthContext);
   if (!isAuthenticated || role !== 'admin') {
@@ -370,14 +417,14 @@ const App = () => {
             </ProtectedRoute>
           } />
           <Route path="/Guide" element={
-            <ProtectedRoute>
+            <FacultyProtectedRoute>
               <Guide />
-            </ProtectedRoute>
+            </FacultyProtectedRoute>
           } />
           <Route path="/Panel" element={
-            <ProtectedRoute>
+            <FacultyProtectedRoute>
               <Panel teams={teams} reviews={reviews} />
-            </ProtectedRoute>
+            </FacultyProtectedRoute>
           } />
 
           {/* ADDING THE NEW ADMIN STUDENT MANAGEMENT ROUTE */}

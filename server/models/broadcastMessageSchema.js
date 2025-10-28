@@ -41,6 +41,13 @@ const broadcastMessageSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // action determines how clients/servers should treat this broadcast
+    // 'notice' = informational (default), 'block' = block faculty access
+    action: {
+      type: String,
+      enum: ['notice', 'block'],
+      default: 'notice',
+    },
   },
   { timestamps: true }
 );

@@ -2014,6 +2014,7 @@ export async function createBroadcastMessage(req, res) {
       targetDepartments,
       expiresAt,
       isActive,
+      action = 'notice',
     } = req.body;
 
     if (!message || typeof message !== "string" || !message.trim()) {
@@ -2078,6 +2079,7 @@ export async function createBroadcastMessage(req, res) {
       createdByEmployeeId: admin.employeeId,
       createdByName: admin.name || "",
       expiresAt: expiryDate,
+      action: ['notice', 'block'].includes(action) ? action : 'notice',
     };
 
     if (typeof isActive === "boolean") {
