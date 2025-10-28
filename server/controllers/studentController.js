@@ -2,6 +2,8 @@ import Faculty from "../models/facultySchema.js";
 import Student from "../models/studentSchema.js";
 import Request from "../models/requestSchema.js";
 import MarkingSchema from "../models/markingSchema.js";
+import Project from "../models/projectSchema.js";
+import { logger, safeMeta } from "../utils/logger.js";
 
 export const getMarkingSchema = async (req, res) => {
   try {
@@ -98,7 +100,7 @@ export async function requestAdmin(req, res, next) {
     const { facultyType } = req.params;
     const { regNo, reviewType, reason } = req.body;
 
-    console.log("Request admin called:", { facultyType, regNo, reviewType });
+  logger.info('request_admin_called', safeMeta({ facultyType, regNo, reviewType, user: req.user?.id }));
 
     // Validate facultyType
     if (!["guide", "panel"].includes(facultyType)) {
@@ -151,11 +153,11 @@ export async function requestAdmin(req, res, next) {
       status: "pending",
     });
 
-    await request.save();
-    console.log("Request saved successfully");
+  await request.save();
+  logger.info('request_saved', safeMeta({ requestId: request._id, faculty: { id: facultyId, name: facultyDoc.name, employeeId: facultyDoc.employeeId }, student: student._id, reviewType }));
     return res.status(201).json({ message: "Request successfully posted" });
   } catch (error) {
-    console.error("Error in requestAdmin:", error);
+  logger.error('request_admin_error', safeMeta({ error: error?.message, stack: error?.stack }));
     return res.status(500).json({ message: error.message });
   }
 }
@@ -238,8 +240,8 @@ export const updateStudentDetails = async (req, res) => {
     const { regNo } = req.params;
     const updateFields = req.body;
 
-    console.log("📝 Updating student details for:", regNo);
-    console.log("📥 Update fields received:", JSON.stringify(updateFields, null, 2));
+  logger.info('update_student_called', safeMeta({ regNo, user: req.user?.id }));
+  logger.debug('update_student_payload', safeMeta({ regNo, updateFieldsKeys: Object.keys(updateFields || {}) }));
 
     // Allowed fields for direct update
     const allowedFields = [
@@ -266,6 +268,7 @@ export const updateStudentDetails = async (req, res) => {
       updateFields.requiresContribution !== undefined &&
       typeof updateFields.requiresContribution !== "boolean"
     ) {
+      logger.warn('invalid_requiresContribution', safeMeta({ regNo, requiresContribution: updateFields.requiresContribution }));
       return res.status(400).json({
         success: false,
         message: "requiresContribution must be a boolean value",
@@ -289,12 +292,12 @@ export const updateStudentDetails = async (req, res) => {
         });
       }
 
-      console.log(`📝 Updating contributionType to: ${updateFields.contributionType}`);
+  logger.info('update_contribution_type', safeMeta({ regNo, contributionType: updateFields.contributionType }));
     }
 
     // ✅ NEW: Logic validation - if requiresContribution is false, contributionType should be 'none'
     if (updateFields.requiresContribution === false && updateFields.contributionType && updateFields.contributionType !== 'none') {
-      console.warn(`⚠️  Warning: Setting requiresContribution to false but contributionType is not 'none'. Forcing contributionType to 'none'.`);
+  logger.warn('contribution_type_mismatch_forced', safeMeta({ regNo, forcedTo: 'none', provided: updateFields.contributionType }));
       updates.contributionType = 'none';
     }
 
@@ -324,13 +327,11 @@ export const updateStudentDetails = async (req, res) => {
         });
       }
 
-      console.log(
-        `✅ Marking schema found for ${newSchool}/${newDepartment} (requiresContribution: ${markingSchema.requiresContribution}, contributionType: ${markingSchema.contributionType})`
-      );
+      logger.info('marking_schema_found_on_student_update', safeMeta({ regNo, newSchool, newDepartment, requiresContribution: markingSchema.requiresContribution, contributionType: markingSchema.contributionType }));
 
       // ✅ NEW: Optionally inherit contribution settings from new schema if not explicitly provided
       if (updateFields.requiresContribution === undefined && updateFields.contributionType === undefined) {
-        console.log(`📝 Inheriting contribution settings from new schema`);
+  logger.info('inheriting_contribution_settings', safeMeta({ regNo, fromSchema: { requiresContribution: markingSchema.requiresContribution, contributionType: markingSchema.contributionType } }));
         updates.requiresContribution = markingSchema.requiresContribution || false;
         updates.contributionType = markingSchema.contributionType || 'none';
       }
@@ -339,9 +340,7 @@ export const updateStudentDetails = async (req, res) => {
     // Handle marks, comments, and attendance updates
     let marksUpdateOps = {};
     if (Array.isArray(updateFields.marksUpdate)) {
-      console.log(
-        `📊 Processing ${updateFields.marksUpdate.length} review updates`
-      );
+      logger.info('processing_marks_updates', safeMeta({ regNo, updatesCount: updateFields.marksUpdate?.length || 0 }));
 
       for (const reviewUpdate of updateFields.marksUpdate) {
         const { reviewName, marks, comments, attendance, locked } =
@@ -354,12 +353,13 @@ export const updateStudentDetails = async (req, res) => {
           });
         }
 
-        console.log(`  🔄 Updating review: ${reviewName}`);
+  logger.info('updating_review', safeMeta({ regNo, reviewName }));
 
         // Add marks updates
         if (marks && typeof marks === "object") {
           for (const [componentName, markValue] of Object.entries(marks)) {
             if (typeof markValue !== "number") {
+              logger.warn('invalid_mark_value', safeMeta({ regNo, reviewName, componentName, markValue }));
               return res.status(400).json({
                 success: false,
                 message: `Mark value for ${componentName} must be a number`,
@@ -373,6 +373,7 @@ export const updateStudentDetails = async (req, res) => {
         // Add comments if present
         if (comments !== undefined) {
           if (typeof comments !== "string") {
+            logger.warn('invalid_comments_type', safeMeta({ regNo, reviewName, commentsType: typeof comments }));
             return res.status(400).json({
               success: false,
               message: "Comments must be a string",
@@ -387,6 +388,7 @@ export const updateStudentDetails = async (req, res) => {
             typeof attendance !== "object" ||
             typeof attendance.value !== "boolean"
           ) {
+            logger.warn('invalid_attendance_type', safeMeta({ regNo, reviewName, attendance }));
             return res.status(400).json({
               success: false,
               message:
@@ -409,7 +411,7 @@ export const updateStudentDetails = async (req, res) => {
       }
     } else if (updateFields.marksUpdate) {
       // For backward compatibility (single review update)
-      console.log("📊 Processing single review update (backward compatibility)");
+    logger.info('processing_single_review_update', safeMeta({ regNo }));
 
       const { reviewName, marks, comments, attendance, locked } =
         updateFields.marksUpdate;
@@ -421,7 +423,7 @@ export const updateStudentDetails = async (req, res) => {
         });
       }
 
-      console.log(`  🔄 Updating review: ${reviewName}`);
+  logger.info('updating_single_review', safeMeta({ regNo, reviewName }));
 
       // Add marks updates
       if (marks && typeof marks === "object") {
@@ -486,7 +488,55 @@ export const updateStudentDetails = async (req, res) => {
       });
     }
 
-    console.log("💾 Applying updates:", JSON.stringify(updateOps, null, 2));
+    // Enrich logs with actor (faculty) info and existing student snapshot
+    const actor = req.user?.id ? await Faculty.findById(req.user.id).select('name employeeId').lean() : null;
+    const existingStudent = await Student.findOne({ regNo }).lean();
+    // Try to find the project and panel associated with this student to log panel info
+    let projectForStudent = null;
+    try {
+      if (existingStudent) {
+        projectForStudent = await Project.findOne({ students: existingStudent._id })
+          .populate({ path: 'panel', populate: { path: 'members', model: 'Faculty', select: 'name employeeId' } })
+          .lean();
+      }
+    } catch (e) {
+      // non-fatal for logging
+      logger.warn('project_lookup_failed_for_logging', safeMeta({ regNo, error: e?.message }));
+    }
+
+    // Build a human-friendly summary of marks/comments being applied
+    const marksSummary = [];
+    if (Array.isArray(updateFields.marksUpdate)) {
+      for (const ru of updateFields.marksUpdate) {
+        marksSummary.push({
+          reviewName: ru.reviewName,
+          marks: ru.marks || null,
+          comments: ru.comments || null,
+          attendance: ru.attendance || null,
+          locked: ru.locked !== undefined ? ru.locked : null,
+        });
+      }
+    } else if (updateFields.marksUpdate) {
+      const ru = updateFields.marksUpdate;
+      marksSummary.push({
+        reviewName: ru.reviewName,
+        marks: ru.marks || null,
+        comments: ru.comments || null,
+        attendance: ru.attendance || null,
+        locked: ru.locked !== undefined ? ru.locked : null,
+      });
+    }
+
+    const pptChange = updates.pptApproved !== undefined ? { before: existingStudent?.pptApproved || null, after: updates.pptApproved } : null;
+
+    logger.info('faculty_marks_update_attempt', safeMeta({
+      actor: actor ? { id: actor._id, name: actor.name, employeeId: actor.employeeId } : null,
+      regNo,
+      marksSummary,
+      pptChange,
+      otherUpdates: Object.keys(updates).length ? updates : null,
+      project: projectForStudent ? { id: projectForStudent._id, name: projectForStudent.name, panel: projectForStudent.panel ? { id: projectForStudent.panel._id, members: projectForStudent.panel.members } : null } : null,
+    }));
 
     // Perform the update with validation
     const updatedStudent = await Student.findOneAndUpdate(
@@ -505,8 +555,7 @@ export const updateStudentDetails = async (req, res) => {
       });
     }
 
-    console.log("✅ Student updated successfully:", updatedStudent._id);
-    console.log(`📝 Updated contribution settings: requiresContribution=${updatedStudent.requiresContribution}, contributionType=${updatedStudent.contributionType}`);
+  logger.info('student_updated_success', safeMeta({ regNo, studentId: updatedStudent._id, updatedFields: Object.keys(updateOps), requiresContribution: updatedStudent.requiresContribution, contributionType: updatedStudent.contributionType, user: req.user?.id }));
 
     return res.status(200).json({
       success: true,
@@ -515,7 +564,7 @@ export const updateStudentDetails = async (req, res) => {
       updatedFields: Object.keys(updateOps),
     });
   } catch (error) {
-    console.error("❌ Error updating student details:", error);
+    logger.error('error_updating_student', safeMeta({ regNo, error: error?.message, stack: error?.stack }));
 
     // Handle validation errors
     if (error.name === "ValidationError") {

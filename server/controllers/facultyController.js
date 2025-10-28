@@ -3,6 +3,7 @@ import Project from "../models/projectSchema.js";
 import Panel from "../models/panelSchema.js";
 import MarkingSchema from "../models/markingSchema.js";
 import BroadcastMessage from "../models/broadcastMessageSchema.js";
+import { logger, safeMeta } from "../utils/logger.js";
 
 // Get details of a faculty by employee ID
 export async function getFacultyDetails(req, res) {
@@ -30,10 +31,7 @@ export async function getFacultyDetails(req, res) {
 // Update this function in your facultyController.js
 export async function getMarkingSchema(req, res) {
   try {
-    console.log('=== GET MARKING SCHEMA CALLED ===');
-    console.log('Request method:', req.method);
-    console.log('Request URL:', req.url);
-    console.log('User from token:', req.user);
+    logger.info('get_marking_schema_called', safeMeta({ method: req.method, url: req.url, user: req.user?.id, requestId: req.requestId }));
 
     // Get school and department from authenticated faculty user
     const facultyId = req.user.id;
@@ -84,12 +82,7 @@ export async function getMarkingSchema(req, res) {
       });
     }
 
-    console.log('✅ Marking schema retrieved successfully');
-    console.log('Reviews in schema:', schema.reviews.map(r => ({
-      reviewName: r.reviewName,
-      componentsCount: r.components?.length || 0,
-      hasDeadline: !!r.deadline
-    })));
+    logger.info('marking_schema_retrieved', safeMeta({ schemaId: schema._id, reviewsCount: schema.reviews?.length || 0 }));
 
     return res.status(200).json({
       success: true,
@@ -113,8 +106,11 @@ export async function getFacultyProjects(req, res) {
   try {
     const { employeeId } = req.params;
 
+    logger.info('get_faculty_projects_called', safeMeta({ employeeId, requestId: req.requestId, user: req.user?.id }));
+
     const faculty = await Faculty.findOne({ employeeId });
     if (!faculty) {
+      logger.warn('faculty_not_found_for_projects', safeMeta({ employeeId }));
       return res
         .status(404)
         .json({ message: "No faculty found with the provided employeeId." });
