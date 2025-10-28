@@ -50,9 +50,43 @@ export async function getFilteredStudents(req, res) {
     if (specialization) filter.specialization = specialization;
 
     // Query students matching the filter (if filter is empty returns all)
-    const students = await Student.find(filter);
+    const students = await Student.find(filter).lean();
 
-    return res.json({ students });
+    // Process students to ensure pptApproved field is properly structured
+    const processedStudents = students.map(student => {
+      // Convert MongoDB Map to plain object for reviews
+      let processedReviews = {};
+      if (student.reviews) {
+        if (student.reviews instanceof Map) {
+          processedReviews = Object.fromEntries(student.reviews);
+        } else if (typeof student.reviews === 'object') {
+          processedReviews = { ...student.reviews };
+        }
+      }
+
+      // Convert deadline Map to plain object
+      let processedDeadlines = {};
+      if (student.deadline) {
+        if (student.deadline instanceof Map) {
+          processedDeadlines = Object.fromEntries(student.deadline);
+        } else if (typeof student.deadline === 'object') {
+          processedDeadlines = { ...student.deadline };
+        }
+      }
+
+      return {
+        ...student,
+        reviews: processedReviews,
+        deadline: processedDeadlines,
+        // Always return pptApproved object with proper structure and fallback values
+        pptApproved: {
+          approved: student.pptApproved?.approved ?? false,
+          locked: student.pptApproved?.locked ?? false,
+        },
+      };
+    });
+
+    return res.json({ students: processedStudents });
   } catch (error) {
     return res.status(500).json({ message: error.stack });
   }
