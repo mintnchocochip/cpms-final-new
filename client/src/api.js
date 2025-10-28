@@ -362,6 +362,33 @@ export const updateProject = async (projectIdOrData, projectData = null) => {
   }
 };
 
+// Add this function to your api.js file
+export const updateProjectDetails = async (updatePayload) => {
+  try {
+    console.log('📤 [API] Sending project update request:', updatePayload);
+    const response = await fetch(`${API_BASE_URL}/api/projects/update`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        // Add authentication headers if needed
+        // 'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(updatePayload)
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to update project details');
+    }
+
+    console.log('✅ [API] Project update successful:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ [API] Error updating project details:', error);
+    throw error;
+  }
+};
 
 
 // Delete project (using existing project/:projectId endpoint)
