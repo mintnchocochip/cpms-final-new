@@ -456,6 +456,7 @@ const rawPanels = [
   ],
 ];
 
+// BAI Internship panels
 // const rawPanels = [
 //   [
 //     ["52262", "Dr. Mercy Rajaselvi Beaulah P"],
