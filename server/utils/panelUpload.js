@@ -77,7 +77,7 @@ async function createPanels() {
           members: facultyDocs,
           venue: venue,
           school: "SCOPE",
-          department: "MCA",
+          department: "MCA 1st Year",
         });
         await newPanel.save();
         console.log(
