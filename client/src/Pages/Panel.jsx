@@ -14,58 +14,7 @@ import {
 } from '../api';
 import FacultyBroadcastFeed from '../Components/FacultyBroadcastFeed';
 import ProjectNameEditor from '../Components/ProjectNameEditor';
-const handleProjectNameUpdate = useCallback(async (projectId, newName) => {
-  try {
-    console.log('🔄 [Panel] Updating project name:', { projectId, newName });
-    
-    // Show loading notification
-    const loadingId = showNotification(
-      'info', 
-      'Updating Project...', 
-      'Please wait while we update the project name...', 
-      10000
-    );
 
-    // Prepare the payload for your backend endpoint
-    const updatePayload = {
-      projectId: projectId,
-      projectUpdates: {
-        name: newName
-      },
-      studentUpdates: [] // Empty student updates
-    };
-
-    console.log('📤 [Panel] Sending update payload:', updatePayload);
-    
-    const response = await updateProjectDetails(updatePayload);
-    
-    // Hide loading notification
-    hideNotification(loadingId);
-    
-    if (response.success) {
-      console.log('✅ [Panel] Project name updated successfully');
-      
-      // Refresh the data to show updated name
-      await handleRefresh();
-      
-      showNotification(
-        'success',
-        'Project Updated',
-        `Project name updated to "${newName}" successfully!`
-      );
-    } else {
-      throw new Error(response.message || 'Failed to update project name');
-    }
-  } catch (error) {
-    console.error('❌ [Panel] Error updating project name:', error);
-    showNotification(
-      'error',
-      'Update Failed',
-      error.message || 'Failed to update project name. Please try again.'
-    );
-    throw error; // Re-throw to let the component handle it
-  }
-}, [handleRefresh, showNotification, hideNotification]);
 // ✅ FIXED: Normalize student data function moved outside component
 function normalizeStudentData(student) {
   console.log('🔧 [normalizeStudentData] Processing student:', student.name);
@@ -531,7 +480,58 @@ const Panel = () => {
       setRefreshing(false);
     }
   }, [fetchData, showNotification]);
+const handleProjectNameUpdate = useCallback(async (projectId, newName) => {
+  try {
+    console.log('🔄 [Panel] Updating project name:', { projectId, newName });
+    
+    // Show loading notification
+    const loadingId = showNotification(
+      'info', 
+      'Updating Project...', 
+      'Please wait while we update the project name...', 
+      10000
+    );
 
+    // Prepare the payload for your backend endpoint
+    const updatePayload = {
+      projectId: projectId,
+      projectUpdates: {
+        name: newName
+      },
+      studentUpdates: [] // Empty student updates
+    };
+
+    console.log('📤 [Panel] Sending update payload:', updatePayload);
+    
+    const response = await updateProjectDetails(updatePayload);
+    
+    // Hide loading notification
+    hideNotification(loadingId);
+    
+    if (response.success) {
+      console.log('✅ [Panel] Project name updated successfully');
+      
+      // Refresh the data to show updated name
+      await handleRefresh();
+      
+      showNotification(
+        'success',
+        'Project Updated',
+        `Project name updated to "${newName}" successfully!`
+      );
+    } else {
+      throw new Error(response.message || 'Failed to update project name');
+    }
+  } catch (error) {
+    console.error('❌ [Panel] Error updating project name:', error);
+    showNotification(
+      'error',
+      'Update Failed',
+      error.message || 'Failed to update project name. Please try again.'
+    );
+    throw error; // Re-throw to let the component handle it
+  }
+}, [handleRefresh, showNotification, hideNotification]);
   const getTeamRequestStatus = useCallback((team, reviewType) => {
     if (!team) return 'none';
     

@@ -363,27 +363,21 @@ export const updateProject = async (projectIdOrData, projectData = null) => {
 };
 
 // Add this function to your api.js file
+// ✅ FIXED: Use axios instead of fetch to get automatic token injection
 export const updateProjectDetails = async (updatePayload) => {
   try {
     console.log('📤 [API] Sending project update request:', updatePayload);
-    const response = await fetch(`${API_BASE_URL}/api/projects/update`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        // Add authentication headers if needed
-        // 'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(updatePayload)
-    });
-
-    const data = await response.json();
     
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to update project details');
+    // Validate required fields
+    if (!updatePayload.projectId) {
+      throw new Error('Project ID is required');
     }
-
-    console.log('✅ [API] Project update successful:', data);
-    return data;
+    
+    // Use axios API instance (which has the interceptor for auth token)
+    const response = await API.put('/project/update', updatePayload);
+    
+    console.log('✅ [API] Project update successful:', response.data);
+    return response.data;
   } catch (error) {
     console.error('❌ [API] Error updating project details:', error);
     throw error;

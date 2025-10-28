@@ -16,8 +16,6 @@ import {
   
 } from '../api';
 import ProjectNameEditor from '../Components/ProjectNameEditor';
-
-
   const handleUpdateStudent = async (regNo, updateData) => {
   try {
     console.log('🔵 [Parent] Updating student:', regNo, updateData);
@@ -34,7 +32,8 @@ import ProjectNameEditor from '../Components/ProjectNameEditor';
   }
 };
 
-// Memoized inner content component to prevent unnecessary re-renders
+
+
 const GuideContent = React.memo(({ 
   teams, 
   expandedTeam, 
@@ -106,7 +105,11 @@ const GuideContent = React.memo(({
                         </button>
                         <div className="min-w-0 flex-1">
                           <h3 className="font-semibold text-gray-900 text-base sm:text-lg lg:text-xl break-words mb-2">
-                            {team.title}
+                             <ProjectNameEditor
+    projectId={team.id}
+    currentName={team.title}
+    onUpdate={handleProjectNameUpdate}
+  />
                           </h3>
                           <p className="text-sm sm:text-base text-gray-600 mb-3">{team.description}</p>
                           
@@ -236,61 +239,6 @@ const GuideContent = React.memo(({
     </div>
   );
 });
-// Add to imports at the top
-
-// Add this handler function inside the Guide component (after other handlers)
-const handleProjectNameUpdate = useCallback(async (projectId, newName) => {
-  try {
-    console.log('🔄 [Guide] Updating project name:', { projectId, newName });
-    
-    // Show loading notification
-    const loadingId = showNotification(
-      'info', 
-      'Updating Project...', 
-      'Please wait while we update the project name...', 
-      10000
-    );
-
-    // Prepare the payload for your backend endpoint
-    const updatePayload = {
-      projectId: projectId,
-      projectUpdates: {
-        name: newName
-      },
-      studentUpdates: [] // Empty student updates
-    };
-
-    console.log('📤 [Guide] Sending update payload:', updatePayload);
-    
-    const response = await updateProjectDetails(updatePayload);
-    
-    // Hide loading notification
-    hideNotification(loadingId);
-    
-    if (response.success) {
-      console.log('✅ [Guide] Project name updated successfully');
-      
-      // Refresh the data to show updated name
-      await handleRefresh();
-      
-      showNotification(
-        'success',
-        'Project Updated',
-        `Project name updated to "${newName}" successfully!`
-      );
-    } else {
-      throw new Error(response.message || 'Failed to update project name');
-    }
-  } catch (error) {
-    console.error('❌ [Guide] Error updating project name:', error);
-    showNotification(
-      'error',
-      'Update Failed',
-      error.message || 'Failed to update project name. Please try again.'
-    );
-    throw error; // Re-throw to let the component handle it
-  }
-}, [handleRefresh, showNotification, hideNotification]);
 
 const Guide = () => {
   const [teams, setTeams] = useState([]);
@@ -653,6 +601,7 @@ const fetchData = useCallback(async () => {
   }, [fetchData]);
 
   // ✅ FIXED: Only refresh inner content, not entire page
+
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
@@ -670,6 +619,64 @@ const fetchData = useCallback(async () => {
     }
   }, [fetchData, showNotification]);
 
+
+// Memoized inner content component to prevent unnecessary re-renders
+
+// Add to imports at the top
+
+// Add this handler function inside the Guide component (after other handlers)
+const handleProjectNameUpdate = useCallback(async (projectId, newName) => {
+  try {
+    console.log('🔄 [Guide] Updating project name:', { projectId, newName });
+    
+    // Show loading notification
+    const loadingId = showNotification(
+      'info', 
+      'Updating Project...', 
+      'Please wait while we update the project name...', 
+      10000
+    );
+
+    // Prepare the payload for your backend endpoint
+    const updatePayload = {
+      projectId: projectId,
+      projectUpdates: {
+        name: newName
+      },
+      studentUpdates: [] // Empty student updates
+    };
+
+    console.log('📤 [Guide] Sending update payload:', updatePayload);
+    
+    const response = await updateProjectDetails(updatePayload);
+    
+    // Hide loading notification
+    hideNotification(loadingId);
+    
+    if (response.success) {
+      console.log('✅ [Guide] Project name updated successfully');
+      
+      // Refresh the data to show updated name
+      await handleRefresh();
+      
+      showNotification(
+        'success',
+        'Project Updated',
+        `Project name updated to "${newName}" successfully!`
+      );
+    } else {
+      throw new Error(response.message || 'Failed to update project name');
+    }
+  } catch (error) {
+    console.error('❌ [Guide] Error updating project name:', error);
+    showNotification(
+      'error',
+      'Update Failed',
+      error.message || 'Failed to update project name. Please try again.'
+    );
+    throw error; // Re-throw to let the component handle it
+  }
+}, [handleRefresh, showNotification, hideNotification]);
   const getTeamRequestStatus = useCallback((team, reviewType) => {
     if (!team) return 'none';
     
