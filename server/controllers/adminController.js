@@ -122,10 +122,11 @@ export async function createOrUpdateMarkingSchema(req, res) {
           });
         }
 
-        if (comp.weight <= 0) {
+        // allow zero weight (0 marks) for components; only negative weights are invalid
+        if (comp.weight < 0) {
           return res.status(400).json({
             success: false,
-            message: `Component ${comp.name} must have a positive weight`,
+            message: `Component ${comp.name} must have a non-negative weight`,
           });
         }
 
