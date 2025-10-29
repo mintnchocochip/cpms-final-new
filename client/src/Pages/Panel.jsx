@@ -188,11 +188,9 @@ const PanelContent = React.memo(({
                 <div className="flex items-center space-x-3">
                   <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
                   <div>
- <ProjectNameEditor
-    projectId={team.id}
-    currentName={team.title}
-    onUpdate={handleProjectNameUpdate}
-  />                    <p className="text-xs sm:text-sm text-yellow-700 mt-1">No panel reviews configured for this project</p>
+  <h3 className="font-semibold text-gray-900 text-base sm:text-lg lg:text-xl break-words mb-2">
+                          {team.title}
+                        </h3>                  <p className="text-xs sm:text-sm text-yellow-700 mt-1">No panel reviews configured for this project</p>
                   </div>
                 </div>
               </div>
@@ -214,12 +212,17 @@ const PanelContent = React.memo(({
                         }`} />
                       </button>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-gray-900 text-base sm:text-lg lg:text-xl break-words mb-2">
-                          {team.title}
-                        </h3>
-                        <p className="text-sm sm:text-base text-gray-600 mb-3">
-                          Guide: {team.guideFaculty?.name || 'N/A'}
-                        </p>
+            <div className="mb-2">
+  <ProjectNameEditor
+    projectId={team.id}
+    currentName={team.title}
+    onUpdate={handleProjectNameUpdate}
+  />
+</div>
+<p className="text-sm sm:text-base text-gray-600 mb-3">
+  Guide: {team.guideFaculty?.name || 'N/A'}
+</p>
+
                         
                         <div className="flex items-center gap-4 mb-3">
                           <div className="flex items-center gap-2 text-purple-600">

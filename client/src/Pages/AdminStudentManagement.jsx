@@ -667,49 +667,32 @@ const excelData = groupStudents.map(student => {
 
 
 // Download WITH split - separate sheets for each department + review type combination
+// Download WITH split - One sheet per department with ALL review components as separate columns
 const downloadExcelWithSplit = useCallback(async () => {
   try {
-    showNotification("info", "Preparing Excel", "Fetching schemas and organizing data with splits...");
+    showNotification("info", "Preparing Excel", "Fetching schemas and organizing data with component splits...");
     
-    // Group students by school_department_reviewType
+    // Group students by school_department (each group has its own schema)
     const studentGroups = {};
     
     filteredStudents.forEach(student => {
-      if (selectedReviewFilter === "all") {
-        // For "All Reviews", create separate groups for each review type
-        if (student.reviews) {
-          Object.keys(student.reviews).forEach(reviewType => {
-            const key = `${student.school}_${student.department}_${reviewType}`;
-            if (!studentGroups[key]) {
-              studentGroups[key] = [];
-            }
-            studentGroups[key].push({ ...student, _selectedReview: reviewType });
-          });
-        }
-      } else {
-        // For specific review, only include students with that review
-        if (student.reviews && student.reviews[selectedReviewFilter]) {
-          const key = `${student.school}_${student.department}_${selectedReviewFilter}`;
-          if (!studentGroups[key]) {
-            studentGroups[key] = [];
-          }
-          studentGroups[key].push({ ...student, _selectedReview: selectedReviewFilter });
-        }
+      const key = `${student.school}_${student.department}`;
+      if (!studentGroups[key]) {
+        studentGroups[key] = [];
       }
+      studentGroups[key].push(student);
     });
 
-    const uniqueCombinations = Object.keys(studentGroups).map(key => {
-      const parts = key.split('_');
-      const reviewType = parts.pop();
-      return parts.join('_');
-    });
-    
-    const schemasToFetch = [...new Set(uniqueCombinations)].filter(combo => !studentSchemas[combo]);
+    // Fetch schemas for all combinations
+    const uniqueCombinations = Object.keys(studentGroups);
+    const schemasToFetch = uniqueCombinations.filter(combo => !studentSchemas[combo]);
     
     let allSchemas = { ...studentSchemas };
     
     for (const combo of schemasToFetch) {
-      const [school, department] = combo.split('_');
+      const parts = combo.split('_');
+      const school = parts[0];
+      const department = parts.slice(1).join('_'); // Handle departments with underscores in name
       try {
         const response = await getMarkingSchema(school, department);
         allSchemas[combo] = response.schema;
@@ -721,18 +704,19 @@ const downloadExcelWithSplit = useCallback(async () => {
       }
     }
 
-    showNotification("info", "Processing Data", "Creating Excel with split review data...");
+    showNotification("info", "Processing Data", "Creating Excel with component-wise split data...");
 
     const wb = XLSX.utils.book_new();
+    let sheetCounter = 1; // For unique sheet names
 
+    // Process each school/department group SEPARATELY
     Object.entries(studentGroups).forEach(([groupKey, groupStudents]) => {
       const parts = groupKey.split('_');
-      const reviewType = parts.pop();
       const school = parts[0];
       const department = parts.slice(1).join('_');
-      const schemaKey = `${school}_${department}`;
-      const schema = allSchemas[schemaKey];
+      const schema = allSchemas[groupKey]; // Get THIS department's schema
 
+      // ✅ FIX: Map students using ONLY this department's schema
       const excelData = groupStudents.map(student => {
         const row = {
           "Semester (CH2024-25)": "05",
@@ -746,72 +730,89 @@ const downloadExcelWithSplit = useCallback(async () => {
           "PAT_Detected": student.PAT ? "Yes" : "No"
         };
 
-        // Only add data for the specific review type for this sheet
-        const selectedReview = student._selectedReview;
-        if (student.reviews && student.reviews[selectedReview]) {
-          const reviewData = student.reviews[selectedReview];
-          const reviewSchema = schema?.reviews?.find(r => r.reviewName === selectedReview);
-          const reviewDisplayName = reviewSchema?.displayName || selectedReview;
+        // ✅ Process reviews based on THIS department's schema ONLY
+        if (student.reviews && schema?.reviews) {
+          // Determine which reviews to process
+          const reviewsToProcess = selectedReviewFilter === "all" 
+            ? schema.reviews.map(r => r.reviewName) // Use schema's review list
+            : schema.reviews.filter(r => r.reviewName === selectedReviewFilter).map(r => r.reviewName);
 
-          // ✅ ADD COMPONENT-WISE MARKS
-          if (reviewData.marks && reviewSchema?.components) {
-            reviewSchema.components.forEach(component => {
-              const componentDisplayName = component.displayName || component.name;
-              const markValue = reviewData.marks[component.name];
+          // ✅ Process each review defined in THIS schema
+          reviewsToProcess.forEach(reviewType => {
+            const reviewData = student.reviews[reviewType];
+            const reviewSchema = schema.reviews.find(r => r.reviewName === reviewType);
+            
+            if (!reviewSchema) return; // Skip if review not in this dept's schema
+            
+            const reviewDisplayName = reviewSchema.displayName || reviewType;
+
+            // ✅ Add component-wise marks based on THIS review's components in schema
+            if (reviewSchema.components && reviewSchema.components.length > 0) {
+              reviewSchema.components.forEach(component => {
+                const componentDisplayName = component.displayName || component.name;
+                const columnName = `${reviewDisplayName}_${componentDisplayName}`;
+                
+                // Get mark value from student data
+                const markValue = reviewData?.marks?.[component.name];
+                
+                // Handle PAT marks
+                if (markValue === -1 || markValue === "PAT") {
+                  row[columnName] = "PAT";
+                } else if (markValue !== undefined && markValue !== null) {
+                  row[columnName] = markValue;
+                } else {
+                  row[columnName] = "N/A"; // Student doesn't have this mark yet
+                }
+              });
+            }
+
+            // ✅ Add summary columns for this review
+            if (reviewData) {
+              let totalMarks = 0;
+              let patAdjustedMarks = 0;
               
-              // Handle PAT marks (-1 or "PAT")
-              if (markValue === -1 || markValue === "PAT") {
-                row[`${reviewDisplayName}_${componentDisplayName}`] = "PAT";
-              } else {
-                row[`${reviewDisplayName}_${componentDisplayName}`] = markValue ?? "N/A";
+              if (reviewData.marks && typeof reviewData.marks === 'object') {
+                Object.values(reviewData.marks).forEach(mark => {
+                  const numericMark = parseFloat(mark) || 0;
+                  totalMarks += numericMark;
+                  
+                  if (mark === -1 || mark === "PAT") {
+                    patAdjustedMarks += 0;
+                  } else {
+                    patAdjustedMarks += numericMark;
+                  }
+                });
               }
-            });
-          } else if (reviewData.marks) {
-            // Fallback: if no schema components, add raw marks
-            Object.entries(reviewData.marks).forEach(([markKey, markValue]) => {
-              if (markValue === -1 || markValue === "PAT") {
-                row[`${reviewDisplayName}_${markKey}`] = "PAT";
-              } else {
-                row[`${reviewDisplayName}_${markKey}`] = markValue ?? "N/A";
-              }
-            });
-          }
 
-          // Calculate totals
-          let totalMarks = 0;
-          let patAdjustedMarks = 0;
-          
-          if (reviewData.marks && typeof reviewData.marks === 'object') {
-            Object.values(reviewData.marks).forEach(mark => {
-              const numericMark = parseFloat(mark) || 0;
-              totalMarks += numericMark;
+              row[`${reviewDisplayName}_Total_Marks`] = totalMarks;
+              row[`${reviewDisplayName}_PAT_Adjusted_Marks`] = patAdjustedMarks;
               
-              if (mark === -1 || mark === "PAT") {
-                patAdjustedMarks += 0;
-              } else {
-                patAdjustedMarks += numericMark;
+              const hasPATMarks = reviewData.marks && Object.values(reviewData.marks).some(mark => 
+                mark === -1 || mark === "PAT"
+              );
+              row[`${reviewDisplayName}_Contains_PAT`] = hasPATMarks ? "Yes" : "No";
+              row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
+              row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
+              
+              if (reviewData.comments) {
+                row[`${reviewDisplayName}_Comments`] = reviewData.comments;
               }
-            });
-          }
-
-          row[`${reviewDisplayName}_Total_Marks`] = totalMarks;
-          row[`${reviewDisplayName}_PAT_Adjusted_Marks`] = patAdjustedMarks;
-          
-          const hasPATMarks = reviewData.marks && Object.values(reviewData.marks).some(mark => 
-            mark === -1 || mark === "PAT"
-          );
-          row[`${reviewDisplayName}_Contains_PAT`] = hasPATMarks ? "Yes" : "No";
-          row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
-          row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
-          
-          if (reviewData.comments) {
-            row[`${reviewDisplayName}_Comments`] = reviewData.comments;
-          }
+            } else {
+              // Student doesn't have this review yet
+              row[`${reviewDisplayName}_Total_Marks`] = 0;
+              row[`${reviewDisplayName}_PAT_Adjusted_Marks`] = 0;
+              row[`${reviewDisplayName}_Contains_PAT`] = "No";
+              row[`${reviewDisplayName}_Status`] = "Not Started";
+              row[`${reviewDisplayName}_Attendance`] = "N/A";
+            }
+          });
         }
 
+        // Add PPT approval status
         row["PPT_Approved"] = student.pptApproved?.approved ? "Yes" : "No";
         row["PPT_Locked"] = student.pptApproved?.locked ? "Yes" : "No";
 
+        // Add deadlines
         if (student.deadline) {
           Object.entries(student.deadline).forEach(([type, deadlineData]) => {
             row[`Deadline_${type}_From`] = deadlineData.from ? new Date(deadlineData.from).toLocaleDateString() : "";
@@ -822,8 +823,10 @@ const downloadExcelWithSplit = useCallback(async () => {
         return row;
       });
 
+      // Create worksheet for this department
       const ws = XLSX.utils.json_to_sheet(excelData);
 
+      // Auto-size columns
       const colWidths = [];
       const headers = Object.keys(excelData[0] || {});
       headers.forEach((header, index) => {
@@ -835,30 +838,33 @@ const downloadExcelWithSplit = useCallback(async () => {
       });
       ws['!cols'] = colWidths;
 
-      // Get review display name for sheet name
-      const reviewSchema = schema?.reviews?.find(r => r.reviewName === reviewType);
-      const reviewDisplayName = reviewSchema?.displayName || reviewType;
+      // ✅ Create unique sheet name with counter
+      let baseSheetName = `${school}_${department}`.replace(/[:\\/?*\[\]]/g, '');
       
-      let sheetName = `${school}_${department}_${reviewDisplayName}`.replace(/[?]/g, '');
-      if (sheetName.length > 31) {
-        sheetName = sheetName.substring(0, 28) + "...";
-      }
+      // Add counter suffix BEFORE truncating
+      const suffix = `_${sheetCounter}`;
+      const maxBaseLength = 31 - suffix.length;
+      
+      let sheetName = baseSheetName.substring(0, maxBaseLength) + suffix;
+      sheetCounter++;
 
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     });
 
+    // Generate filename
     const timestamp = new Date().toISOString().split('T')[0];
     let filename;
     
     if (adminContext.skipped || Object.keys(studentGroups).length > 1) {
       const reviewFilter = selectedReviewFilter === "all" ? "AllReviews" : selectedReviewFilter;
-      filename = `StudentManagement_Split_${reviewFilter}_${timestamp}.xlsx`;
-      showNotification("success", "Download Complete", `Excel file downloaded: ${filename} (${Object.keys(studentGroups).length} sheets with splits)`);
+      filename = `StudentManagement_ComponentSplit_${reviewFilter}_${timestamp}.xlsx`;
+      showNotification("success", "Download Complete", `Excel file downloaded: ${filename} (${Object.keys(studentGroups).length} department sheets)`);
     } else {
       const contextStr = `${adminContext.school}_${adminContext.department}`.replace(/[^a-zA-Z0-9]/g, '');
       const reviewFilter = selectedReviewFilter === "all" ? "AllReviews" : selectedReviewFilter;
-      filename = `StudentManagement_Split_${contextStr}_${reviewFilter}_${timestamp}.xlsx`;
-      showNotification("success", "Download Complete", `Excel file downloaded: ${filename}`);
+      filename = `StudentManagement_ComponentSplit_${contextStr}_${reviewFilter}_${timestamp}.xlsx`;
+      showNotification("success", "Download Complete", `Excel file downloaded: ${filename}`)
+;
     }
 
     XLSX.writeFile(wb, filename);
@@ -867,7 +873,9 @@ const downloadExcelWithSplit = useCallback(async () => {
     console.error("Excel download error:", error);
     showNotification("error", "Download Failed", "Failed to download Excel file. Please try again.");
   }
-}, [filteredStudents, adminContext, showNotification, studentSchemas, getMarkingSchema, setStudentSchemas, selectedReviewFilter]);
+}, [filteredStudents, adminContext, showNotification, studentSchemas, setStudentSchemas, selectedReviewFilter]);
+
+
 
 
 
