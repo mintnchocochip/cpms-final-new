@@ -443,7 +443,7 @@ const toggleStudentExpanded = useCallback(async (regNo) => {
 
 // Enhanced Download Excel function - Multi-sheet for all mode, single sheet for filtered mode
 // Enhanced Download Excel function - Only downloads selected review type
-const downloadExcel = useCallback(async () => {
+const downloadExcelWithoutSplit = useCallback(async () => {
   try {
     // Show loading notification
     showNotification("info", "Preparing Excel", "Fetching schemas and organizing data...");
@@ -663,6 +663,212 @@ const excelData = groupStudents.map(student => {
     showNotification("error", "Download Failed", "Failed to download Excel file. Please try again.");
   }
 }, [filteredStudents, adminContext, showNotification, studentSchemas, getMarkingSchema, setStudentSchemas, selectedReviewFilter]);
+// Add two separate download functions after your existing downloadExcel function
+
+
+// Download WITH split - separate sheets for each department + review type combination
+const downloadExcelWithSplit = useCallback(async () => {
+  try {
+    showNotification("info", "Preparing Excel", "Fetching schemas and organizing data with splits...");
+    
+    // Group students by school_department_reviewType
+    const studentGroups = {};
+    
+    filteredStudents.forEach(student => {
+      if (selectedReviewFilter === "all") {
+        // For "All Reviews", create separate groups for each review type
+        if (student.reviews) {
+          Object.keys(student.reviews).forEach(reviewType => {
+            const key = `${student.school}_${student.department}_${reviewType}`;
+            if (!studentGroups[key]) {
+              studentGroups[key] = [];
+            }
+            studentGroups[key].push({ ...student, _selectedReview: reviewType });
+          });
+        }
+      } else {
+        // For specific review, only include students with that review
+        if (student.reviews && student.reviews[selectedReviewFilter]) {
+          const key = `${student.school}_${student.department}_${selectedReviewFilter}`;
+          if (!studentGroups[key]) {
+            studentGroups[key] = [];
+          }
+          studentGroups[key].push({ ...student, _selectedReview: selectedReviewFilter });
+        }
+      }
+    });
+
+    const uniqueCombinations = Object.keys(studentGroups).map(key => {
+      const parts = key.split('_');
+      const reviewType = parts.pop();
+      return parts.join('_');
+    });
+    
+    const schemasToFetch = [...new Set(uniqueCombinations)].filter(combo => !studentSchemas[combo]);
+    
+    let allSchemas = { ...studentSchemas };
+    
+    for (const combo of schemasToFetch) {
+      const [school, department] = combo.split('_');
+      try {
+        const response = await getMarkingSchema(school, department);
+        allSchemas[combo] = response.schema;
+        setStudentSchemas(prev => ({ ...prev, [combo]: response.schema }));
+      } catch (error) {
+        console.error('Error fetching schema for ' + combo, error);
+        allSchemas[combo] = null;
+        setStudentSchemas(prev => ({ ...prev, [combo]: null }));
+      }
+    }
+
+    showNotification("info", "Processing Data", "Creating Excel with split review data...");
+
+    const wb = XLSX.utils.book_new();
+
+    Object.entries(studentGroups).forEach(([groupKey, groupStudents]) => {
+      const parts = groupKey.split('_');
+      const reviewType = parts.pop();
+      const school = parts[0];
+      const department = parts.slice(1).join('_');
+      const schemaKey = `${school}_${department}`;
+      const schema = allSchemas[schemaKey];
+
+      const excelData = groupStudents.map(student => {
+        const row = {
+          "Semester (CH2024-25)": "05",
+          "Class Number (CH2024-2505)": "02680",
+          "Mark Mode Code": "PE005",
+          "Register No": student.regNo,
+          "Name": student.name,
+          "School": student.school,
+          "Department": student.department,
+          "Email": student.emailId,
+          "PAT_Detected": student.PAT ? "Yes" : "No"
+        };
+
+        // Only add data for the specific review type for this sheet
+        const selectedReview = student._selectedReview;
+        if (student.reviews && student.reviews[selectedReview]) {
+          const reviewData = student.reviews[selectedReview];
+          const reviewSchema = schema?.reviews?.find(r => r.reviewName === selectedReview);
+          const reviewDisplayName = reviewSchema?.displayName || selectedReview;
+
+          // ✅ ADD COMPONENT-WISE MARKS
+          if (reviewData.marks && reviewSchema?.components) {
+            reviewSchema.components.forEach(component => {
+              const componentDisplayName = component.displayName || component.name;
+              const markValue = reviewData.marks[component.name];
+              
+              // Handle PAT marks (-1 or "PAT")
+              if (markValue === -1 || markValue === "PAT") {
+                row[`${reviewDisplayName}_${componentDisplayName}`] = "PAT";
+              } else {
+                row[`${reviewDisplayName}_${componentDisplayName}`] = markValue ?? "N/A";
+              }
+            });
+          } else if (reviewData.marks) {
+            // Fallback: if no schema components, add raw marks
+            Object.entries(reviewData.marks).forEach(([markKey, markValue]) => {
+              if (markValue === -1 || markValue === "PAT") {
+                row[`${reviewDisplayName}_${markKey}`] = "PAT";
+              } else {
+                row[`${reviewDisplayName}_${markKey}`] = markValue ?? "N/A";
+              }
+            });
+          }
+
+          // Calculate totals
+          let totalMarks = 0;
+          let patAdjustedMarks = 0;
+          
+          if (reviewData.marks && typeof reviewData.marks === 'object') {
+            Object.values(reviewData.marks).forEach(mark => {
+              const numericMark = parseFloat(mark) || 0;
+              totalMarks += numericMark;
+              
+              if (mark === -1 || mark === "PAT") {
+                patAdjustedMarks += 0;
+              } else {
+                patAdjustedMarks += numericMark;
+              }
+            });
+          }
+
+          row[`${reviewDisplayName}_Total_Marks`] = totalMarks;
+          row[`${reviewDisplayName}_PAT_Adjusted_Marks`] = patAdjustedMarks;
+          
+          const hasPATMarks = reviewData.marks && Object.values(reviewData.marks).some(mark => 
+            mark === -1 || mark === "PAT"
+          );
+          row[`${reviewDisplayName}_Contains_PAT`] = hasPATMarks ? "Yes" : "No";
+          row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
+          row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
+          
+          if (reviewData.comments) {
+            row[`${reviewDisplayName}_Comments`] = reviewData.comments;
+          }
+        }
+
+        row["PPT_Approved"] = student.pptApproved?.approved ? "Yes" : "No";
+        row["PPT_Locked"] = student.pptApproved?.locked ? "Yes" : "No";
+
+        if (student.deadline) {
+          Object.entries(student.deadline).forEach(([type, deadlineData]) => {
+            row[`Deadline_${type}_From`] = deadlineData.from ? new Date(deadlineData.from).toLocaleDateString() : "";
+            row[`Deadline_${type}_To`] = deadlineData.to ? new Date(deadlineData.to).toLocaleDateString() : "";
+          });
+        }
+
+        return row;
+      });
+
+      const ws = XLSX.utils.json_to_sheet(excelData);
+
+      const colWidths = [];
+      const headers = Object.keys(excelData[0] || {});
+      headers.forEach((header, index) => {
+        const maxLength = Math.max(
+          header.length,
+          ...excelData.map(row => String(row[header] || "").length)
+        );
+        colWidths[index] = { width: Math.min(maxLength + 2, 50) };
+      });
+      ws['!cols'] = colWidths;
+
+      // Get review display name for sheet name
+      const reviewSchema = schema?.reviews?.find(r => r.reviewName === reviewType);
+      const reviewDisplayName = reviewSchema?.displayName || reviewType;
+      
+      let sheetName = `${school}_${department}_${reviewDisplayName}`.replace(/[?]/g, '');
+      if (sheetName.length > 31) {
+        sheetName = sheetName.substring(0, 28) + "...";
+      }
+
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    });
+
+    const timestamp = new Date().toISOString().split('T')[0];
+    let filename;
+    
+    if (adminContext.skipped || Object.keys(studentGroups).length > 1) {
+      const reviewFilter = selectedReviewFilter === "all" ? "AllReviews" : selectedReviewFilter;
+      filename = `StudentManagement_Split_${reviewFilter}_${timestamp}.xlsx`;
+      showNotification("success", "Download Complete", `Excel file downloaded: ${filename} (${Object.keys(studentGroups).length} sheets with splits)`);
+    } else {
+      const contextStr = `${adminContext.school}_${adminContext.department}`.replace(/[^a-zA-Z0-9]/g, '');
+      const reviewFilter = selectedReviewFilter === "all" ? "AllReviews" : selectedReviewFilter;
+      filename = `StudentManagement_Split_${contextStr}_${reviewFilter}_${timestamp}.xlsx`;
+      showNotification("success", "Download Complete", `Excel file downloaded: ${filename}`);
+    }
+
+    XLSX.writeFile(wb, filename);
+
+  } catch (error) {
+    console.error("Excel download error:", error);
+    showNotification("error", "Download Failed", "Failed to download Excel file. Please try again.");
+  }
+}, [filteredStudents, adminContext, showNotification, studentSchemas, getMarkingSchema, setStudentSchemas, selectedReviewFilter]);
+
 
 
 
@@ -799,14 +1005,22 @@ const excelData = groupStudents.map(student => {
                   <span>Advanced Filters</span>
                   {showFilters ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </button>
-                <button
-                  onClick={downloadExcel}
-                  disabled={filteredStudents.length === 0}
-                  className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Export Excel ({filteredStudents.length})</span>
-                </button>
+                 <button
+    onClick={downloadExcelWithoutSplit}
+    disabled={filteredStudents.length === 0}
+    className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
+  >
+    <Download className="h-4 w-4" />
+    <span>Export ({filteredStudents.length})</span>
+  </button>
+    <button
+    onClick={downloadExcelWithSplit}
+    disabled={filteredStudents.length === 0}
+    className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
+  >
+    <FileSpreadsheet className="h-4 w-4" />
+    <span>Export Split ({filteredStudents.length})</span>
+  </button>
               </div>
             </div>
 

@@ -10,8 +10,10 @@ import {
   updateProject,
   createReviewRequest, // ✅ ADDED: Import createReviewRequest
   batchCheckRequestStatuses,
+  updateProjectDetails
 } from '../api';
 import FacultyBroadcastFeed from '../Components/FacultyBroadcastFeed';
+import ProjectNameEditor from '../Components/ProjectNameEditor';
 
 // ✅ FIXED: Normalize student data function moved outside component
 function normalizeStudentData(student) {
@@ -82,7 +84,8 @@ const PanelContent = React.memo(({
   getTeamRequestStatus,
   isTeamDeadlinePassed,
   isReviewLocked,
-  refreshKey 
+  refreshKey,
+  handleProjectNameUpdate
 }) => {
   console.log('🔄 [PanelContent] Rendering inner content with refreshKey:', refreshKey);
 
@@ -185,8 +188,11 @@ const PanelContent = React.memo(({
                 <div className="flex items-center space-x-3">
                   <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
                   <div>
-                    <p className="font-semibold text-yellow-800 text-sm sm:text-base">{team.title}</p>
-                    <p className="text-xs sm:text-sm text-yellow-700 mt-1">No panel reviews configured for this project</p>
+ <ProjectNameEditor
+    projectId={team.id}
+    currentName={team.title}
+    onUpdate={handleProjectNameUpdate}
+  />                    <p className="text-xs sm:text-sm text-yellow-700 mt-1">No panel reviews configured for this project</p>
                   </div>
                 </div>
               </div>
@@ -474,7 +480,58 @@ const Panel = () => {
       setRefreshing(false);
     }
   }, [fetchData, showNotification]);
+const handleProjectNameUpdate = useCallback(async (projectId, newName) => {
+  try {
+    console.log('🔄 [Panel] Updating project name:', { projectId, newName });
+    
+    // Show loading notification
+    const loadingId = showNotification(
+      'info', 
+      'Updating Project...', 
+      'Please wait while we update the project name...', 
+      10000
+    );
 
+    // Prepare the payload for your backend endpoint
+    const updatePayload = {
+      projectId: projectId,
+      projectUpdates: {
+        name: newName
+      },
+      studentUpdates: [] // Empty student updates
+    };
+
+    console.log('📤 [Panel] Sending update payload:', updatePayload);
+    
+    const response = await updateProjectDetails(updatePayload);
+    
+    // Hide loading notification
+    hideNotification(loadingId);
+    
+    if (response.success) {
+      console.log('✅ [Panel] Project name updated successfully');
+      
+      // Refresh the data to show updated name
+      await handleRefresh();
+      
+      showNotification(
+        'success',
+        'Project Updated',
+        `Project name updated to "${newName}" successfully!`
+      );
+    } else {
+      throw new Error(response.message || 'Failed to update project name');
+    }
+  } catch (error) {
+    console.error('❌ [Panel] Error updating project name:', error);
+    showNotification(
+      'error',
+      'Update Failed',
+      error.message || 'Failed to update project name. Please try again.'
+    );
+    throw error; // Re-throw to let the component handle it
+  }
+}, [handleRefresh, showNotification, hideNotification]);
   const getTeamRequestStatus = useCallback((team, reviewType) => {
     if (!team) return 'none';
     
@@ -781,6 +838,7 @@ const Panel = () => {
               isTeamDeadlinePassed={isTeamDeadlinePassed}
               isReviewLocked={isReviewLocked}
               refreshKey={refreshKey}
+              handleProjectNameUpdate={handleProjectNameUpdate}
             />
 
             {/* ✅ ADDED: Edit Request Modal */}

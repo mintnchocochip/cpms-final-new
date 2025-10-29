@@ -11,9 +11,11 @@ import {
   updateProject,
   createReviewRequest,
   batchCheckRequestStatuses,
-  updateStudent 
+  updateStudent ,
+  updateProjectDetails
+  
 } from '../api';
-
+import ProjectNameEditor from '../Components/ProjectNameEditor';
   const handleUpdateStudent = async (regNo, updateData) => {
   try {
     console.log('🔵 [Parent] Updating student:', regNo, updateData);
@@ -30,7 +32,8 @@ import {
   }
 };
 
-// Memoized inner content component to prevent unnecessary re-renders
+
+
 const GuideContent = React.memo(({ 
   teams, 
   expandedTeam, 
@@ -43,7 +46,8 @@ const GuideContent = React.memo(({
   isReviewLocked,
   getButtonColor,
   setActivePopup,
-  refreshKey // This will force re-render when changed
+  refreshKey 
+  ,handleProjectNameUpdate // This will force re-render when changed
 }) => {
   console.log('🔄 [GuideContent] Rendering inner content with refreshKey:', refreshKey);
   
@@ -74,8 +78,11 @@ const GuideContent = React.memo(({
                   <div className="flex items-center space-x-3">
                     <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
                     <div>
-                      <p className="font-semibold text-yellow-800 text-sm sm:text-base">{team.title}</p>
-                      <p className="text-xs sm:text-sm text-yellow-700 mt-1">No marking schema configured for this project</p>
+<ProjectNameEditor
+  projectId={team.id}
+  currentName={team.title}
+  onUpdate={handleProjectNameUpdate}
+/>                      <p className="text-xs sm:text-sm text-yellow-700 mt-1">No marking schema configured for this project</p>
                     </div>
                   </div>
                 </div>
@@ -98,7 +105,11 @@ const GuideContent = React.memo(({
                         </button>
                         <div className="min-w-0 flex-1">
                           <h3 className="font-semibold text-gray-900 text-base sm:text-lg lg:text-xl break-words mb-2">
-                            {team.title}
+                             <ProjectNameEditor
+    projectId={team.id}
+    currentName={team.title}
+    onUpdate={handleProjectNameUpdate}
+  />
                           </h3>
                           <p className="text-sm sm:text-base text-gray-600 mb-3">{team.description}</p>
                           
@@ -590,6 +601,7 @@ const fetchData = useCallback(async () => {
   }, [fetchData]);
 
   // ✅ FIXED: Only refresh inner content, not entire page
+
   const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
@@ -607,6 +619,64 @@ const fetchData = useCallback(async () => {
     }
   }, [fetchData, showNotification]);
 
+
+// Memoized inner content component to prevent unnecessary re-renders
+
+// Add to imports at the top
+
+// Add this handler function inside the Guide component (after other handlers)
+const handleProjectNameUpdate = useCallback(async (projectId, newName) => {
+  try {
+    console.log('🔄 [Guide] Updating project name:', { projectId, newName });
+    
+    // Show loading notification
+    const loadingId = showNotification(
+      'info', 
+      'Updating Project...', 
+      'Please wait while we update the project name...', 
+      10000
+    );
+
+    // Prepare the payload for your backend endpoint
+    const updatePayload = {
+      projectId: projectId,
+      projectUpdates: {
+        name: newName
+      },
+      studentUpdates: [] // Empty student updates
+    };
+
+    console.log('📤 [Guide] Sending update payload:', updatePayload);
+    
+    const response = await updateProjectDetails(updatePayload);
+    
+    // Hide loading notification
+    hideNotification(loadingId);
+    
+    if (response.success) {
+      console.log('✅ [Guide] Project name updated successfully');
+      
+      // Refresh the data to show updated name
+      await handleRefresh();
+      
+      showNotification(
+        'success',
+        'Project Updated',
+        `Project name updated to "${newName}" successfully!`
+      );
+    } else {
+      throw new Error(response.message || 'Failed to update project name');
+    }
+  } catch (error) {
+    console.error('❌ [Guide] Error updating project name:', error);
+    showNotification(
+      'error',
+      'Update Failed',
+      error.message || 'Failed to update project name. Please try again.'
+    );
+    throw error; // Re-throw to let the component handle it
+  }
+}, [handleRefresh, showNotification, hideNotification]);
   const getTeamRequestStatus = useCallback((team, reviewType) => {
     if (!team) return 'none';
     
@@ -1004,6 +1074,7 @@ const fetchData = useCallback(async () => {
               getButtonColor={getButtonColor}
               setActivePopup={setActivePopup}
               refreshKey={refreshKey}
+              handleProjectNameUpdate={handleProjectNameUpdate}
             />
 
             {/* ✅ NEW: Edit Request Modal */}
