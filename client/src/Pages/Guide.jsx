@@ -88,148 +88,127 @@ const GuideContent = React.memo(({
             }
             
             return (
-              <div key={team.id} className="bg-white hover:bg-gray-50 transition-colors duration-200">
-                <div className="p-4 sm:p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
-                          className="flex items-center flex-shrink-0 mt-1 p-1 rounded-lg hover:bg-blue-100 transition-colors"
-                        >
-                          <ChevronRight className={`w-5 h-5 text-gray-600 transition-transform duration-200 ${
-                            expandedTeam === team.id ? 'rotate-90' : ''
-                          }`} />
-                        </button>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-gray-900 text-base sm:text-lg lg:text-xl break-words mb-2">
-                             <ProjectNameEditor
-    projectId={team.id}
-    currentName={team.title}
-    onUpdate={handleProjectNameUpdate}
-  />
-                          </h3>
-                          <p className="text-sm sm:text-base text-gray-600 mb-3">{team.description}</p>
-                          
-                          <div className="flex items-center gap-4 mb-3">
-                            <div className="flex items-center gap-2 text-blue-600">
-                              <Users className="w-4 h-4" />
-                              <span className="text-sm font-medium">
-                                {team.students.length} Student{team.students.length !== 1 ? 's' : ''}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          {/* ✅ UPDATED: Status Information with Panel Reviews */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
-                            {reviewTypes.map(reviewType => {
-                              const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
-                              const requestStatus = getTeamRequestStatus(team, reviewType.key);
-                              const isPanelReview = reviewType.isPanelReview || false; // ✅ NEW
-                              
-                              return (
-                                <div key={reviewType.key} className="flex items-center gap-2 bg-gray-50 rounded-lg">
-                                  <span className={`font-medium ${isPanelReview ? 'text-purple-700' : 'text-gray-700'}`}>
-                                    {reviewType.name}:
-                                  </span>
-                                  <div className="flex items-center gap-1">
-                                    <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                                      isPanelReview 
-                                        ? 'bg-purple-100 text-purple-700' // ✅ NEW: Purple for panel reviews
-                                        : isPassed 
-                                          ? 'bg-red-100 text-red-700' 
-                                          : 'bg-green-100 text-green-700'
-                                    }`}>
-                                      {isPanelReview 
-                                        ? 'Panel Review' // ✅ NEW: Show "Panel Review" instead of deadline status
-                                        : isPassed 
-                                          ? 'Deadline Passed' 
-                                          : 'Active'
-                                      }
-                                    </span>
-                                    {requestStatus === 'approved' && !isPanelReview && (
-                                      <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-lg text-xs font-medium">Extended</span>
-                                    )}
-                                    {requestStatus === 'pending' && !isPanelReview && (
-                                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-lg text-xs font-medium">Pending</span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* ✅ UPDATED: Review Buttons with Panel Support and PPT Indicator */}
-                    <div className="flex flex-wrap gap-3 justify-start lg:justify-end">
-                      {reviewTypes.map(reviewType => {
-                        const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
-                        const requestStatus = getTeamRequestStatus(team, reviewType.key);
-                        const isPanelReview = reviewType.isPanelReview || false; // ✅ NEW
-                        
-                        // ✅ CHANGED: Get PPT requirement from schema
-                        const schemaReview = team.markingSchema?.reviews?.find(r => r.reviewName === reviewType.key);
-                        const requiresPPT = !!schemaReview?.pptApproved;
-                        
-                        return (
-                          <button
-                            key={reviewType.key}
-                            onClick={() => setActivePopup({ 
-                              type: reviewType.key, 
-                              teamId: team.id,
-                              teamTitle: team.title,
-                              students: team.students,
-                              markingSchema: team.markingSchema
-                            })}
-                            className={`px-4 py-3 text-white text-sm font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
-                              isPanelReview 
-                                ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700' // ✅ NEW: Purple for panel reviews
-                                : getButtonColor(reviewType.key)
-                            } ${
-                              isPassed ? 'opacity-75' : ''
-                            } flex items-center gap-2 whitespace-nowrap min-w-0`}
-                          >
-                            <span className="truncate max-w-24 sm:max-w-none">{reviewType.name}</span>
-                            {requiresPPT && ( // ✅ CHANGED: Use schema-based PPT requirement
-                              <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">PPT</span>
-                            )}
-                            {isPanelReview && ( // ✅ NEW: Panel indicator
-                              <span className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded-full flex-shrink-0 font-bold">👥</span>
-                            )}
-                            {requestStatus === 'approved' && !isPanelReview && (
-                              <span className="text-xs bg-purple-500 px-2 py-1 rounded-full flex-shrink-0 font-bold">EXT</span>
-                            )}
-                            {isPassed && !isPanelReview && (
-                              <span className="text-xs bg-red-500 px-2 py-1 rounded-full flex-shrink-0">🔒</span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* ✅ UPDATED: Expanded Content with Panel Reviews Support */}
-                  {expandedTeam === team.id && (
-                    <div className="mt-6 -mx-4 sm:-mx-6 bg-gray-50 rounded-xl overflow-hidden">
-                      <div className="p-4 sm:p-6">
-                        <ReviewTable 
-                          team={team} 
-                          onUpdateStudent={handleUpdateStudent} 
-                          deadlines={deadlines}
-                          requestStatuses={requestStatuses}
-                          isDeadlinePassed={(reviewType) => isTeamDeadlinePassed(reviewType, team.id)}
-                          isReviewLocked={(student, reviewType) => isReviewLocked(student, reviewType, team.id)}
-                          markingSchema={team.markingSchema}
-                          panelMode={false}
-                          showPanelReviews={true} // ✅ NEW: Show panel reviews in table
-                        />
-                      </div>
-                    </div>
+            <div key={team.id} className="bg-white hover:bg-gray-50 transition-colors duration-200">
+  <div className="p-4 sm:p-6">
+    {/* ✅ FIXED: Changed to vertical stacking on all screen sizes to prevent overlap */}
+    <div className="flex flex-col gap-4">
+      {/* Left Section: Project Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start gap-3">
+          <button
+            onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
+            className="flex items-center flex-shrink-0 mt-1 p-1 rounded-lg hover:bg-blue-100 transition-colors"
+          >
+            <ChevronRight className={`w-5 h-5 text-gray-600 transition-transform duration-200 ${
+              expandedTeam === team.id ? 'rotate-90' : ''
+            }`} />
+          </button>
+          <div className="min-w-0 flex-1">
+            {/* ✅ FIXED: Project title with word-break to prevent overflow */}
+            <div className="mb-2">
+              <ProjectNameEditor
+                projectId={team.id}
+                currentName={team.title}
+                onUpdate={handleProjectNameUpdate}
+              />
+            </div>
+            <p className="text-sm sm:text-base text-gray-600 mb-3 break-words">{team.description}</p>
+            
+            <div className="flex items-center gap-4 mb-3">
+              <div className="flex items-center gap-2 text-blue-600">
+                <Users className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  {team.students.length} Student{team.students.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+            
+            {/* Review Status List */}
+            
+          </div>
+        </div>
+      </div>
+      
+      {/* ✅ FIXED: Review Buttons - Now below content to prevent overlap */}
+      <div className="w-full">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {reviewTypes.map(reviewType => {
+            const isPassed = isTeamDeadlinePassed(reviewType.key, team.id);
+            const requestStatus = getTeamRequestStatus(team, reviewType.key);
+            const isPanelReview = reviewType.isPanelReview || false;
+            const schemaReview = team.markingSchema?.reviews?.find(r => r.reviewName === reviewType.key);
+            const requiresPPT = !!schemaReview?.pptApproved;
+            
+            return (
+              <button
+                key={reviewType.key}
+                onClick={() => setActivePopup({ 
+                  type: reviewType.key, 
+                  teamId: team.id,
+                  teamTitle: team.title,
+                  students: team.students,
+                  markingSchema: team.markingSchema
+                })}
+                className={`px-3 py-3 text-white text-xs sm:text-sm font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
+                  isPanelReview 
+                    ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
+                    : getButtonColor(reviewType.key)
+                } ${
+                  isPassed ? 'opacity-75' : ''
+                } flex flex-col items-center justify-center gap-2 min-h-[70px]`}
+              >
+                <span className="text-center leading-tight break-words w-full">
+                  {reviewType.name}
+                </span>
+                <div className="flex items-center gap-1 flex-wrap justify-center">
+                  {requiresPPT && (
+                    <span className="text-xs bg-white bg-opacity-30 px-2 py-0.5 rounded-full font-bold">
+                      PPT
+                    </span>
+                  )}
+                  {isPanelReview && (
+                    <span className="text-xs bg-white bg-opacity-30 px-2 py-0.5 rounded-full font-bold">
+                      👥
+                    </span>
+                  )}
+                  {requestStatus === 'approved' && !isPanelReview && (
+                    <span className="text-xs bg-purple-500 px-2 py-0.5 rounded-full font-bold">
+                      EXT
+                    </span>
+                  )}
+                  {isPassed && !isPanelReview && (
+                    <span className="text-xs bg-red-500 px-2 py-0.5 rounded-full">
+                      🔒
+                    </span>
                   )}
                 </div>
-              </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+
+    {/* Expanded Content */}
+    {expandedTeam === team.id && (
+      <div className="mt-6 -mx-4 sm:-mx-6 bg-gray-50 rounded-xl overflow-hidden">
+        <div className="p-4 sm:p-6">
+          <ReviewTable 
+            team={team} 
+            deadlines={deadlines}
+            requestStatuses={requestStatuses}
+            isDeadlinePassed={(reviewType) => isTeamDeadlinePassed(reviewType, team.id)}
+            isReviewLocked={(student, reviewType) => isReviewLocked(student, reviewType, team.id)}
+            markingSchema={team.markingSchema}
+            guideMode={true}
+            showGuideReviews={true}
+          />
+        </div>
+      </div>
+    )}
+  </div>
+</div>
+
             );
           })}
         </div>
