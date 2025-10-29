@@ -43,43 +43,6 @@ function safeMeta(obj) {
   }
 }
 
-// redact sensitive keys from objects (recursive)
-function redact(obj, keys = ['password', 'pwd', 'token', 'accessToken', 'refreshToken', 'authorization', 'auth']) {
-  if (!obj || typeof obj !== 'object') return obj;
-  const result = Array.isArray(obj) ? [] : {};
-  for (const [k, v] of Object.entries(obj)) {
-    try {
-      if (keys.includes(k.toString().toLowerCase())) {
-        result[k] = 'REDACTED';
-        continue;
-      }
-
-      if (v && typeof v === 'object') {
-        result[k] = redact(v, keys);
-      } else {
-        result[k] = v;
-      }
-    } catch (e) {
-      result[k] = 'UNSERIALIZABLE';
-    }
-  }
-  return result;
-}
-
-// safely stringify with size limit to avoid logging extremely large payloads
-function safeStringifyWithLimit(obj, maxChars = 100000) {
-  try {
-    const str = JSON.stringify(obj);
-    if (str.length > maxChars) {
-      return `${str.slice(0, maxChars)}... (truncated, total ${str.length} chars)`;
-    }
-    return str;
-  } catch (e) {
-    return '[unserializable]';
-  }
-}
-
 export { logger, safeMeta };
-export { redact, safeStringifyWithLimit };
 
 export default logger;

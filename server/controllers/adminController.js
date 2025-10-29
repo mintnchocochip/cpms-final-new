@@ -2058,6 +2058,10 @@ export async function createBroadcastMessage(req, res) {
     const normalizedSchools = normalizeAudience(targetSchools);
     const normalizedDepartments = normalizeAudience(targetDepartments);
 
+  // also prepare normalized lowercase versions to make matching simple
+  const normalizedSchoolsLower = normalizedSchools.map((s) => String(s).trim().toLowerCase());
+  const normalizedDepartmentsLower = normalizedDepartments.map((d) => String(d).trim().toLowerCase());
+
     let expiryDate = null;
     if (expiresAt) {
       const parsedExpiry = new Date(expiresAt);
@@ -2075,6 +2079,8 @@ export async function createBroadcastMessage(req, res) {
       message: message.trim(),
       targetSchools: normalizedSchools,
       targetDepartments: normalizedDepartments,
+      targetSchoolsNormalized: normalizedSchoolsLower,
+      targetDepartmentsNormalized: normalizedDepartmentsLower,
       createdBy: admin._id,
       createdByEmployeeId: admin.employeeId,
       createdByName: admin.name || "",

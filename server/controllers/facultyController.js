@@ -216,19 +216,38 @@ export async function getFacultyBroadcasts(req, res) {
     const parsedLimit = Math.min(Number(limit) || 20, 50);
     const now = new Date();
 
+    // Use case-insensitive exact matching for audience values to tolerate
+    // differences in casing or spacing between stored faculty values and
+    // admin-entered broadcast targets. Build regex list for $in queries.
+    const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Prepare normalized forms of the faculty's school/department for fast
+    // matching against broadcasts that store normalized arrays.
+    const facultySchoolsNormalized = facultySchools.map((s) => String(s).trim().toLowerCase());
+    const facultyDepartmentsNormalized = facultyDepartments.map((d) => String(d).trim().toLowerCase());
+
+    // Preserve the regex fallback for older broadcasts that may not have
+    // normalized arrays; this ensures backward compatibility.
+    const schoolRegexes = facultySchools.map((s) => new RegExp(`^${escapeRegExp(s)}$`, 'i'));
+    const deptRegexes = facultyDepartments.map((d) => new RegExp(`^${escapeRegExp(d)}$`, 'i'));
+
     const audienceFilter = [
       {
         $or: [
           { targetSchools: { $exists: false } },
           { targetSchools: { $size: 0 } },
-          { targetSchools: { $in: facultySchools } },
+          // match against normalized stored values
+          { targetSchoolsNormalized: { $in: facultySchoolsNormalized } },
+          // fallback to legacy field with case-insensitive regex
+          { targetSchools: { $in: schoolRegexes } },
         ],
       },
       {
         $or: [
           { targetDepartments: { $exists: false } },
           { targetDepartments: { $size: 0 } },
-          { targetDepartments: { $in: facultyDepartments } },
+          { targetDepartmentsNormalized: { $in: facultyDepartmentsNormalized } },
+          { targetDepartments: { $in: deptRegexes } },
         ],
       },
     ];
