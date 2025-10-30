@@ -34,6 +34,7 @@ const AdminBroadcast = () => {
     targetSchools: [],
     targetDepartments: [],
     expiresAt: "",
+    action: 'notice',
   });
   const [sending, setSending] = useState(false);
 
@@ -115,6 +116,7 @@ const AdminBroadcast = () => {
         targetSchools: formData.targetSchools,
         targetDepartments: formData.targetDepartments,
         expiresAt: formData.expiresAt || undefined,
+        action: formData.action || 'notice',
       };
 
       await createBroadcastMessage(payload);
@@ -130,6 +132,7 @@ const AdminBroadcast = () => {
         targetSchools: [],
         targetDepartments: [],
         expiresAt: "",
+        action: 'notice',
       });
 
       fetchHistory();
@@ -326,6 +329,25 @@ const AdminBroadcast = () => {
                       The message disappears automatically after this time. Leave empty to keep it active.
                     </p>
                   </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Action
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border ${formData.action === 'notice' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white'}`}>
+                        <input type="radio" name="action" value="notice" checked={formData.action === 'notice'} onChange={handleInputChange} />
+                        <span className="text-sm">Notice (informational)</span>
+                      </label>
+                      <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border ${formData.action === 'block' ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 bg-white'}`}>
+                        <input type="radio" name="action" value="block" checked={formData.action === 'block'} onChange={handleInputChange} />
+                        <span className="text-sm">Block faculty access</span>
+                      </label>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Choose 'Block faculty access' to temporarily prevent faculty from using the portal (they will still see this broadcast).
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -424,6 +446,9 @@ const AdminBroadcast = () => {
                                 Expires {formatTimestamp(item.expiresAt)}
                               </span>
                             )}
+                            <span>
+                              Action: <strong className="ml-1">{item.action || 'notice'}</strong>
+                            </span>
                             {isExpired && (
                               <span className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600">
                                 Expired

@@ -122,10 +122,11 @@ export async function createOrUpdateMarkingSchema(req, res) {
           });
         }
 
-        if (comp.weight <= 0) {
+        // allow zero weight (0 marks) for components; only negative weights are invalid
+        if (comp.weight < 0) {
           return res.status(400).json({
             success: false,
-            message: `Component ${comp.name} must have a positive weight`,
+            message: `Component ${comp.name} must have a non-negative weight`,
           });
         }
 
@@ -2013,6 +2014,7 @@ export async function createBroadcastMessage(req, res) {
       targetDepartments,
       expiresAt,
       isActive,
+      action = 'notice',
     } = req.body;
 
     if (!message || typeof message !== "string" || !message.trim()) {
@@ -2056,6 +2058,10 @@ export async function createBroadcastMessage(req, res) {
     const normalizedSchools = normalizeAudience(targetSchools);
     const normalizedDepartments = normalizeAudience(targetDepartments);
 
+  // also prepare normalized lowercase versions to make matching simple
+  const normalizedSchoolsLower = normalizedSchools.map((s) => String(s).trim().toLowerCase());
+  const normalizedDepartmentsLower = normalizedDepartments.map((d) => String(d).trim().toLowerCase());
+
     let expiryDate = null;
     if (expiresAt) {
       const parsedExpiry = new Date(expiresAt);
@@ -2073,10 +2079,13 @@ export async function createBroadcastMessage(req, res) {
       message: message.trim(),
       targetSchools: normalizedSchools,
       targetDepartments: normalizedDepartments,
+      targetSchoolsNormalized: normalizedSchoolsLower,
+      targetDepartmentsNormalized: normalizedDepartmentsLower,
       createdBy: admin._id,
       createdByEmployeeId: admin.employeeId,
       createdByName: admin.name || "",
       expiresAt: expiryDate,
+      action: ['notice', 'block'].includes(action) ? action : 'notice',
     };
 
     if (typeof isActive === "boolean") {

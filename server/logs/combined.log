@@ -1,0 +1,6 @@
+{"level":"info","message":"logger_test_start","test":true,"timestamp":"2025-10-28T06:48:40.405Z"}
+{"level":"warn","message":"logger_test_warn","reason":"just-testing","timestamp":"2025-10-28T06:48:40.406Z"}
+{"error":"none","level":"error","message":"logger_test_error","timestamp":"2025-10-28T06:48:40.406Z"}
+{"level":"info","message":"logger_test_start","test":true,"timestamp":"2025-10-28T06:57:25.574Z"}
+{"level":"warn","message":"logger_test_warn","reason":"just-testing","timestamp":"2025-10-28T06:57:25.575Z"}
+{"error":"none","level":"error","message":"logger_test_error","timestamp":"2025-10-28T06:57:25.575Z"}
