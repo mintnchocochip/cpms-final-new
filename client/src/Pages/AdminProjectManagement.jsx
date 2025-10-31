@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAllProjects, updateProject, deleteProject } from "../api.js";
+import { getAllProjects, updateProject, deleteProject, getMarkingSchema } from "../api.js";
 import Navbar from "../Components/UniversalNavbar";
 
 import {
@@ -33,6 +33,7 @@ import {
   Save,
   Plus,
   Star,
+  Lock,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -46,6 +47,119 @@ const extractReviewEntries = (reviews) => {
     return Object.values(reviews);
   }
   return [];
+};
+
+const getReviewEntriesWithKeys = (reviews) => {
+  if (!reviews) return [];
+  if (reviews instanceof Map) {
+    return Array.from(reviews.entries());
+  }
+  if (typeof reviews === "object") {
+    return Object.entries(reviews);
+  }
+  return [];
+};
+
+const toTitleCase = (value) => {
+  if (!value || typeof value !== "string") return "Review";
+  const withSpaces = value
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([0-9])/gi, "$1 $2")
+    .trim();
+  return withSpaces.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const schemaKeyFor = (school, department) => {
+  if (!school || !department) return null;
+  return `${school}|||${department}`;
+};
+
+const deriveSchemaKeyForProject = (project) => {
+  if (!project) return null;
+  const directKey = schemaKeyFor(project.school, project.department);
+  if (directKey) return directKey;
+
+  if (Array.isArray(project.students)) {
+    for (const student of project.students) {
+      const fallbackKey = schemaKeyFor(student?.school, student?.department);
+      if (fallbackKey) {
+        return fallbackKey;
+      }
+    }
+  }
+
+  return null;
+};
+
+const getStudentReviewRecord = (student, reviewName) => {
+  if (!student || !reviewName) return null;
+  const { reviews } = student;
+
+  if (!reviews) return null;
+  if (typeof reviews.get === "function") {
+    return reviews.get(reviewName);
+  }
+
+  if (typeof reviews === "object") {
+    return reviews[reviewName];
+  }
+
+  return null;
+};
+
+const computeProjectReviewPptMeta = (project, schemaCache) => {
+  if (!project) return [];
+
+  const metadata = [];
+  const seen = new Set();
+
+  const schemaKey = deriveSchemaKeyForProject(project);
+  const schema = schemaKey ? schemaCache.get(schemaKey) : null;
+
+  if (schema?.reviews && Array.isArray(schema.reviews)) {
+    schema.reviews.forEach((review) => {
+      if (!review?.reviewName) return;
+      if (!review?.pptApproved) return;
+      if (seen.has(review.reviewName)) return;
+
+      seen.add(review.reviewName);
+      metadata.push({
+        key: review.reviewName,
+        label: review.displayName || toTitleCase(review.reviewName),
+        facultyType: review.facultyType,
+        requiresPpt: true,
+      });
+    });
+  }
+
+  if (metadata.length > 0) {
+    return metadata;
+  }
+
+  // Fallback to student review data when schema is unavailable
+  if (Array.isArray(project.students)) {
+    project.students.forEach((student) => {
+      getReviewEntriesWithKeys(student.reviews).forEach(([reviewName, reviewData]) => {
+        if (!reviewName || seen.has(reviewName)) return;
+        if (!reviewData || typeof reviewData !== "object") return;
+        if (!reviewData.pptApproved) return;
+
+        seen.add(reviewName);
+        metadata.push({
+          key: reviewName,
+          label:
+            reviewData.reviewDisplayName ||
+            reviewData.displayName ||
+            reviewData.name ||
+            toTitleCase(reviewName),
+          facultyType: reviewData.facultyType,
+          requiresPpt: true,
+        });
+      });
+    });
+  }
+
+  return metadata;
 };
 
 const studentHasPresentAttendance = (student) => {
@@ -76,6 +190,7 @@ const DEPARTMENT_OPTIONS = [
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [adminContext, setAdminContext] = useState(null);
+  const [schemaCache, setSchemaCache] = useState(() => new Map());
   
   // Filter states
   const [selectedSchool, setSelectedSchool] = useState("");
@@ -230,6 +345,45 @@ const exportToBulkTemplate = (projects) => {
     }
   }, [navigate]);
 
+  const primeSchemaCache = useCallback(async (projectList) => {
+    if (!projectList || projectList.length === 0) {
+      setSchemaCache(new Map());
+      return;
+    }
+
+    const schemaKeys = new Set();
+    projectList.forEach((project) => {
+      const key = deriveSchemaKeyForProject(project);
+      if (key) {
+        schemaKeys.add(key);
+      }
+    });
+
+    if (schemaKeys.size === 0) {
+      setSchemaCache(new Map());
+      return;
+    }
+
+    const schemaEntries = await Promise.all(
+      Array.from(schemaKeys).map(async (key) => {
+        const [school, department] = key.split("|||");
+        try {
+          const schemaResponse = await getMarkingSchema(school, department);
+          const schemaData = schemaResponse?.schema || schemaResponse?.data?.schema || null;
+          return [key, schemaData];
+        } catch (schemaError) {
+          console.error(
+            `[AdminProjectManagement] Failed to fetch marking schema for ${school}/${department}:`,
+            schemaError
+          );
+          return [key, null];
+        }
+      })
+    );
+
+    setSchemaCache(new Map(schemaEntries));
+  }, []);
+
   // Fetch projects data
 // Fetch projects data
 const fetchProjects = useCallback(async () => {
@@ -249,21 +403,25 @@ const fetchProjects = useCallback(async () => {
     const response = await getAllProjects(params);
     
     if (response?.data?.data) {
-      setProjects(response.data.data);
-      showNotification("success", "Data Loaded", `Successfully loaded ${response.data.data.length} projects`);
+      const projectData = response.data.data;
+      setProjects(projectData);
+      await primeSchemaCache(projectData);
+      showNotification("success", "Data Loaded", `Successfully loaded ${projectData.length} projects`);
     } else {
       setProjects([]);
+      setSchemaCache(new Map());
       showNotification("error", "No Data", "No projects found matching the criteria");
     }
     
   } catch (error) {
     console.error("Error fetching projects:", error);
     setProjects([]);
+    setSchemaCache(new Map());
     showNotification("error", "Fetch Failed", "Failed to load project data. Please try again.");
   } finally {
     setLoading(false);
   }
-}, [adminContext, showNotification]); // Removed selectedSchool, selectedDepartment dependencies
+}, [adminContext, primeSchemaCache, showNotification]); // Removed selectedSchool, selectedDepartment dependencies
 
 
 useEffect(() => {
@@ -298,21 +456,29 @@ const applyFilters = useCallback(async () => {
     const response = await getAllProjects(params);
     
     if (response?.data?.data) {
-      setProjects(response.data.data);
-      showNotification("success", "Filters Applied", `Successfully loaded ${response.data.data.length} projects with filters`);
+      const projectData = response.data.data;
+      setProjects(projectData);
+      await primeSchemaCache(projectData);
+      showNotification(
+        "success",
+        "Filters Applied",
+        `Successfully loaded ${projectData.length} projects with filters`
+      );
     } else {
       setProjects([]);
+      setSchemaCache(new Map());
       showNotification("error", "No Data", "No projects found matching the criteria");
     }
     
   } catch (error) {
     console.error("Error applying filters:", error);
     setProjects([]);
+    setSchemaCache(new Map());
     showNotification("error", "Filter Failed", "Failed to apply filters. Please try again.");
   } finally {
     setLoading(false);
   }
-}, [adminContext, selectedSchool, selectedDepartment, showNotification]);
+}, [adminContext, primeSchemaCache, selectedSchool, selectedDepartment, showNotification]);
 
   // Handle context change - redirect to school selection
   const handleChangeSchoolDepartment = useCallback(() => {
@@ -334,6 +500,15 @@ const applyFilters = useCallback(async () => {
 
   // Type options for the select element
   const typeOptions = ['Software', 'Hardware'];
+
+  const projectReviewMetaMap = useMemo(() => {
+    const map = new Map();
+    projects.forEach((project) => {
+      const meta = computeProjectReviewPptMeta(project, schemaCache);
+      map.set(project._id, meta);
+    });
+    return map;
+  }, [projects, schemaCache]);
 
   // Helper function to normalize type for backend
   const normalizeType = (type) => {
@@ -933,6 +1108,7 @@ const applyFilters = useCallback(async () => {
                   {filteredProjects.map((project) => {
                     const isExpanded = expandedProjects.has(project._id);
                     const hasPresentStudent = projectHasPresentStudent(project);
+                    const projectReviewMeta = projectReviewMetaMap.get(project._id) || [];
                     
                     return (
                       <div
@@ -1124,49 +1300,120 @@ const applyFilters = useCallback(async () => {
                               </h5>
                               {project.students && project.students.length > 0 ? (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                                  {project.students.map((student, index) => (
-                                    <div key={student._id} className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 shadow-sm">
-                                      <div className="flex justify-between items-start mb-3">
-                                        <h6 className="font-bold text-base sm:text-lg text-slate-800">{student.name}</h6>
-                                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-semibold">
-                                          #{index + 1}
-                                        </span>
-                                      </div>
-                                      
-                                      <div className="space-y-2">
-                                        <div>
-                                          <span className="text-xs sm:text-sm font-semibold text-slate-700">Reg No:</span>
-                                          <p className="text-slate-600">{student.regNo}</p>
+                                  {project.students.map((student, index) => {
+                                    const pptStatuses = projectReviewMeta.map((meta) => {
+                                      const reviewRecord = getStudentReviewRecord(student, meta.key);
+                                      const pptData = reviewRecord?.pptApproved;
+                                      return {
+                                        key: meta.key,
+                                        label: meta.label,
+                                        facultyType: meta.facultyType,
+                                        approved: pptData?.approved === true,
+                                        locked: pptData?.locked === true,
+                                      };
+                                    });
+
+                                    const hasReviewLevelStatuses = projectReviewMeta.length > 0;
+                                    const allApproved = hasReviewLevelStatuses && pptStatuses.every((status) => status.approved);
+                                    const pendingCount = hasReviewLevelStatuses
+                                      ? pptStatuses.filter((status) => !status.approved).length
+                                      : 0;
+
+                                    const studentReviewCount = student.reviews
+                                      ? typeof student.reviews.size === "number"
+                                        ? student.reviews.size
+                                        : Object.keys(student.reviews).length
+                                      : 0;
+
+                                    return (
+                                      <div key={student._id} className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 shadow-sm">
+                                        <div className="flex justify-between items-start mb-3">
+                                          <h6 className="font-bold text-base sm:text-lg text-slate-800">{student.name}</h6>
+                                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-semibold">
+                                            #{index + 1}
+                                          </span>
                                         </div>
-                                        <div>
-                                          <span className="text-xs sm:text-sm font-semibold text-slate-700">Email:</span>
-                                          <p className="text-slate-600">{student.emailId}</p>
-                                        </div>
-                                        <div>
-                                          <span className="text-xs sm:text-sm font-semibold text-slate-700">Reviews:</span>
-                                          <p className="text-slate-600">
-                                            {student.reviews ? Object.keys(student.reviews).length : 0} completed
-                                          </p>
-                                        </div>
-                                        <div>
-                                          <span className="text-xs sm:text-sm font-semibold text-slate-700">PPT Status:</span>
-                                          <div className="flex items-center space-x-2 mt-1">
-                                            {student.pptApproved?.approved ? (
+
+                                        <div className="space-y-2">
+                                          <div>
+                                            <span className="text-xs sm:text-sm font-semibold text-slate-700">Reg No:</span>
+                                            <p className="text-slate-600">{student.regNo}</p>
+                                          </div>
+                                          <div>
+                                            <span className="text-xs sm:text-sm font-semibold text-slate-700">Email:</span>
+                                            <p className="text-slate-600">{student.emailId}</p>
+                                          </div>
+                                          <div>
+                                            <span className="text-xs sm:text-sm font-semibold text-slate-700">Reviews:</span>
+                                            <p className="text-slate-600">{studentReviewCount} completed</p>
+                                          </div>
+                                          <div>
+                                            <span className="text-xs sm:text-sm font-semibold text-slate-700">PPT Approval:</span>
+                                            {hasReviewLevelStatuses ? (
                                               <>
-                                                <CheckCircle className="h-4 w-4 text-emerald-600" />
-                                                <span className="text-emerald-600 text-sm">Approved</span>
+                                                <div className="mt-2 space-y-2">
+                                                  {pptStatuses.map((status) => {
+                                                    const StatusIcon = status.approved ? CheckCircle : Clock;
+                                                    return (
+                                                      <div
+                                                        key={`${student._id}_${status.key}`}
+                                                        className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm"
+                                                      >
+                                                        <div className="flex items-center gap-2">
+                                                          <span className="font-semibold text-xs sm:text-sm text-slate-700">
+                                                            {status.label}
+                                                          </span>
+                                                          {status.facultyType && (
+                                                            <span className="text-[10px] uppercase tracking-wide text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                                                              {String(status.facultyType).toUpperCase()}
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                        <div
+                                                          className={`flex items-center gap-1 text-xs sm:text-sm font-semibold ${
+                                                            status.approved ? "text-emerald-600" : "text-amber-600"
+                                                          }`}
+                                                        >
+                                                          <StatusIcon className="h-3.5 w-3.5" />
+                                                          <span>{status.approved ? "Approved" : "Pending"}</span>
+                                                          {status.locked && <Lock className="h-3 w-3 text-slate-500" />}
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                                <div className="mt-2">
+                                                  <span
+                                                    className={`text-xs sm:text-sm font-semibold ${
+                                                      allApproved ? "text-emerald-600" : "text-amber-600"
+                                                    }`}
+                                                  >
+                                                    {allApproved
+                                                      ? "All required PPTs approved"
+                                                      : `${pendingCount} review${pendingCount === 1 ? "" : "s"} pending approval`}
+                                                  </span>
+                                                </div>
                                               </>
                                             ) : (
-                                              <>
-                                                <Clock className="h-4 w-4 text-amber-600" />
-                                                <span className="text-amber-600 text-sm">Pending</span>
-                                              </>
+                                              <div className="flex items-center space-x-2 mt-1">
+                                                {student.pptApproved?.approved ? (
+                                                  <>
+                                                    <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                                    <span className="text-emerald-600 text-sm">Approved</span>
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <Clock className="h-4 w-4 text-amber-600" />
+                                                    <span className="text-amber-600 text-sm">Pending</span>
+                                                  </>
+                                                )}
+                                              </div>
                                             )}
                                           </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               ) : (
                                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-6">

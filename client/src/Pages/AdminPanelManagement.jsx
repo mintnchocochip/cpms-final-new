@@ -65,28 +65,21 @@ const normalizeMarksCollection = (marks) => {
   return {};
 };
 
-const reviewHasMeaningfulData = (review) => {
+const reviewHasPositiveMarks = (review) => {
   if (!review || typeof review !== "object") return false;
-
-  if (review.locked) return true;
-
-  const attendanceValue = review.attendance?.value;
-  if (attendanceValue === true) return true;
-
-  if (review.comments && review.comments.trim().length > 0) return true;
 
   const marks = normalizeMarksCollection(review.marks);
   for (const value of Object.values(marks)) {
-    if (value === "PAT") return true;
-    if (typeof value === "number" && !Number.isNaN(value) && value !== 0) {
+    if (typeof value === "number" && !Number.isNaN(value) && value > 0) {
       return true;
     }
     if (typeof value === "string") {
       const trimmed = value.trim();
       if (!trimmed) continue;
       const numeric = Number(trimmed);
-      if (!Number.isNaN(numeric) && numeric !== 0) return true;
-      if (trimmed.toUpperCase() === "PAT") return true;
+      if (!Number.isNaN(numeric) && numeric > 0) {
+        return true;
+      }
     }
   }
 
@@ -107,14 +100,16 @@ const schemaKeyFor = (school, department) => {
   return `${school}|||${department}`;
 };
 
-const computeProjectMarkInfo = (project, panel, schemaCache) => {
+const computeProjectMarkInfo = (project, panel, schemaCache, selectedReview) => {
   const baseSummary = {
     reviewNames: [],
     totalStudents: Array.isArray(project?.students) ? project.students.length : 0,
-    studentsWithAnyMarks: 0,
+    studentsWithMarks: 0,
     studentsFullyMarked: 0,
     hasAnyMarked: false,
     isFullyMarked: false,
+    projectMarked: false,
+    projectFullyMarked: false,
     status: "none",
   };
 
@@ -134,38 +129,53 @@ const computeProjectMarkInfo = (project, panel, schemaCache) => {
     };
   }
 
-  const reviewNames = panelReviews.map((review) => review.reviewName);
-  let studentsWithAnyMarks = 0;
+  const applicableReviews = selectedReview && selectedReview !== "all"
+    ? panelReviews.filter((review) => review.reviewName === selectedReview)
+    : panelReviews;
+
+  if (applicableReviews.length === 0) {
+    return {
+      ...baseSummary,
+      reviewNames: panelReviews.map((review) => review.reviewName),
+      status: "no-review",
+    };
+  }
+
+  const reviewNames = applicableReviews.map((review) => review.reviewName);
+  let studentsWithMarks = 0;
   let studentsFullyMarked = 0;
 
   project.students.forEach((student) => {
     const reviews = normalizeReviewCollection(student.reviews);
 
-    const hasAny = reviewNames.some((reviewName) => reviewHasMeaningfulData(reviews[reviewName]));
-    const isComplete = reviewNames.every((reviewName) => reviewHasMeaningfulData(reviews[reviewName]));
+    const hasPositiveMarks = reviewNames.some((reviewName) => reviewHasPositiveMarks(reviews[reviewName]));
+    const hasMarksForAll = reviewNames.every((reviewName) => reviewHasPositiveMarks(reviews[reviewName]));
 
-    if (hasAny) studentsWithAnyMarks += 1;
-    if (isComplete) studentsFullyMarked += 1;
+    if (hasPositiveMarks) studentsWithMarks += 1;
+    if (hasMarksForAll) studentsFullyMarked += 1;
   });
 
   const totalStudents = project.students.length;
-  const isFullyMarked = totalStudents > 0 && studentsFullyMarked === totalStudents;
-  const hasAnyMarked = studentsWithAnyMarks > 0;
+  const projectFullyMarked = totalStudents > 0 && studentsFullyMarked === totalStudents;
+  const projectMarked = studentsWithMarks > 0;
+  const status = projectFullyMarked ? "full" : projectMarked ? "partial" : "none";
 
   return {
     reviewNames,
     totalStudents,
-    studentsWithAnyMarks,
+    studentsWithMarks,
     studentsFullyMarked,
-    hasAnyMarked,
-    isFullyMarked,
-    status: isFullyMarked ? "full" : hasAnyMarked ? "partial" : "none",
+    hasAnyMarked: projectMarked,
+    isFullyMarked: projectFullyMarked,
+    projectMarked,
+    projectFullyMarked,
+    status,
   };
 };
 
-const computePanelMarkSummary = (panel, schemaCache) => {
+const computePanelMarkSummary = (panel, schemaCache, selectedReview) => {
   const enrichedTeams = panel.teams.map((team) => {
-    const markStatus = computeProjectMarkInfo(team.full, panel, schemaCache);
+    const markStatus = computeProjectMarkInfo(team.full, panel, schemaCache, selectedReview);
     return {
       ...team,
       markStatus,
@@ -173,17 +183,17 @@ const computePanelMarkSummary = (panel, schemaCache) => {
   });
 
   const totalProjects = enrichedTeams.length;
-  const fullyMarkedProjects = enrichedTeams.filter((team) => team.markStatus.isFullyMarked).length;
-  const projectsWithAnyMarks = enrichedTeams.filter((team) => team.markStatus.hasAnyMarked).length;
-  const partialProjects = Math.max(projectsWithAnyMarks - fullyMarkedProjects, 0);
-  const unmarkedProjects = Math.max(totalProjects - projectsWithAnyMarks, 0);
+  const fullyMarkedProjects = enrichedTeams.filter((team) => team.markStatus.projectFullyMarked).length;
+  const projectsWithMarks = enrichedTeams.filter((team) => team.markStatus.projectMarked).length;
+  const partialProjects = Math.max(projectsWithMarks - fullyMarkedProjects, 0);
+  const unmarkedProjects = Math.max(totalProjects - projectsWithMarks, 0);
 
   let status = "none";
   if (totalProjects === 0) {
     status = "no-projects";
-  } else if (fullyMarkedProjects === totalProjects) {
+  } else if (fullyMarkedProjects === totalProjects && totalProjects > 0) {
     status = "all";
-  } else if (projectsWithAnyMarks === 0) {
+  } else if (projectsWithMarks === 0) {
     status = "none";
   } else {
     status = "partial";
@@ -196,6 +206,7 @@ const computePanelMarkSummary = (panel, schemaCache) => {
       fullyMarkedProjects,
       partialProjects,
       unmarkedProjects,
+      markedProjects: projectsWithMarks,
       status,
     },
   };
@@ -205,6 +216,9 @@ const AdminPanelManagement = () => {
   const navigate = useNavigate();
   const [facultyList, setFacultyList] = useState([]);
   const [panels, setPanels] = useState([]);
+  const [schemaCache, setSchemaCache] = useState(() => new Map());
+  const [panelReviewOptions, setPanelReviewOptions] = useState([]);
+  const [selectedReview, setSelectedReview] = useState("all");
   const [modalTeam, setModalTeam] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState({
     type: "",
@@ -362,18 +376,35 @@ const AdminPanelManagement = () => {
         })
       );
 
-      const schemaCache = new Map(schemaEntries);
+      const schemaCacheMap = new Map(schemaEntries);
+      setSchemaCache(schemaCacheMap);
 
-      const panelsWithMarkStatus = formattedPanels.map((panel) => {
-        const { teams: enrichedTeams, summary } = computePanelMarkSummary(panel, schemaCache);
-        return {
-          ...panel,
-          teams: enrichedTeams,
-          markSummary: summary,
-        };
+      const reviewOptionMap = new Map();
+      schemaCacheMap.forEach((schema) => {
+        (schema?.reviews || [])
+          .filter((review) => review.facultyType === "panel")
+          .forEach((review) => {
+            const reviewName = review.reviewName;
+            if (!reviewName) return;
+            if (!reviewOptionMap.has(reviewName)) {
+              reviewOptionMap.set(reviewName, {
+                value: reviewName,
+                label: review.displayName || review.reviewName,
+              });
+            }
+          });
       });
 
-      setPanels(panelsWithMarkStatus);
+      const reviewOptions = Array.from(reviewOptionMap.values()).sort((a, b) =>
+        a.label.localeCompare(b.label)
+      );
+      setPanelReviewOptions(reviewOptions);
+      setSelectedReview((prev) => {
+        if (prev === "all") return prev;
+        return reviewOptions.some((option) => option.value === prev) ? prev : "all";
+      });
+
+      setPanels(formattedPanels);
 
       // Process guide projects
       let guideProjectData = [];
@@ -415,6 +446,9 @@ const AdminPanelManagement = () => {
       setFacultyList([]);
       setUnassignedTeams([]);
       setAllGuideProjects([]);
+      setSchemaCache(new Map());
+      setPanelReviewOptions([]);
+      setSelectedReview("all");
       showNotification("error", "Fetch Failed", "Failed to load panel data. Please try again.");
     } finally {
       setLoading(false);
@@ -714,6 +748,10 @@ const AdminPanelManagement = () => {
     setShowAutoAssignModal(true);
   }, [isAutoCreating, showNotification]);
 
+  const handleReviewSelectionChange = useCallback((event) => {
+    setSelectedReview(event.target.value);
+  }, []);
+
   const handleManualAssign = useCallback(async (panelId, projectId) => {
     try {
       const panel = panels.find((entry) => entry.panelId === panelId);
@@ -759,8 +797,21 @@ const AdminPanelManagement = () => {
     [searchQuery]
   );
 
+  const panelsWithMarkStatus = useMemo(() => {
+    if (!panels.length) return [];
+
+    return panels.map((panel) => {
+      const { teams, summary } = computePanelMarkSummary(panel, schemaCache, selectedReview);
+      return {
+        ...panel,
+        teams,
+        markSummary: summary,
+      };
+    });
+  }, [panels, schemaCache, selectedReview]);
+
   const filteredPanels = useMemo(() => {
-    return panels.filter((panel) => {
+    return panelsWithMarkStatus.filter((panel) => {
       const matchesSearch =
         !searchQuery ||
         panel.facultyNames.some((name) => filterMatches(name)) ||
@@ -797,10 +848,10 @@ const AdminPanelManagement = () => {
           return true;
       }
     });
-  }, [panels, searchQuery, filterMatches, panelMarkFilter]);
+  }, [panelsWithMarkStatus, searchQuery, filterMatches, panelMarkFilter]);
 
   const markStatusCounts = useMemo(() => {
-    return panels.reduce(
+    return panelsWithMarkStatus.reduce(
       (acc, panel) => {
         const status = panel.markSummary?.status || "unknown";
         if (status === "all") acc.all += 1;
@@ -811,7 +862,7 @@ const AdminPanelManagement = () => {
       },
       { all: 0, partial: 0, none: 0, noProjects: 0 }
     );
-  }, [panels]);
+  }, [panelsWithMarkStatus]);
 
   if (loading) {
     return (
@@ -886,14 +937,14 @@ const AdminPanelManagement = () => {
             <PanelStatsCard
               icon={() => <div className="h-6 w-6 sm:h-8 sm:w-8 bg-white/30 rounded-lg flex items-center justify-center text-white font-bold text-xs sm:text-sm">P</div>}
               title="Total Panels"
-              value={panels.length}
+              value={panelsWithMarkStatus.length}
               bgColor="bg-gradient-to-br from-emerald-500 to-emerald-600"
               iconBg="bg-white/20"
             />
             <PanelStatsCard
               icon={CheckCircle}
               title="Assigned Teams"
-              value={panels.reduce((sum, panel) => sum + panel.teams.length, 0)}
+              value={panelsWithMarkStatus.reduce((sum, panel) => sum + panel.teams.length, 0)}
               bgColor="bg-gradient-to-br from-purple-500 to-purple-600"
               iconBg="bg-white/20"
             />
@@ -980,6 +1031,25 @@ const AdminPanelManagement = () => {
                   <option value="partial">⚠️ Partially Marked</option>
                   <option value="none">🚫 No Marks Recorded</option>
                   <option value="no-projects">📂 No Projects Assigned</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">
+                  Panel Review
+                </label>
+                <select
+                  value={selectedReview}
+                  onChange={handleReviewSelectionChange}
+                  disabled={panelReviewOptions.length === 0}
+                  title={panelReviewOptions.length === 0 ? "No panel reviews available" : "Filter by review"}
+                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm sm:text-base disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <option value="all">All Reviews</option>
+                  {panelReviewOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="flex items-end">
@@ -1079,7 +1149,7 @@ const AdminPanelManagement = () => {
         {/* ✅ Panels using extracted component */}
         <div className="mx-4 sm:mx-6 md:mx-8 mb-8">
           <div className="bg-white rounded-2xl shadow-lg">
-            {panels.length === 0 ? (
+            {panelsWithMarkStatus.length === 0 ? (
               <div className="text-center py-16 sm:py-20">
                 <div className="mx-auto w-24 h-24 sm:w-32 sm:h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mb-6 sm:mb-8">
                   <Users className="h-12 w-12 sm:h-16 sm:w-16 text-slate-400" />
@@ -1098,7 +1168,7 @@ const AdminPanelManagement = () => {
                     <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
                   <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
-                    Panel Records ({filteredPanels.length.toLocaleString()} / {panels.length.toLocaleString()})
+                    Panel Records ({filteredPanels.length.toLocaleString()} / {panelsWithMarkStatus.length.toLocaleString()})
                   </h2>
                 </div>
                 {filteredPanels.length === 0 ? (
