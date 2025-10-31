@@ -22,6 +22,8 @@ import {
   deleteFacultyByEmployeeId,
   createBroadcastMessage,
   getBroadcastMessages,
+  updateBroadcastMessage,
+  deleteBroadcastMessage,
 } from "../controllers/adminController.js";
 import { adminMiddleware } from "../middlewares/adminMiddleware.js";
 
@@ -72,5 +74,7 @@ adminRouter.post("/autoAssignPanel", adminMiddleware, autoAssignPanelsToProjects
 // Broadcast routes
 adminRouter.post("/broadcasts", adminMiddleware, createBroadcastMessage);
 adminRouter.get("/broadcasts", adminMiddleware, getBroadcastMessages);
+adminRouter.patch("/broadcasts/:id", adminMiddleware, updateBroadcastMessage);
+adminRouter.delete("/broadcasts/:id", adminMiddleware, deleteBroadcastMessage);
 
 export default adminRouter;

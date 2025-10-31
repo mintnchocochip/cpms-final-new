@@ -180,6 +180,12 @@ export const createBroadcastMessage = (payload) => API.post("/admin/broadcasts",
 export const getAdminBroadcastMessages = (params = {}) =>
   API.get("/admin/broadcasts", { params });
 
+export const updateBroadcastMessage = (id, payload) =>
+  API.patch(`/admin/broadcasts/${id}`, payload);
+
+export const deleteBroadcastMessage = (id) =>
+  API.delete(`/admin/broadcasts/${id}`);
+
 export const getFacultyBroadcastMessages = (params = {}) =>
   API.get("/faculty/broadcasts", { params });
 

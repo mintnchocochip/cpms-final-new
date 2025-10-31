@@ -45,7 +45,7 @@ const broadcastMessageSchema = new mongoose.Schema(
     },
     expiresAt: {
       type: Date,
-      default: null,
+      required: true,
     },
     isActive: {
       type: Boolean,

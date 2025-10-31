@@ -23,6 +23,18 @@ export default async function broadcastBlockMiddleware(req, res, next) {
 
     const now = new Date();
 
+    try {
+      await BroadcastMessage.updateMany(
+        {
+          isActive: true,
+          expiresAt: { $exists: true, $lte: now },
+        },
+        { $set: { isActive: false } }
+      );
+    } catch (deactivateError) {
+      console.error('WARN auto-deactivate broadcasts failed in middleware', deactivateError);
+    }
+
     const audienceFilter = [
       {
         $or: [
@@ -44,7 +56,7 @@ export default async function broadcastBlockMiddleware(req, res, next) {
       action: 'block',
       isActive: true,
       $and: audienceFilter,
-      $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+      expiresAt: { $exists: true, $gt: now },
     };
 
     const blocking = await BroadcastMessage.findOne(filters).lean();

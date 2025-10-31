@@ -216,6 +216,18 @@ export async function getFacultyBroadcasts(req, res) {
     const parsedLimit = Math.min(Number(limit) || 20, 50);
     const now = new Date();
 
+    try {
+      await BroadcastMessage.updateMany(
+        {
+          isActive: true,
+          expiresAt: { $exists: true, $lte: now },
+        },
+        { $set: { isActive: false } }
+      );
+    } catch (deactivateError) {
+      console.error("WARN auto-deactivate broadcasts failed", deactivateError);
+    }
+
     // Use case-insensitive exact matching for audience values to tolerate
     // differences in casing or spacing between stored faculty values and
     // admin-entered broadcast targets. Build regex list for $in queries.
@@ -265,7 +277,7 @@ export async function getFacultyBroadcasts(req, res) {
     }
 
     if (includeExpired !== "true") {
-      filters.$or = [{ expiresAt: null }, { expiresAt: { $gt: now } }];
+      filters.expiresAt = { $exists: true, $gt: now };
     }
 
     const messages = await BroadcastMessage.find(filters)

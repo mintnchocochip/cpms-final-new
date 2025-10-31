@@ -2024,6 +2024,13 @@ export async function createBroadcastMessage(req, res) {
       });
     }
 
+    if (!expiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: "An expiry date/time is required for every broadcast.",
+      });
+    }
+
     if (targetSchools && !Array.isArray(targetSchools)) {
       return res.status(400).json({
         success: false,
@@ -2063,15 +2070,20 @@ export async function createBroadcastMessage(req, res) {
   const normalizedDepartmentsLower = normalizedDepartments.map((d) => String(d).trim().toLowerCase());
 
     let expiryDate = null;
-    if (expiresAt) {
-      const parsedExpiry = new Date(expiresAt);
-      if (Number.isNaN(parsedExpiry.getTime())) {
-        return res.status(400).json({
-          success: false,
-          message: "expiresAt must be a valid date string.",
-        });
-      }
-      expiryDate = parsedExpiry;
+    const parsedExpiry = new Date(expiresAt);
+    if (Number.isNaN(parsedExpiry.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "expiresAt must be a valid date string.",
+      });
+    }
+    expiryDate = parsedExpiry;
+
+    if (expiryDate <= new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "Expiry must be a future date and time.",
+      });
     }
 
     const payload = {
@@ -2086,11 +2098,8 @@ export async function createBroadcastMessage(req, res) {
       createdByName: admin.name || "",
       expiresAt: expiryDate,
       action: ['notice', 'block'].includes(action) ? action : 'notice',
+      isActive: typeof isActive === "boolean" ? isActive : true,
     };
-
-    if (typeof isActive === "boolean") {
-      payload.isActive = isActive;
-    }
 
     const broadcast = await BroadcastMessage.create(payload);
 
@@ -2122,6 +2131,19 @@ export async function getBroadcastMessages(req, res) {
     const parsedSkip = Number(skip) || 0;
     const now = new Date();
 
+    // Auto deactivate expired broadcasts while tolerating legacy records without expiry
+    try {
+      await BroadcastMessage.updateMany(
+        {
+          isActive: true,
+          expiresAt: { $exists: true, $lte: now },
+        },
+        { $set: { isActive: false } }
+      );
+    } catch (deactivateError) {
+      console.error("WARN auto-deactivate broadcasts failed", deactivateError);
+    }
+
     const filters = {};
 
     if (activeOnly === "true") {
@@ -2129,7 +2151,7 @@ export async function getBroadcastMessages(req, res) {
     }
 
     if (includeExpired !== "true") {
-      filters.$or = [{ expiresAt: null }, { expiresAt: { $gt: now } }];
+      filters.expiresAt = { $exists: true, $gt: now };
     }
 
     const broadcasts = await BroadcastMessage.find(filters)
@@ -2155,6 +2177,155 @@ export async function getBroadcastMessages(req, res) {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch broadcast messages.",
+      error: error.message,
+    });
+  }
+}
+
+export async function updateBroadcastMessage(req, res) {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      message,
+      targetSchools,
+      targetDepartments,
+      expiresAt,
+      isActive,
+      action,
+    } = req.body;
+
+    const broadcast = await BroadcastMessage.findById(id);
+    if (!broadcast) {
+      return res.status(404).json({
+        success: false,
+        message: "Broadcast not found.",
+      });
+    }
+
+    if (message !== undefined) {
+      if (typeof message !== "string" || !message.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Message content is required.",
+        });
+      }
+      broadcast.message = message.trim();
+    }
+
+    if (title !== undefined) {
+      broadcast.title = String(title || "").trim();
+    }
+
+    const normalizeAudience = (list) => {
+      if (!Array.isArray(list)) return [];
+      const filtered = list.filter(Boolean).map((value) => String(value).trim()).filter(Boolean);
+      return [...new Set(filtered)];
+    };
+
+    if (targetSchools !== undefined) {
+      if (!Array.isArray(targetSchools)) {
+        return res.status(400).json({
+          success: false,
+          message: "targetSchools must be an array of strings.",
+        });
+      }
+      const normalized = normalizeAudience(targetSchools);
+      broadcast.targetSchools = normalized;
+      broadcast.targetSchoolsNormalized = normalized.map((s) => s.toLowerCase());
+    }
+
+    if (targetDepartments !== undefined) {
+      if (!Array.isArray(targetDepartments)) {
+        return res.status(400).json({
+          success: false,
+          message: "targetDepartments must be an array of strings.",
+        });
+      }
+      const normalized = normalizeAudience(targetDepartments);
+      broadcast.targetDepartments = normalized;
+      broadcast.targetDepartmentsNormalized = normalized.map((d) => d.toLowerCase());
+    }
+
+    if (expiresAt !== undefined) {
+      if (!expiresAt) {
+        return res.status(400).json({
+          success: false,
+          message: "An expiry date/time is required for every broadcast.",
+        });
+      }
+
+      const parsedExpiry = new Date(expiresAt);
+      if (Number.isNaN(parsedExpiry.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "expiresAt must be a valid date string.",
+        });
+      }
+
+      if (parsedExpiry <= new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: "Expiry must be a future date and time.",
+        });
+      }
+
+      broadcast.expiresAt = parsedExpiry;
+    }
+
+    if (isActive !== undefined) {
+      broadcast.isActive = Boolean(isActive);
+    }
+
+    if (action !== undefined) {
+      if (!['notice', 'block'].includes(action)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid action specified.",
+        });
+      }
+      broadcast.action = action;
+    }
+
+    const updated = await broadcast.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Broadcast updated successfully.",
+      data: updated,
+    });
+  } catch (error) {
+    console.error("❌ Error updating broadcast message:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update broadcast message.",
+      error: error.message,
+    });
+  }
+}
+
+export async function deleteBroadcastMessage(req, res) {
+  try {
+    const { id } = req.params;
+    const broadcast = await BroadcastMessage.findByIdAndDelete(id);
+
+    if (!broadcast) {
+      return res.status(404).json({
+        success: false,
+        message: "Broadcast not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Broadcast deleted successfully.",
+      data: broadcast,
+    });
+  } catch (error) {
+    console.error("❌ Error deleting broadcast message:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete broadcast message.",
       error: error.message,
     });
   }
