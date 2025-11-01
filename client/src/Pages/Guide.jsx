@@ -83,6 +83,9 @@ const GuideContent = React.memo(({
           {teams.map(team => {
             const reviewTypes = getReviewTypes(team.markingSchema);
             const deadlines = getDeadlines(team.markingSchema);
+            const studentRegNos = (team.students || [])
+              .map(student => student?.regNo)
+              .filter(Boolean);
             
             if (!reviewTypes.length) {
               return (
@@ -118,29 +121,36 @@ const GuideContent = React.memo(({
           <div className="min-w-0 flex-1">
             {/* ✅ FIXED: Project title with word-break to prevent overflow */}
             <div className="mb-2">
-              <ProjectNameEditor
-                projectId={team.id}
-                currentName={team.title}
-                onUpdate={handleProjectNameUpdate}
-              />
+              <div className="flex flex-wrap items-center gap-3">
+                <ProjectNameEditor
+                  projectId={team.id}
+                  currentName={team.title}
+                  onUpdate={handleProjectNameUpdate}
+                />
+                {team.department && (
+                  <span className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1">
+                    <span className="inline-flex h-4 w-4 rounded-full bg-slate-500" aria-hidden="true"></span>
+                    <span className="text-base font-semibold tracking-wide text-slate-900 leading-snug">
+                      {team.department}
+                    </span>
+                  </span>
+                )}
+              </div>
             </div>
             <p className="text-sm sm:text-base text-gray-600 mb-3 break-words">{team.description}</p>
             
             <div className="flex items-center gap-4 mb-3">
-              <div className="flex items-center gap-2 text-blue-600">
+              <div className="flex flex-wrap items-center gap-2 text-blue-600">
                 <Users className="w-4 h-4" />
                 <span className="text-sm font-medium">
                   {team.students.length} Student{team.students.length !== 1 ? 's' : ''}
                 </span>
-              </div>
-              {team.department && (
-                <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1">
-                  <span className="inline-flex h-4 w-4 rounded-full bg-slate-500" aria-hidden="true"></span>
-                  <span className="text-base font-semibold tracking-wide text-slate-900 leading-snug">
-                    {team.department}
+                {studentRegNos.length > 0 && (
+                  <span className="text-xs sm:text-sm font-semibold text-blue-700">
+                    {studentRegNos.join(', ')}
                   </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
             
             {/* Review Status List */}
