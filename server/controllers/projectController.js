@@ -104,7 +104,6 @@ export async function createProject(req, res, next) {
       );
     }
 
-    // ✅ Extract both requiresContribution and contributionType from marking schema
     const schemaRequiresContribution = markingSchema.requiresContribution || false;
     const schemaContributionType = markingSchema.contributionType || 'none';
 

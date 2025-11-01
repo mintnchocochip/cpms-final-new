@@ -30,7 +30,47 @@ import {
   BarChart3,
   Edit3,
   Trash2,
+  Lock,
 } from "lucide-react";
+
+const getReviewEntriesWithKeys = (reviews) => {
+  if (!reviews) return [];
+  if (reviews instanceof Map) {
+    return Array.from(reviews.entries());
+  }
+  if (typeof reviews?.entries === "function") {
+    return Array.from(reviews.entries());
+  }
+  if (typeof reviews === "object") {
+    return Object.entries(reviews);
+  }
+  return [];
+};
+
+const toTitleCase = (value) => {
+  if (!value || typeof value !== "string") return "Review";
+  const withSpaces = value
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([0-9])/gi, "$1 $2")
+    .trim();
+  return withSpaces.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getStudentReviewRecord = (student, reviewName) => {
+  if (!student || !reviewName) return null;
+  const { reviews } = student;
+  if (!reviews) return null;
+
+  if (reviews instanceof Map || typeof reviews.get === "function") {
+    return reviews.get(reviewName);
+  }
+
+  if (typeof reviews === "object") {
+    return reviews[reviewName];
+  }
+
+  return null;
+};
 
 const AdminStudentManagement = () => {
   const navigate = useNavigate();
@@ -361,6 +401,56 @@ const toggleStudentExpanded = useCallback(async (regNo) => {
       return { status: "locked", color: "red" };
     }
   }, []);
+
+  const getStudentPptStatuses = useCallback(
+    (student) => {
+      if (!student) return [];
+
+      const statuses = [];
+      const seen = new Set();
+      const schemaKey = `${student.school}_${student.department}`;
+      const schema = studentSchemas[schemaKey];
+
+      const registerStatus = (reviewName, label, facultyType) => {
+        if (!reviewName || seen.has(reviewName)) return;
+        const reviewRecord = getStudentReviewRecord(student, reviewName);
+        if (!reviewRecord?.pptApproved) return;
+
+        seen.add(reviewName);
+        statuses.push({
+          key: reviewName,
+          label: label || reviewRecord.reviewDisplayName || reviewRecord.displayName || reviewRecord.name || toTitleCase(reviewName),
+          facultyType,
+          approved: reviewRecord.pptApproved?.approved === true,
+          locked: reviewRecord.pptApproved?.locked === true,
+        });
+      };
+
+      if (schema?.reviews && Array.isArray(schema.reviews)) {
+        schema.reviews.forEach((review) => {
+          if (!review?.reviewName) return;
+          if (!review?.pptApproved) return;
+          registerStatus(review.reviewName, review.displayName, review.facultyType);
+        });
+      }
+
+      if (statuses.length === 0) {
+        getReviewEntriesWithKeys(student.reviews).forEach(([reviewName, reviewData]) => {
+          if (!reviewName || seen.has(reviewName)) return;
+          if (!reviewData?.pptApproved) return;
+
+          registerStatus(
+            reviewName,
+            reviewData.reviewDisplayName || reviewData.displayName || reviewData.name,
+            reviewData.facultyType
+          );
+        });
+      }
+
+      return statuses;
+    },
+    [studentSchemas]
+  );
   // Add this function after your existing functions
 
 
@@ -1172,6 +1262,16 @@ const downloadExcelWithSplit = useCallback(async () => {
                 <div className="space-y-4">
                   {filteredStudents.map((student) => {
                     const isExpanded = expandedStudents.has(student.regNo);
+                    const schemaKey = `${student.school}_${student.department}`;
+                    const pptStatuses = getStudentPptStatuses(student);
+                    const hasReviewLevelPptStatuses = pptStatuses.length > 0;
+                    const allReviewPptApproved = hasReviewLevelPptStatuses
+                      ? pptStatuses.every((status) => status.approved)
+                      : student.pptApproved?.approved === true;
+                    const pendingReviewPptCount = hasReviewLevelPptStatuses
+                      ? pptStatuses.filter((status) => !status.approved).length
+                      : 0;
+                    const isSchemaLoading = loadingSchemas.has(schemaKey);
                     
                     return (
                       <div
@@ -1230,11 +1330,25 @@ const downloadExcelWithSplit = useCallback(async () => {
       <span>{Object.keys(student.reviews).length} reviews</span>
     </span>
   )}
-  {student.pptApproved?.approved && (
-    <span className="bg-emerald-100 text-emerald-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
-      <Award className="h-3 w-3 sm:h-4 sm:w-4" />
-      <span>PPT Approved</span>
-    </span>
+  {hasReviewLevelPptStatuses ? (
+    allReviewPptApproved ? (
+      <span className="bg-emerald-100 text-emerald-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
+        <Award className="h-3 w-3 sm:h-4 sm:w-4" />
+        <span>All PPT Approved</span>
+      </span>
+    ) : (
+      <span className="bg-amber-100 text-amber-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
+        <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />
+        <span>PPT Pending{pendingReviewPptCount > 0 ? ` (${pendingReviewPptCount})` : ''}</span>
+      </span>
+    )
+  ) : (
+    student.pptApproved?.approved ? (
+      <span className="bg-emerald-100 text-emerald-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
+        <Award className="h-3 w-3 sm:h-4 sm:w-4" />
+        <span>PPT Approved</span>
+      </span>
+    ) : null
   )}
   
   {/* Action buttons */}
@@ -1453,24 +1567,92 @@ const downloadExcelWithSplit = useCallback(async () => {
                                 <span>Presentation Status</span>
                               </h5>
                               <div className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 shadow-sm">
-                                <div className="flex items-center space-x-3 sm:space-x-4">
-                                  <span className="font-semibold text-slate-700 text-xs sm:text-sm">Approval Status:</span>
-                                  {student.pptApproved?.approved ? (
-                                    <span className="flex items-center space-x-2 text-emerald-600 text-xs sm:text-sm">
-                                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                                      <span>Approved</span>
-                                    </span>
-                                  ) : (
-                                    <span className="flex items-center space-x-2 text-red-600 text-xs sm:text-sm">
-                                      <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                                      <span>Pending Approval</span>
-                                    </span>
-                                  )}
-                                  {student.pptApproved?.locked && (
-                                    <span className="bg-slate-100 text-slate-700 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm font-semibold">
-                                      Status Locked
-                                    </span>
-                                  )}
+                                <div className="flex flex-col gap-3">
+                                  <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                                    <span className="font-semibold text-slate-700 text-xs sm:text-sm">Approval Status:</span>
+                                    {isSchemaLoading && !hasReviewLevelPptStatuses ? (
+                                      <span className="flex items-center gap-2 text-slate-500 text-xs sm:text-sm">
+                                        <span className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></span>
+                                        <span>Loading review-level status…</span>
+                                      </span>
+                                    ) : hasReviewLevelPptStatuses ? (
+                                      allReviewPptApproved ? (
+                                        <span className="flex items-center space-x-2 text-emerald-600 text-xs sm:text-sm">
+                                          <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                                          <span>All reviews approved</span>
+                                        </span>
+                                      ) : (
+                                        <span className="flex items-center space-x-2 text-amber-600 text-xs sm:text-sm">
+                                          <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+                                          <span>{pendingReviewPptCount} review{pendingReviewPptCount === 1 ? "" : "s"} pending approval</span>
+                                        </span>
+                                      )
+                                    ) : (
+                                      student.pptApproved?.approved ? (
+                                        <span className="flex items-center space-x-2 text-emerald-600 text-xs sm:text-sm">
+                                          <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                                          <span>Approved</span>
+                                        </span>
+                                      ) : (
+                                        <span className="flex items-center space-x-2 text-red-600 text-xs sm:text-sm">
+                                          <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                                          <span>Pending Approval</span>
+                                        </span>
+                                      )
+                                    )}
+                                    {!hasReviewLevelPptStatuses && student.pptApproved?.locked && (
+                                      <span className="bg-slate-100 text-slate-700 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm font-semibold">
+                                        Status Locked
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {isSchemaLoading && !hasReviewLevelPptStatuses ? null : hasReviewLevelPptStatuses ? (
+                                    <>
+                                      <div className="space-y-2">
+                                        {pptStatuses.map((status) => {
+                                          const StatusIcon = status.approved ? CheckCircle : Clock;
+                                          return (
+                                            <div
+                                              key={`${student.regNo}_${status.key}`}
+                                              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-semibold text-xs sm:text-sm text-slate-700">
+                                                  {status.label || toTitleCase(status.key)}
+                                                </span>
+                                                {status.facultyType && (
+                                                  <span className="text-[10px] uppercase tracking-wide text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                                                    {String(status.facultyType).toUpperCase()}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div
+                                                className={`flex items-center gap-1 text-xs sm:text-sm font-semibold ${
+                                                  status.approved ? "text-emerald-600" : "text-amber-600"
+                                                }`}
+                                              >
+                                                <StatusIcon className="h-3.5 w-3.5" />
+                                                <span>{status.approved ? "Approved" : "Pending"}</span>
+                                                {status.locked && <Lock className="h-3 w-3 text-slate-500" />}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                      <div className="mt-2">
+                                        <span
+                                          className={`text-xs sm:text-sm font-semibold ${
+                                            allReviewPptApproved ? "text-emerald-600" : "text-amber-600"
+                                          }`}
+                                        >
+                                          {allReviewPptApproved
+                                            ? "All required PPTs approved"
+                                            : `${pendingReviewPptCount} review${pendingReviewPptCount === 1 ? "" : "s"} pending approval`}
+                                        </span>
+                                      </div>
+                                    </>
+                                  ) : null}
                                 </div>
                               </div>
                             </div>
