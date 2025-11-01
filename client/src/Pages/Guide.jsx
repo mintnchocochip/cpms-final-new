@@ -61,7 +61,7 @@ const GuideContent = React.memo(({
         <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-slate-600">
           <div className="flex items-center gap-2">
             <span className="inline-flex h-4 w-4 sm:h-5 sm:w-5 rounded-md bg-gradient-to-r from-blue-500 to-blue-600 shadow-sm" aria-hidden="true"></span>
-            <span className="font-medium">Enter marks required</span>
+            <span className="font-medium">Mark Entry Required</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="inline-flex h-4 w-4 sm:h-5 sm:w-5 rounded-md bg-gradient-to-r from-purple-500 to-purple-600 shadow-sm" aria-hidden="true"></span>
@@ -133,6 +133,14 @@ const GuideContent = React.memo(({
                   {team.students.length} Student{team.students.length !== 1 ? 's' : ''}
                 </span>
               </div>
+              {team.department && (
+                <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1">
+                  <span className="inline-flex h-4 w-4 rounded-full bg-slate-400" aria-hidden="true"></span>
+                  <span className="text-sm font-semibold text-slate-800 leading-tight">
+                    {team.department}
+                  </span>
+                </div>
+              )}
             </div>
             
             {/* Review Status List */}
