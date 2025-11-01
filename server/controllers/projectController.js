@@ -99,7 +99,6 @@ export async function createProject(req, res, next) {
     }).session(session);
     
     if (!guideFacultyDoc) {
-      await session.abortTransaction();
       throw new Error(
         `Guide faculty with employee id ${guideFacultyEmpId} not found`
       );
@@ -268,7 +267,13 @@ export async function createProject(req, res, next) {
       },
     });
   } catch (error) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      try {
+        await session.abortTransaction();
+      } catch (abortError) {
+        logger.error('create_project_abort_failed', safeMeta({ error: abortError?.message }));
+      }
+    }
     console.error("❌ Error creating project:", error);
 
     if (error.code === 11000) {
