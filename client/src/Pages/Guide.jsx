@@ -57,6 +57,18 @@ const GuideContent = React.memo(({
         <h2 className="text-xl sm:text-2xl font-bold text-white">My Guided Projects</h2>
         <p className="text-blue-100 mt-1">Projects under your guidance and mentorship</p>
       </div>
+      <div className="px-5 py-4 sm:px-6 bg-slate-50 border-b border-slate-200">
+        <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-slate-600">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-4 w-4 sm:h-5 sm:w-5 rounded-md bg-gradient-to-r from-blue-500 to-blue-600 shadow-sm" aria-hidden="true"></span>
+            <span className="font-medium">Mark Entry Required</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-4 w-4 sm:h-5 sm:w-5 rounded-md bg-gradient-to-r from-purple-500 to-purple-600 shadow-sm" aria-hidden="true"></span>
+            <span className="font-medium">Approve PPT only</span>
+          </div>
+        </div>
+      </div>
       
       {teams.length === 0 ? (
         <div className="p-8 sm:p-12 text-center">
@@ -121,6 +133,14 @@ const GuideContent = React.memo(({
                   {team.students.length} Student{team.students.length !== 1 ? 's' : ''}
                 </span>
               </div>
+              {team.department && (
+                <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1">
+                  <span className="inline-flex h-4 w-4 rounded-full bg-slate-400" aria-hidden="true"></span>
+                  <span className="text-sm font-semibold text-slate-800 leading-tight">
+                    {team.department}
+                  </span>
+                </div>
+              )}
             </div>
             
             {/* Review Status List */}
