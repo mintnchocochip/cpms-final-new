@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronUp, ChevronDown, LogOut } from "lucide-react";
+import { ChevronUp, ChevronDown, LogOut, Key } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import Profile_img from "../Images/profile.png";
 
 function Profile1({ userType = "auto" }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -7,6 +9,7 @@ function Profile1({ userType = "auto" }) {
     const [error, setError] = useState(null);
     const [userData, setUserData] = useState(null);
     const dropdownRef = useRef(null);
+    const navigate = useNavigate();
     
     const toggleDropdown = () => {
         setIsOpen((prevState) => !prevState);
@@ -106,6 +109,11 @@ function Profile1({ userType = "auto" }) {
         };
     }, [isOpen]);
     
+    const handleChangePassword = () => {
+        setIsOpen(false);
+        navigate('/forgot-password');
+    };
+    
     const handleSignOut = async () => {
         setIsLoading(true);
         setError(null);
@@ -163,9 +171,9 @@ function Profile1({ userType = "auto" }) {
                     <div className="p-2 sm:p-4 border-b border-gray-200 flex justify-evenly items-center">
                         <div>
                             <img 
-                                src={userData.imageUrl || "/api/placeholder/50/50"} 
+                                src={Profile_img} 
                                 alt="profile pic" 
-                                className="h-10 w-10 sm:h-14 w-14 bg-white rounded-full border-black border-2" 
+                                className="h-10 w-10 sm:h-10 bg-white rounded-full border-black border-2" 
                             />
                         </div>
                         <div className="text-center sm:text-left">
@@ -180,12 +188,22 @@ function Profile1({ userType = "auto" }) {
                         </div>
                     )}
                     
+                    {/* Change Password Button */}
                     <div 
-                        className={`p-1 sm:p-2 flex items-center cursor-pointer ${
+                        className="p-2 sm:p-3 flex items-center cursor-pointer hover:bg-gray-100 transition-colors border-b border-gray-200"
+                        onClick={handleChangePassword}
+                    >
+                        <Key className="mr-2" color="#4B5563" size={16} />
+                        <span className="text-gray-700 font-medium text-sm sm:text-base">Change Password</span>
+                    </div>
+                    
+                    {/* Sign Out Button */}
+                    <div 
+                        className={`p-2 sm:p-3 flex items-center cursor-pointer ${
                             isLoading 
                                 ? "bg-gray-400" 
                                 : "bg-red-600 hover:bg-red-700"
-                        }`}
+                        } transition-colors rounded-b-md`}
                         onClick={isLoading ? null : handleSignOut}
                     >
                         {isLoading ? (
@@ -195,7 +213,7 @@ function Profile1({ userType = "auto" }) {
                             </>
                         ) : (
                             <>
-                                <LogOut className="mr-1 sm:mr-2" color="white" size={16} />
+                                <LogOut className="mr-2" color="white" size={16} />
                                 <span className="text-white font-semibold text-sm sm:text-base">Sign Out</span>
                             </>
                         )}
