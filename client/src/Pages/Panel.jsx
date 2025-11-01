@@ -231,6 +231,14 @@ const PanelContent = React.memo(({
                               {team.students.length} Student{team.students.length !== 1 ? 's' : ''}
                             </span>
                           </div>
+                          {team.department && (
+                            <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1">
+                              <span className="inline-flex h-4 w-4 rounded-full bg-slate-500" aria-hidden="true"></span>
+                              <span className="text-base font-semibold tracking-wide text-slate-900 leading-snug">
+                                {team.department}
+                              </span>
+                            </div>
+                          )}
                           {team.panel?.venue && (
                             <div className="flex items-center gap-2 text-gray-600">
                               <MapPin className="w-4 h-4" />

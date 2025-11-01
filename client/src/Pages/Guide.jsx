@@ -135,8 +135,8 @@ const GuideContent = React.memo(({
               </div>
               {team.department && (
                 <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1">
-                  <span className="inline-flex h-4 w-4 rounded-full bg-slate-400" aria-hidden="true"></span>
-                  <span className="text-sm font-semibold text-slate-800 leading-tight">
+                  <span className="inline-flex h-4 w-4 rounded-full bg-slate-500" aria-hidden="true"></span>
+                  <span className="text-base font-semibold tracking-wide text-slate-900 leading-snug">
                     {team.department}
                   </span>
                 </div>
