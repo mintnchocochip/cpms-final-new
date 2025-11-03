@@ -171,6 +171,7 @@ export async function createProject(req, res, next) {
               locked: false,
             },
             locked: inputReview.locked || false,
+            pptApproved: inputReview.pptApproved || { approved: false, locked: false }, 
           });
         }
 
