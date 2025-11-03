@@ -8,7 +8,8 @@ export const departmentOptions = [
   'BBA', 
   'MBA', 
   'BDes',
-  'MDes'
+  'MDes',
+  'M.Tech 2yrs (1st years)'
 ];
 
 export const specializationOptionsDisplay = [
