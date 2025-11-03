@@ -96,6 +96,54 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
+const BROADCAST_BLOCK_EVENT = 'faculty-blocked';
+
+const dispatchBroadcastBlockEvent = (broadcast) => {
+  try {
+    if (broadcast) {
+      sessionStorage.setItem('blockedBroadcast', JSON.stringify(broadcast));
+    } else {
+      sessionStorage.removeItem('blockedBroadcast');
+    }
+
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent(BROADCAST_BLOCK_EVENT, { detail: broadcast || null }));
+    }
+  } catch (err) {
+    console.error('Failed to dispatch broadcast block event', err);
+  }
+};
+
+API.interceptors.response.use(
+  (response) => {
+    try {
+      const url = response?.config?.url || '';
+      // When fetching the broadcast feed, clear any stored block if none remain active
+      if (url.includes('/faculty/broadcasts')) {
+        const payload = response?.data;
+        const broadcasts = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+        const blocking = broadcasts.find?.((msg) => msg?.action === 'block' && msg?.isActive);
+        if (!blocking) {
+          dispatchBroadcastBlockEvent(null);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to analyze broadcast response', err);
+    }
+    return response;
+  },
+  (error) => {
+    const status = error?.response?.status;
+    if (status === 403) {
+      const broadcast = error?.response?.data?.broadcast;
+      if (broadcast?.action === 'block' && broadcast?.isActive !== false) {
+        dispatchBroadcastBlockEvent(broadcast);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Auth endpoints
 export const adminLogin = (data) => API.post("/auth/login", data);
 

@@ -23,6 +23,7 @@ import AdminBroadcast from './Pages/AdminBroadcast';
 import AdminStudentManagement from './Pages/AdminStudentManagement';
 
 const AuthContext = React.createContext(null);
+const BROADCAST_BLOCK_EVENT = 'faculty-blocked';
 
 const token = sessionStorage.getItem('token');
 if (token) {
@@ -35,9 +36,17 @@ export const AuthProvider = ({ children }) => {
   );
   const [role, setRole] = useState(sessionStorage.getItem('role') || null);
 
+  const clearBroadcastBlock = () => {
+    sessionStorage.removeItem('blockedBroadcast');
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent(BROADCAST_BLOCK_EVENT, { detail: null }));
+    }
+  };
+
   const login = (token, userRole) => {
     sessionStorage.setItem('token', token);
     sessionStorage.setItem('role', userRole);
+    clearBroadcastBlock();
     setIsAuthenticated(true);
     setRole(userRole);
   };
@@ -45,6 +54,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('role');
+    clearBroadcastBlock();
     setIsAuthenticated(false);
     setRole(null);
   };
@@ -66,41 +76,137 @@ const ProtectedRoute = ({ children }) => {
 // displays a blocking notice to faculty users if one is active.
 const FacultyProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useContext(AuthContext);
-  const [blockedBroadcast, setBlockedBroadcast] = useState(null);
   const role = sessionStorage.getItem('role') || (sessionStorage.getItem('faculty') ? 'faculty' : null);
+  const [blockedBroadcast, setBlockedBroadcast] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('blockedBroadcast');
+      return stored ? JSON.parse(stored) : null;
+    } catch (err) {
+      console.error('Failed to hydrate blocked broadcast from storage', err);
+      return null;
+    }
+  });
+  const [checkingBroadcast, setCheckingBroadcast] = useState(() => {
+    try {
+      return !sessionStorage.getItem('blockedBroadcast');
+    } catch (_) {
+      return true;
+    }
+  });
+
+  const updateBlockedState = React.useCallback((broadcast) => {
+    try {
+      if (broadcast) {
+        sessionStorage.setItem('blockedBroadcast', JSON.stringify(broadcast));
+      } else {
+        sessionStorage.removeItem('blockedBroadcast');
+      }
+    } catch (err) {
+      console.error('Failed to persist blocked broadcast state', err);
+    }
+    setBlockedBroadcast(broadcast || null);
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return () => undefined;
+    const handler = (event) => {
+      updateBlockedState(event.detail || null);
+      setCheckingBroadcast(false);
+    };
+    window.addEventListener(BROADCAST_BLOCK_EVENT, handler);
+    return () => {
+      window.removeEventListener(BROADCAST_BLOCK_EVENT, handler);
+    };
+  }, [updateBlockedState]);
 
   React.useEffect(() => {
     let cancelled = false;
-    const checkBroadcast = async () => {
-      try {
-        if (!isAuthenticated) return;
-        if (role === 'admin') return; // admins are not blocked by this
 
-        // call faculty broadcasts (limit 5) and look for action==='block'
-        const res = await (await import('./api')).getFacultyBroadcastMessages({ limit: 5 });
-        const messages = res?.data || [];
-        const blocking = messages.find(m => m.action === 'block' && m.isActive);
-        if (!cancelled && blocking) setBlockedBroadcast(blocking);
+    const checkBroadcast = async () => {
+      if (!isAuthenticated || role === 'admin') {
+        setCheckingBroadcast(false);
+        return;
+      }
+
+      try {
+        const api = await import('./api');
+        const res = await api.getFacultyBroadcastMessages({ limit: 5 });
+        const payload = res?.data;
+        const broadcasts = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : [];
+        const blocking = broadcasts.find((msg) => msg?.action === 'block' && msg?.isActive);
+        if (!cancelled) {
+          updateBlockedState(blocking || null);
+        }
       } catch (err) {
-        // ignore errors - treat as not blocked
         console.error('Error checking broadcasts', err);
+      } finally {
+        if (!cancelled) {
+          setCheckingBroadcast(false);
+        }
       }
     };
 
-    checkBroadcast();
-    return () => { cancelled = true; };
-  }, [isAuthenticated]);
+    if (role !== 'admin') {
+      checkBroadcast();
+    } else {
+      setCheckingBroadcast(false);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, role, updateBlockedState]);
 
   if (!isAuthenticated) return <Navigate to="/login" />;
 
-  if (blockedBroadcast) {
+  if (role !== 'admin' && checkingBroadcast) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
-        <div className="max-w-3xl w-full bg-white shadow-lg rounded-lg p-8">
-          <h2 className="text-2xl font-bold mb-4">Administrator Notice</h2>
-          {blockedBroadcast.title && <h3 className="text-lg font-semibold mb-2">{blockedBroadcast.title}</h3>}
-          <p className="text-gray-700 mb-4" style={{ whiteSpace: 'pre-wrap' }}>{blockedBroadcast.message}</p>
-          <p className="text-sm text-gray-500">Access to the faculty portal has been temporarily restricted by the administrator.</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-900/30">
+        <div className="flex flex-col items-center gap-3 text-slate-600">
+          <div className="h-12 w-12 rounded-full border-4 border-slate-300 border-t-blue-500 animate-spin" />
+          <p className="text-sm font-medium text-slate-500">Checking access permissions…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (role !== 'admin' && blockedBroadcast) {
+    const expiresAt = blockedBroadcast.expiresAt ? new Date(blockedBroadcast.expiresAt) : null;
+    return (
+      <div className="relative min-h-screen w-full overflow-hidden">
+        <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" aria-hidden="true" />
+        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
+          <div className="max-w-2xl w-full bg-white/90 backdrop-blur rounded-2xl shadow-2xl px-6 py-8 text-center">
+            <h2 className="text-2xl font-bold text-slate-900 mb-3">Administrator Notice</h2>
+            {blockedBroadcast.title && (
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">{blockedBroadcast.title}</h3>
+            )}
+            <p
+              className="text-slate-700 leading-relaxed"
+              style={{ whiteSpace: 'pre-wrap' }}
+            >
+              {blockedBroadcast.message}
+            </p>
+            <p className="text-sm text-slate-500 mt-4">
+              Access to the faculty portal is temporarily restricted while this broadcast is active.
+            </p>
+            {expiresAt && !Number.isNaN(expiresAt.getTime()) && (
+              <p className="text-xs text-slate-500 mt-2">
+                Scheduled to lift on {expiresAt.toLocaleString()}.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-6 inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
     );
