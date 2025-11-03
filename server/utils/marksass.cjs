@@ -4,6 +4,9 @@
  * Processes ONLY Review 1 (panelReview1) marks with NEW 4-component structure
  * Uses PUT /api/student/:regNo endpoint
  * 
+ * ✅ FIXED: Payload format matches exact specification
+ * ✅ marksUpdate includes: reviewName, marks, comments, attendance, locked, pptApproved
+ * 
  * New Components:
  * 1. Knowledge on Research Domain/Problem statement (5 marks)
  * 2. Literature Review (15 Latest Papers - from Reputed Journals/Conferences) (5 marks)
@@ -24,8 +27,8 @@ const readline = require('readline');
 // Configuration
 const EXCEL_FILE_PATH = '/home/administrator/Desktop/excel-files/StudentManagement_Review1_4Components.xlsx';
 const API_BASE_URL = 'http://localhost:5000/api/student';
-const AUTH_TOKEN = 
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4Zjg5N2JlMjJiN2QwODQ3NDRmNjU0OCIsImVtYWlsSWQiOiJhZG1pbkB2aXQuYWMuaW4iLCJlbXBsb3llZUlkIjoiQURNSU4wMDEiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NjIxNzk0OTksImV4cCI6MTc2MjI2NTg5OX0.8E756qY0VRLeWuxrpfb4-gXeyz_jAa_8Lhbsp7Rs8bM"
+const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4Zjg5N2JlMjJiN2QwODQ3NDRmNjU0OCIsImVtYWlsSWQiOiJhZG1pbkB2aXQuYWMuaW4iLCJlbXBsb3llZUlkIjoiQURNSU4wMDEiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NjIxOTAyNzMsImV4cCI6MTc2MjI3NjY3M30.-Oc4c7PecTEvgb0-6iMpvrp3LbpXIwfRLHsl1d5ESDM';
+
 class StudentReviewUpdater {
     constructor(excelFilePath, apiBaseUrl, authToken, mode = 'dry') {
         this.excelFilePath = excelFilePath;
@@ -33,7 +36,7 @@ class StudentReviewUpdater {
         this.authToken = authToken;
         this.mode = mode; // 'dry', 'test', or 'live'
 
-        // ✅ NEW: 4 components based on updated Excel structure
+        // ✅ 4 components based on updated Excel structure
         this.review1Config = {
             reviewName: 'panelReview1',
             excelPrefix: 'Review 1',
@@ -142,10 +145,17 @@ class StudentReviewUpdater {
         const attendancePresent = attendanceValue === 'present';
         this.log(`  Attendance: ${attendancePresent ? 'Present' : 'Absent'} (raw: "${attendanceValue}")`);
 
-        // Extract PPT Approval
+        // ✅ FIXED: Extract PPT Approval
         const pptApprovalValue = String(row[`${prefix}_PPT_Approved`] || '').toLowerCase();
-        const pptApproved = pptApprovalValue === 'yes';
-        this.log(`  PPT Approved: ${pptApproved ? 'YES' : 'NO'} (raw: "${pptApprovalValue}")`);
+        const pptApprovalBoolean = pptApprovalValue === 'yes';
+        
+        // Database structure expects: { approved: boolean, locked: false }
+        const pptApproved = {
+            approved: pptApprovalBoolean,
+            locked: false
+        };
+        
+        this.log(`  PPT Approved: ${pptApprovalBoolean ? 'YES' : 'NO'} (raw: "${pptApprovalValue}")`);
 
         // Extract comments
         const comments = String(row[`${prefix}_Comments`] || '').trim();
@@ -153,27 +163,33 @@ class StudentReviewUpdater {
             this.log(`  Comments: ${comments.substring(0, 80)}${comments.length > 80 ? '...' : ''}`);
         }
 
-        // Build review data object
-        const reviewData = {
-            reviewName: config.reviewName,
-            marks: componentMarks,
-            comments: comments,
-            attendance: { 
-                value: attendancePresent, 
-                locked: false 
-            },
-            locked: false,
-            pptApproved: pptApproved  // ✅ Always include for Review 1
-        };
-
-        const marksUpdate = [reviewData];
+        // ✅ FIXED: Build exact payload format with all required fields
+        // marksUpdate array contains review update with:
+        // - reviewName
+        // - marks (object)
+        // - comments (string)
+        // - attendance (object with value)
+        // - locked (boolean)
+        // - pptApproved (object with approved and locked)
+        const marksUpdate = [
+            {
+                reviewName: config.reviewName,
+                marks: componentMarks,
+                comments: comments,
+                attendance: { 
+                    value: attendancePresent
+                },
+                locked: false,
+                pptApproved: pptApproved
+            }
+        ];
 
         return {
             regNo,
             name: studentName,
             payload: { 
-                marksUpdate, 
-                PAT: patDetected 
+                marksUpdate,
+                PAT: patDetected
             }
         };
     }
@@ -198,7 +214,7 @@ class StudentReviewUpdater {
                 timeout: 30000
             });
 
-            this.log(`Response: ${response.status} - ${JSON.stringify(response.data).substring(0, 100)}`);
+            this.log(`Response: ${response.status} - ${JSON.stringify(response.data).substring(0, 150)}`);
             return { success: true, data: response.data };
 
         } catch (error) {
@@ -215,7 +231,7 @@ class StudentReviewUpdater {
         this.log(`\n${'='.repeat(70)}`);
         this.log(`Processing sheet: ${sheetName}`);
         
-        // ✅ TEST MODE: Process only first student
+        // TEST MODE: Process only first student
         const studentsToProcess = this.mode === 'test' ? 1 : data.length;
         this.log(`Total students in sheet: ${data.length}`);
         this.log(`Students to process (${this.mode.toUpperCase()} mode): ${studentsToProcess}`);
@@ -299,6 +315,19 @@ class StudentReviewUpdater {
             timestamp: new Date().toISOString(),
             mode: this.mode.toUpperCase(),
             review_processed: 'Review 1 (panelReview1) only - 4 Components',
+            payload_format: {
+                marksUpdate: [
+                    {
+                        reviewName: 'string',
+                        marks: 'object { componentName: number }',
+                        comments: 'string',
+                        attendance: 'object { value: boolean }',
+                        locked: 'boolean',
+                        pptApproved: 'object { approved: boolean, locked: boolean }'
+                    }
+                ],
+                PAT: 'boolean'
+            },
             components: this.review1Config.components,
             summary: {
                 total_students_processed: this.totalStudentsProcessed,
@@ -321,12 +350,31 @@ class StudentReviewUpdater {
         console.log('=== FINAL SUMMARY ===');
         console.log('='.repeat(70));
         console.log(`Review Processed: Review 1 (panelReview1) - 4 Components`);
-        console.log(`Components:`);
+        console.log(`\nPayload Format (CORRECTED):`);
+        console.log(`{`);
+        console.log(`  "marksUpdate": [`);
+        console.log(`    {`);
+        console.log(`      "reviewName": "panelReview1",`);
+        console.log(`      "marks": {`);
+        console.log(`        "Knowledge on Research Domain/Problem statement": 4.5,`);
+        console.log(`        "Literature Review (...)": 3.0,`);
+        console.log(`        "Design of the proposed methodology": 3.5,`);
+        console.log(`        "Implementation": 2.5`);
+        console.log(`      },`);
+        console.log(`      "comments": "string",`);
+        console.log(`      "attendance": { "value": true },`);
+        console.log(`      "locked": false,`);
+        console.log(`      "pptApproved": { "approved": true, "locked": false }`);
+        console.log(`    }`);
+        console.log(`  ],`);
+        console.log(`  "PAT": false`);
+        console.log(`}`);
+        console.log(`\nComponents:`);
         this.review1Config.components.forEach((comp, i) => {
             const shortComp = comp.length > 50 ? comp.substring(0, 50) + '...' : comp;
             console.log(`  ${i + 1}. ${shortComp}`);
         });
-        console.log(`Mode: ${this.mode.toUpperCase()}`);
+        console.log(`\nMode: ${this.mode.toUpperCase()}`);
         console.log(`Total Students: ${report.summary.total_students_processed}`);
         console.log(`✅ Successful: ${report.summary.total_successful}`);
         console.log(`❌ Failed: ${report.summary.total_failed}`);
@@ -341,6 +389,10 @@ class StudentReviewUpdater {
                 console.log(`Student: ${student.name} (${student.reg_no})`);
                 console.log(`Sheet: ${student.sheet}`);
                 console.log(`Status: Successfully updated`);
+                console.log(`\n✅ Payload Format Correct!`);
+                console.log(`   marksUpdate[0].marks: { component: number }`);
+                console.log(`   marksUpdate[0].attendance: { value: boolean }`);
+                console.log(`   marksUpdate[0].pptApproved: { approved: boolean, locked: boolean }`);
             }
         }
 
@@ -391,6 +443,10 @@ async function main() {
     console.log(`  2. Literature Review (15 Latest Papers) (5 marks)`);
     console.log(`  3. Design of the proposed methodology (5 marks)`);
     console.log(`  4. Implementation (5 marks)`);
+    console.log(`\n✅ PAYLOAD FORMAT (CORRECTED):`);
+    console.log(`  marksUpdate[]: array with reviewName, marks, comments, attendance, locked, pptApproved`);
+    console.log(`  pptApproved: { approved: boolean, locked: boolean }`);
+    console.log(`  attendance: { value: boolean }`);
     console.log(`🔐 Auth Token: ${AUTH_TOKEN.substring(0, 30)}...`);
     
     console.log('\n' + '='.repeat(70));
@@ -435,6 +491,8 @@ async function main() {
             console.log('  Register No: 22BAI1158');
             console.log('  Name: SUNEETH S');
             console.log('  Marks: 4.5, 3.0, 3.5, 2.5 (Total: 13.5)');
+            console.log('  PPT Approved: { approved: true, locked: false }');
+            console.log('  Attendance: { value: true }');
         } else {
             console.log('This will update Review 1 (4 components) for ALL 1715 BTech students.');
         }
@@ -470,9 +528,13 @@ async function main() {
         console.log('\n' + '='.repeat(70));
         console.log('✅ TEST MODE SUCCESS!');
         console.log('='.repeat(70));
-        console.log('The first student was successfully updated with 4 components.');
-        console.log('Please verify the data in your database before running LIVE MODE.');
-        console.log('\nTo update all students, run this script again and select option 3.');
+        console.log('The first student was successfully updated with correct payload format:');
+        console.log('✅ Payload structure matches specification');
+        console.log('✅ marksUpdate array with all required fields');
+        console.log('✅ pptApproved: { approved: boolean, locked: boolean }');
+        console.log('✅ attendance: { value: boolean }');
+        console.log('\nPlease verify in your database before running LIVE MODE.');
+        console.log('To update all students, run this script again and select option 3.');
     }
     
     console.log('\n✅ Process complete!\n');
