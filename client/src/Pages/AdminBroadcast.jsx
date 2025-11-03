@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Megaphone, Loader2, CheckCircle2, CalendarX2 } from "lucide-react";
+import { Megaphone, Loader2, CheckCircle2, CalendarX2, Pencil, Trash2, X } from "lucide-react";
 import Navbar from "../Components/UniversalNavbar";
 import { useNotification } from "../Components/NotificationProvider";
 import {
   createBroadcastMessage,
   getAdminBroadcastMessages,
+  updateBroadcastMessage,
+  deleteBroadcastMessage,
 } from "../api";
 import {
   schoolOptions,
@@ -25,6 +27,22 @@ const formatTimestamp = (value) => {
   }).format(date);
 };
 
+const toDatetimeLocalValue = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const tzOffset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - tzOffset * 60000);
+  return local.toISOString().slice(0, 16);
+};
+
+const fromDatetimeLocalValue = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+};
+
 const AdminBroadcast = () => {
   const { showNotification } = useNotification();
 
@@ -34,6 +52,8 @@ const AdminBroadcast = () => {
     targetSchools: [],
     targetDepartments: [],
     expiresAt: "",
+    action: 'notice',
+    isActive: true,
   });
   const [sending, setSending] = useState(false);
 
@@ -41,6 +61,20 @@ const AdminBroadcast = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [includeExpired, setIncludeExpired] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(DEFAULT_HISTORY_LIMIT);
+  const [editingBroadcastId, setEditingBroadcastId] = useState(null);
+
+  const resetForm = useCallback(() => {
+    setFormData({
+      title: "",
+      message: "",
+      targetSchools: [],
+      targetDepartments: [],
+      expiresAt: "",
+      action: 'notice',
+      isActive: true,
+    });
+    setEditingBroadcastId(null);
+  }, []);
 
   const toggleAudienceValue = (key, value) => {
     setFormData((prev) => {
@@ -66,6 +100,13 @@ const AdminBroadcast = () => {
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
+    if (name === "isActive") {
+      setFormData((prev) => ({
+        ...prev,
+        isActive: event.target.checked,
+      }));
+      return;
+    }
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -107,6 +148,34 @@ const AdminBroadcast = () => {
       return;
     }
 
+    if (!formData.expiresAt) {
+      showNotification(
+        "warning",
+        "Expiry required",
+        "Please choose when this broadcast should expire."
+      );
+      return;
+    }
+
+    const expiryIso = fromDatetimeLocalValue(formData.expiresAt);
+    if (!expiryIso) {
+      showNotification(
+        "error",
+        "Invalid expiry",
+        "Please pick a valid future date and time for expiry."
+      );
+      return;
+    }
+
+    if (new Date(expiryIso) <= new Date()) {
+      showNotification(
+        "error",
+        "Expiry must be in the future",
+        "Adjust the expiry so it is later than the current time."
+      );
+      return;
+    }
+
     setSending(true);
     try {
       const payload = {
@@ -114,36 +183,83 @@ const AdminBroadcast = () => {
         message: formData.message.trim(),
         targetSchools: formData.targetSchools,
         targetDepartments: formData.targetDepartments,
-        expiresAt: formData.expiresAt || undefined,
+        expiresAt: expiryIso,
+        action: formData.action || 'notice',
+        isActive: formData.isActive,
       };
 
-      await createBroadcastMessage(payload);
-      showNotification(
-        "success",
-        "Broadcast sent",
-        "Faculty members will see this message within a few minutes."
-      );
+      if (editingBroadcastId) {
+        await updateBroadcastMessage(editingBroadcastId, payload);
+        showNotification(
+          "success",
+          "Broadcast updated",
+          "Changes have been saved and will reflect for faculty shortly."
+        );
+      } else {
+        await createBroadcastMessage(payload);
+        showNotification(
+          "success",
+          "Broadcast sent",
+          "Faculty members will see this message within a few minutes."
+        );
+      }
 
-      setFormData({
-        title: "",
-        message: "",
-        targetSchools: [],
-        targetDepartments: [],
-        expiresAt: "",
-      });
-
+      resetForm();
       fetchHistory();
     } catch (err) {
-      console.error("❌ Failed to send broadcast:", err);
+      console.error("❌ Failed to submit broadcast:", err);
       showNotification(
         "error",
-        "Unable to send broadcast",
+        "Unable to save broadcast",
         err.response?.data?.message || "Please retry in a few moments."
       );
     } finally {
       setSending(false);
     }
   };
+
+  const handleEditBroadcast = useCallback((broadcast) => {
+    setEditingBroadcastId(broadcast._id);
+    setFormData({
+      title: broadcast.title || "",
+      message: broadcast.message || "",
+      targetSchools: broadcast.targetSchools || [],
+      targetDepartments: broadcast.targetDepartments || [],
+      expiresAt: toDatetimeLocalValue(broadcast.expiresAt),
+      action: broadcast.action || 'notice',
+      isActive: broadcast.isActive ?? true,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    resetForm();
+  }, [resetForm]);
+
+  const handleDeleteBroadcast = useCallback(async (broadcastId) => {
+    const confirmDelete = window.confirm("Delete this broadcast permanently?");
+    if (!confirmDelete) return;
+
+    try {
+      await deleteBroadcastMessage(broadcastId);
+      showNotification(
+        "success",
+        "Broadcast deleted",
+        "The broadcast has been removed."
+      );
+      if (editingBroadcastId === broadcastId) {
+        resetForm();
+      }
+      fetchHistory();
+    } catch (err) {
+      console.error("❌ Failed to delete broadcast:", err);
+      showNotification(
+        "error",
+        "Unable to delete broadcast",
+        err.response?.data?.message || "Please retry in a few moments."
+      );
+    }
+  }, [deleteBroadcastMessage, editingBroadcastId, fetchHistory, resetForm, showNotification]);
 
   const activeAudienceDescription = useMemo(() => {
     const schoolLabel =
@@ -199,8 +315,20 @@ const AdminBroadcast = () => {
 
             <section className="mb-10 rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
               <h2 className="mb-4 text-lg font-semibold text-slate-800">
-                Create Broadcast
+                {editingBroadcastId ? "Edit Broadcast" : "Create Broadcast"}
               </h2>
+              {editingBroadcastId && (
+                <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                  <span>Updating an existing broadcast. Changes will overwrite the original message.</span>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="inline-flex items-center gap-1 rounded-lg border border-amber-300 px-3 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                  >
+                    <X className="h-3 w-3" /> Cancel edit
+                  </button>
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
@@ -313,7 +441,7 @@ const AdminBroadcast = () => {
 
                   <div className="sm:col-span-2">
                     <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      Optional Expiry
+                      Expiry <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="datetime-local"
@@ -321,10 +449,44 @@ const AdminBroadcast = () => {
                       value={formData.expiresAt}
                       onChange={handleInputChange}
                       className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      min={toDatetimeLocalValue(new Date(Date.now() + 5 * 60 * 1000))}
                     />
                     <p className="mt-2 text-xs text-slate-500">
-                      The message disappears automatically after this time. Leave empty to keep it active.
+                      The message disappears automatically after this time. Choose a future timestamp.
                     </p>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Action
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border ${formData.action === 'notice' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white'}`}>
+                        <input type="radio" name="action" value="notice" checked={formData.action === 'notice'} onChange={handleInputChange} />
+                        <span className="text-sm">Notice (informational)</span>
+                      </label>
+                      <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border ${formData.action === 'block' ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 bg-white'}`}>
+                        <input type="radio" name="action" value="block" checked={formData.action === 'block'} onChange={handleInputChange} />
+                        <span className="text-sm">Block faculty access</span>
+                      </label>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Choose 'Block faculty access' to temporarily prevent faculty from using the portal (they will still see this broadcast).
+                    </p>
+                  </div>
+
+                  <div className="sm:col-span-2 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="broadcast-active"
+                      name="isActive"
+                      checked={formData.isActive}
+                      onChange={handleInputChange}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="broadcast-active" className="text-sm font-semibold text-slate-700">
+                      Keep this broadcast active until expiry
+                    </label>
                   </div>
                 </div>
 
@@ -342,7 +504,7 @@ const AdminBroadcast = () => {
                     ) : (
                       <Megaphone className="h-4 w-4" />
                     )}
-                    {sending ? "Sending..." : "Send Broadcast"}
+                    {sending ? (editingBroadcastId ? "Saving..." : "Sending...") : editingBroadcastId ? "Update Broadcast" : "Send Broadcast"}
                   </button>
                 </div>
               </form>
@@ -399,13 +561,16 @@ const AdminBroadcast = () => {
                 <ul className="flex flex-col gap-4">
                   {history.map((item) => {
                     const isExpired = item.expiresAt && new Date(item.expiresAt) < new Date();
+                    const isBlocking = item.action === 'block';
                     return (
                       <li
                         key={item._id}
                         className={`rounded-2xl border px-4 py-4 shadow-sm transition hover:shadow-md ${
                           isExpired
                             ? "border-slate-200 bg-slate-50"
-                            : "border-blue-100 bg-blue-50/60"
+                            : isBlocking
+                              ? "border-red-200 bg-red-50/80"
+                              : "border-blue-100 bg-blue-50/60"
                         }`}
                       >
                         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -424,9 +589,25 @@ const AdminBroadcast = () => {
                                 Expires {formatTimestamp(item.expiresAt)}
                               </span>
                             )}
+                            <span>
+                              Status: <strong className="ml-1">{item.isActive ? 'Active' : 'Inactive'}</strong>
+                            </span>
+                            <span>
+                              Action: <strong className="ml-1">{item.action || 'notice'}</strong>
+                            </span>
                             {isExpired && (
                               <span className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600">
                                 Expired
+                              </span>
+                            )}
+                            {isBlocking && !isExpired && (
+                              <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700">
+                                Blocking faculty access
+                              </span>
+                            )}
+                            {item.isActive && !isExpired && (
+                              <span className="text-[11px] font-semibold text-emerald-600">
+                                Currently shown to faculty
                               </span>
                             )}
                           </div>
@@ -450,6 +631,22 @@ const AdminBroadcast = () => {
                               By {item.createdByName}
                             </span>
                           )}
+                          <div className="ml-auto flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEditBroadcast(item)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
+                            >
+                              <Pencil className="h-3.5 w-3.5" /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBroadcast(item._id)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" /> Delete
+                            </button>
+                          </div>
                         </div>
                       </li>
                     );

@@ -11,6 +11,9 @@ import adminRouter from "./routes/adminRoutes.js";
 import authRouter from "./routes/authRoutes.js";
 import studentRouter from "./routes/studentRoutes.js";
 import facultyRouter from "./routes/facultyRoutes.js";
+import correlationId from './middlewares/correlationId.js';
+import requestLogger from './middlewares/requestLogger.js';
+import logger from './utils/logger.js';
 
 import otpRouter from "./routes/otpRoutes.js";
 import helmet from "helmet";
@@ -64,6 +67,11 @@ app.use(express.json({ limit: "50mb" }));
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(cookieParser()); // good to have for future
 
+// correlation id (requestId) must be set before request logging
+app.use(correlationId);
+// request logger - logs incoming requests and timings
+app.use(requestLogger);
+
 const PORT = process.env.PORT || 5000;
 
 // Mount API routes
@@ -75,5 +83,5 @@ app.use("/api/faculty", facultyRouter); // GET /api/faculty/getFacultyDetails/:i
 app.use("/api/otp", otpRouter);
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+  logger.info('server_start', { message: `Server running at http://localhost:${PORT}` });
 });

@@ -6,16 +6,34 @@ import {
   getFacultyBroadcasts,
 } from "../controllers/facultyController.js";
 import jwtAuthMiddleware from "../middlewares/juwAuthMiddleware.js";
+import broadcastBlockMiddleware from "../middlewares/broadcastBlockMiddleware.js";
 
 const facultyRouter = express.Router();
 
-facultyRouter.get("/getFacultyDetails/:employeeId", jwtAuthMiddleware, getFacultyDetails);
+facultyRouter.get(
+  "/getFacultyDetails/:employeeId",
+  jwtAuthMiddleware,
+  broadcastBlockMiddleware,
+  getFacultyDetails
+);
 
 // here school and department are query parameter
-facultyRouter.get("/getMarkingSchema", jwtAuthMiddleware, getMarkingSchema);
+facultyRouter.get(
+  "/getMarkingSchema",
+  jwtAuthMiddleware,
+  broadcastBlockMiddleware,
+  getMarkingSchema
+);
 
+// faculty should always be able to fetch broadcasts (even when blocked)
 facultyRouter.get("/broadcasts", jwtAuthMiddleware, getFacultyBroadcasts);
 
-facultyRouter.get("/:employeeId/projects", getFacultyProjects);
+// Protect projects route as well
+facultyRouter.get(
+  "/:employeeId/projects",
+  jwtAuthMiddleware,
+  broadcastBlockMiddleware,
+  getFacultyProjects
+);
 
 export default facultyRouter

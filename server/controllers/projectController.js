@@ -2,6 +2,7 @@
   import Project from "../models/projectSchema.js";
   import Student from "../models/studentSchema.js"; // Ensure this path is correct
   import Faculty from "../models/facultySchema.js";
+  import { logger, safeMeta } from "../utils/logger.js";
   // Import Panel model at the top of your file
   import Panel from "../models/panelSchema.js";
   import MarkingSchema from "../models/markingSchema.js";
@@ -77,6 +78,13 @@ export async function createProject(req, res, next) {
       school,
       department,
     }).session(session);
+    // Audit log: who attempted to create a project and basic context
+    try {
+      const actor = req.user?.id ? await Faculty.findById(req.user.id).select('name employeeId').lean() : null;
+      req.log && req.log('info', 'create_project_called', { actor: actor ? { id: actor._id, name: actor.name, employeeId: actor.employeeId } : null, projectName: name, studentsCount: studentDetails.length });
+    } catch (e) {
+      logger.warn('create_project_audit_failed', safeMeta({ error: e?.message }));
+    }
     
     if (!markingSchema) {
       await session.abortTransaction();
@@ -91,13 +99,11 @@ export async function createProject(req, res, next) {
     }).session(session);
     
     if (!guideFacultyDoc) {
-      await session.abortTransaction();
       throw new Error(
         `Guide faculty with employee id ${guideFacultyEmpId} not found`
       );
     }
 
-    // ✅ Extract both requiresContribution and contributionType from marking schema
     const schemaRequiresContribution = markingSchema.requiresContribution || false;
     const schemaContributionType = markingSchema.contributionType || 'none';
 
@@ -241,6 +247,14 @@ export async function createProject(req, res, next) {
 
     console.log(`🎉 Project created successfully: ${newProject._id}`);
 
+    // Audit log project created
+    try {
+      const actor = req.user?.id ? await Faculty.findById(req.user.id).select('name employeeId').lean() : null;
+      req.log && req.log('info', 'project_created', { actor: actor ? { id: actor._id, name: actor.name, employeeId: actor.employeeId } : null, projectId: newProject._id, name: newProject.name, studentsCount: studentIds.length });
+    } catch (e) {
+      logger.warn('project_created_audit_failed', safeMeta({ error: e?.message }));
+    }
+
     return res.status(201).json({
       success: true,
       message: "Project created successfully",
@@ -253,7 +267,13 @@ export async function createProject(req, res, next) {
       },
     });
   } catch (error) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      try {
+        await session.abortTransaction();
+      } catch (abortError) {
+        logger.error('create_project_abort_failed', safeMeta({ error: abortError?.message }));
+      }
+    }
     console.error("❌ Error creating project:", error);
 
     if (error.code === 11000) {

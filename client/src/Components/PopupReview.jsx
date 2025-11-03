@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Award, Star, Clock, Calendar, AlertTriangle } from "lucide-react";
+import { X, Award, Star, Clock, Calendar, AlertTriangle, CheckCircle } from "lucide-react";
 
 const PopupReview = ({
   title,
@@ -35,6 +35,10 @@ const PopupReview = ({
   // ✅ NEW: State for contribution requirement and values
   const [requiresContribution, setRequiresContribution] = useState(false);
   const [contributions, setContributions] = useState({}); // { memberId: percentage }
+  
+  // ✅ NEW: States for PPT approval success
+  const [pptSubmitted, setPptSubmitted] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
   const [deadlineInfo, setDeadlineInfo] = useState({
     hasDeadline: false,
@@ -377,6 +381,12 @@ const PopupReview = ({
         `📽️ [PopupReview] PPT approval status: ${pptAlreadyApproved}`
       );
       setTeamPptApproved(pptAlreadyApproved);
+      
+      // ✅ NEW: Set submitted state if PPT already approved
+      if (pptAlreadyApproved && showOnlyPPTApproval) {
+        setPptSubmitted(true);
+        setShowSuccessPopup(true);
+      }
     } else {
       setTeamPptApproved(false);
     }
@@ -577,6 +587,13 @@ const PopupReview = ({
           }
         : null;
       console.log("📽️ [PopupReview] PPT-only submission:", teamPptObj);
+      
+      // ✅ NEW: Show success popup and disable controls
+      if (teamPptApproved) {
+        setPptSubmitted(true);
+        setShowSuccessPopup(true);
+      }
+      
       onSubmit({}, teamPptObj, {});
     } else if (requiresPPT && panelMode) {
       const teamPptObj = {
@@ -740,6 +757,37 @@ const PopupReview = ({
               >
                 Close
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ NEW: Success Popup Overlay */}
+        {showSuccessPopup && showOnlyPPTApproval && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-[60] backdrop-blur-sm">
+            <div className="bg-gradient-to-br from-green-50 to-emerald-100 border-4 border-green-500 rounded-3xl shadow-2xl p-10 max-w-md w-full mx-4 transform transition-all">
+              <div className="flex flex-col items-center text-center">
+                <div className="bg-green-500 rounded-full p-4 mb-6 shadow-lg">
+                  <CheckCircle className="w-16 h-16 text-white" />
+                </div>
+                <h2 className="text-3xl font-bold text-green-800 mb-3">
+                  Success!
+                </h2>
+                <p className="text-xl font-semibold text-green-700 mb-2">
+                  Guide Has Successfully Approved the PPT
+                </p>
+                <p className="text-sm text-green-600 mb-6">
+                  The PPT approval has been recorded and saved.
+                </p>
+                <div className="w-full h-1 bg-green-300 rounded-full mb-6">
+                  <div className="w-full h-full bg-green-600 rounded-full animate-pulse"></div>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-105"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -957,20 +1005,7 @@ const PopupReview = ({
                   Schema Required
                 </span>
               </div>
-              {requiresPPT && (
-                <label className="flex items-center space-x-3 mb-3">
-                  <input
-                    type="checkbox"
-                    checked={teamPptApproved}
-                    onChange={(e) => setTeamPptApproved(e.target.checked)}
-                    disabled={finalFormLocked}
-                    className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                  />
-                  <span className="font-semibold text-blue-800">
-                    Approve Team PPT for this review
-                  </span>
-                </label>
-              )}
+              
               {requiresContribution && (
                 <div>
                   <h4 className="font-semibold text-blue-800 mb-2">
@@ -979,9 +1014,6 @@ const PopupReview = ({
                   {teamMembers.map((member) => (
                     <div key={member._id} className="mb-2">
                       <label className="flex items-center space-x-3">
-                        {/* <span className="text-sm font-medium text-gray-700">
-                          {member.name} ({member.regNo})
-                        </span> */}
                         <select
                           value={contributions[member._id] || ""}
                           onChange={(e) =>
@@ -1039,8 +1071,10 @@ const PopupReview = ({
                       type="checkbox"
                       checked={teamPptApproved}
                       onChange={(e) => setTeamPptApproved(e.target.checked)}
-                      disabled={finalFormLocked}
-                      className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                      disabled={finalFormLocked || pptSubmitted}
+                      className={`w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 ${
+                        pptSubmitted ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
                     />
                     <span className="font-semibold text-blue-800 text-lg">
                       Approve Team PPT
@@ -1242,12 +1276,14 @@ const PopupReview = ({
               disabled={
                 finalFormLocked ||
                 (sub === "Locked" && !showOnlyPPTApproval) ||
-                (showOnlyPPTApproval && !requiresPPT)
+                (showOnlyPPTApproval && !requiresPPT) ||
+                pptSubmitted
               }
               className={`px-6 py-2 rounded-lg font-medium transition-colors ${
                 finalFormLocked ||
                 (sub === "Locked" && !showOnlyPPTApproval) ||
-                (showOnlyPPTApproval && !requiresPPT)
+                (showOnlyPPTApproval && !requiresPPT) ||
+                pptSubmitted
                   ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                   : panelMode && bestProject
                   ? "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white"
@@ -1272,6 +1308,8 @@ const PopupReview = ({
                 ? "Comments/Contributions Required"
                 : showOnlyPPTApproval && !requiresPPT
                 ? "No PPT Required by Schema"
+                : showOnlyPPTApproval && requiresPPT && pptSubmitted
+                ? "✅ PPT Approved"
                 : showOnlyPPTApproval && requiresPPT
                 ? "📽️ Submit PPT Approval"
                 : panelMode && bestProject

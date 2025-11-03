@@ -52,8 +52,8 @@ const studentSchema = new mongoose.Schema({
   timestamps: true // Optional: adds createdAt and updatedAt
 });
 
-// Index for faster queries
-studentSchema.index({ regNo: 1 });
+// Index for faster queries: regNo has a unique index via the schema field option
+// so avoid creating a duplicate index here. Keep compound index for school+department.
 studentSchema.index({ school: 1, department: 1 });
 
 const Student = mongoose.model("Student", studentSchema);

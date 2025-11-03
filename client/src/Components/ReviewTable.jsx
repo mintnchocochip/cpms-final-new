@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Star, BookOpen, Edit2, Save, X } from 'lucide-react';
+import { Star, BookOpen, Edit2, Save, X, CheckCircle, Clock, Lock } from 'lucide-react';
 
 const renderMarks = (reviewObj, components = []) => {
   if (!reviewObj) return <span className="text-gray-400">None</span>;
@@ -203,7 +203,8 @@ const ReviewTable = ({
         key: review.reviewName,
         label: review.displayName || review.reviewName,
         components: review.components || [],
-        requiresPPT: review.requiresPPT || false
+        requiresPPT: Boolean(review.pptApproved),
+        pptDefaults: review.pptApproved || null,
       }));
     }
 
@@ -259,6 +260,21 @@ const ReviewTable = ({
   });
 
   const columns = getColumns();
+  const getReviewDataForStudent = (student, reviewKey) => {
+    if (!student || !reviewKey) return null;
+    const { reviews } = student;
+    if (!reviews) return null;
+
+    if (typeof reviews.get === 'function') {
+      return reviews.get(reviewKey);
+    }
+
+    if (typeof reviews === 'object') {
+      return reviews[reviewKey];
+    }
+
+    return null;
+  };
   console.log('📋 [ReviewTable] Final columns for table:', columns.map(c => ({ key: c.key, label: c.label, components: c.components.length })));
 
   if (columns.length === 0) {
@@ -396,11 +412,34 @@ const ReviewTable = ({
           </tr>
         </thead>
         <tbody>
-          {team.students.map((student, studentIndex) => (
-            <tr
-              key={`${student._id}_${forceRenderKey}`}
-              className={studentIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-            >
+          {team.students.map((student, studentIndex) => {
+            const pptStatuses = columns
+              .map((col) => {
+                const reviewData = getReviewDataForStudent(student, col.key);
+                const pptData = reviewData?.pptApproved;
+                const requiresPpt = col.requiresPPT || Boolean(pptData);
+                if (!requiresPpt) {
+                  return null;
+                }
+
+                return {
+                  key: col.key,
+                  label: col.label,
+                  approved: pptData?.approved === true,
+                  locked: pptData?.locked === true,
+                };
+              })
+              .filter(Boolean);
+
+            const hasReviewStatuses = pptStatuses.length > 0;
+            const allApproved = hasReviewStatuses && pptStatuses.every((status) => status.approved);
+            const pendingCount = hasReviewStatuses ? pptStatuses.filter((status) => !status.approved).length : 0;
+
+            return (
+              <tr
+                key={`${student._id}_${forceRenderKey}`}
+                className={studentIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
+              >
               <td className="px-4 py-3 border font-semibold sticky left-0 bg-inherit z-10 min-w-[150px]">
                 <div className="break-words">
                   <div>{student.name}</div>
@@ -470,7 +509,39 @@ const ReviewTable = ({
                 </div>
               </td>
               <td className="px-4 py-3 border align-middle">
-                <div className="space-y-2">
+                {hasReviewStatuses ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-col gap-2">
+                      {pptStatuses.map((status) => {
+                        const StatusIcon = status.approved ? CheckCircle : Clock;
+                        return (
+                          <div
+                            key={`${student._id}_${status.key}`}
+                            className="flex items-center justify-between rounded-md border border-slate-200 bg-white px-2 py-1.5"
+                          >
+                            <span className="text-xs font-semibold text-slate-700">{status.label}</span>
+                            <div
+                              className={`flex items-center gap-1 text-xs font-semibold ${
+                                status.approved ? 'text-emerald-600' : 'text-amber-600'
+                              }`}
+                            >
+                              <StatusIcon className="w-3.5 h-3.5" />
+                              <span>{status.approved ? 'Approved' : 'Pending'}</span>
+                              {status.locked && <Lock className="w-3 h-3 text-slate-500" />}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="text-xs font-semibold">
+                      <span className={allApproved ? 'text-emerald-600' : 'text-amber-600'}>
+                        {allApproved
+                          ? 'All required PPTs approved'
+                          : `${pendingCount} review${pendingCount === 1 ? '' : 's'} pending approval`}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
                   <div className="text-sm">
                     <span
                       className={student.pptApproved?.approved ? 'text-green-600' : 'text-red-600'}
@@ -478,7 +549,7 @@ const ReviewTable = ({
                       <b>{student.pptApproved?.approved ? 'PPT Approved' : 'PPT Not Approved'}</b>
                     </span>
                   </div>
-                </div>
+                )}
               </td>
               {/* ✅ UPDATED: Contribution Type Cell with Edit Functionality */}
               <td className="px-4 py-3 border align-middle">
@@ -488,7 +559,8 @@ const ReviewTable = ({
                 />
               </td>
             </tr>
-          ))}
+          );
+          })}
         </tbody>
       </table>
     </div>

@@ -3,6 +3,7 @@ import Project from "../models/projectSchema.js";
 import Panel from "../models/panelSchema.js";
 import MarkingSchema from "../models/markingSchema.js";
 import BroadcastMessage from "../models/broadcastMessageSchema.js";
+import { logger, safeMeta } from "../utils/logger.js";
 
 // Get details of a faculty by employee ID
 export async function getFacultyDetails(req, res) {
@@ -30,10 +31,7 @@ export async function getFacultyDetails(req, res) {
 // Update this function in your facultyController.js
 export async function getMarkingSchema(req, res) {
   try {
-    console.log('=== GET MARKING SCHEMA CALLED ===');
-    console.log('Request method:', req.method);
-    console.log('Request URL:', req.url);
-    console.log('User from token:', req.user);
+    logger.info('get_marking_schema_called', safeMeta({ method: req.method, url: req.url, user: req.user?.id, requestId: req.requestId }));
 
     // Get school and department from authenticated faculty user
     const facultyId = req.user.id;
@@ -84,12 +82,7 @@ export async function getMarkingSchema(req, res) {
       });
     }
 
-    console.log('✅ Marking schema retrieved successfully');
-    console.log('Reviews in schema:', schema.reviews.map(r => ({
-      reviewName: r.reviewName,
-      componentsCount: r.components?.length || 0,
-      hasDeadline: !!r.deadline
-    })));
+    logger.info('marking_schema_retrieved', safeMeta({ schemaId: schema._id, reviewsCount: schema.reviews?.length || 0 }));
 
     return res.status(200).json({
       success: true,
@@ -113,8 +106,11 @@ export async function getFacultyProjects(req, res) {
   try {
     const { employeeId } = req.params;
 
+    logger.info('get_faculty_projects_called', safeMeta({ employeeId, requestId: req.requestId, user: req.user?.id }));
+
     const faculty = await Faculty.findOne({ employeeId });
     if (!faculty) {
+      logger.warn('faculty_not_found_for_projects', safeMeta({ employeeId }));
       return res
         .status(404)
         .json({ message: "No faculty found with the provided employeeId." });
@@ -220,19 +216,50 @@ export async function getFacultyBroadcasts(req, res) {
     const parsedLimit = Math.min(Number(limit) || 20, 50);
     const now = new Date();
 
+    try {
+      await BroadcastMessage.updateMany(
+        {
+          isActive: true,
+          expiresAt: { $exists: true, $lte: now },
+        },
+        { $set: { isActive: false } }
+      );
+    } catch (deactivateError) {
+      console.error("WARN auto-deactivate broadcasts failed", deactivateError);
+    }
+
+    // Use case-insensitive exact matching for audience values to tolerate
+    // differences in casing or spacing between stored faculty values and
+    // admin-entered broadcast targets. Build regex list for $in queries.
+    const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Prepare normalized forms of the faculty's school/department for fast
+    // matching against broadcasts that store normalized arrays.
+    const facultySchoolsNormalized = facultySchools.map((s) => String(s).trim().toLowerCase());
+    const facultyDepartmentsNormalized = facultyDepartments.map((d) => String(d).trim().toLowerCase());
+
+    // Preserve the regex fallback for older broadcasts that may not have
+    // normalized arrays; this ensures backward compatibility.
+    const schoolRegexes = facultySchools.map((s) => new RegExp(`^${escapeRegExp(s)}$`, 'i'));
+    const deptRegexes = facultyDepartments.map((d) => new RegExp(`^${escapeRegExp(d)}$`, 'i'));
+
     const audienceFilter = [
       {
         $or: [
           { targetSchools: { $exists: false } },
           { targetSchools: { $size: 0 } },
-          { targetSchools: { $in: facultySchools } },
+          // match against normalized stored values
+          { targetSchoolsNormalized: { $in: facultySchoolsNormalized } },
+          // fallback to legacy field with case-insensitive regex
+          { targetSchools: { $in: schoolRegexes } },
         ],
       },
       {
         $or: [
           { targetDepartments: { $exists: false } },
           { targetDepartments: { $size: 0 } },
-          { targetDepartments: { $in: facultyDepartments } },
+          { targetDepartmentsNormalized: { $in: facultyDepartmentsNormalized } },
+          { targetDepartments: { $in: deptRegexes } },
         ],
       },
     ];
@@ -250,7 +277,7 @@ export async function getFacultyBroadcasts(req, res) {
     }
 
     if (includeExpired !== "true") {
-      filters.$or = [{ expiresAt: null }, { expiresAt: { $gt: now } }];
+      filters.expiresAt = { $exists: true, $gt: now };
     }
 
     const messages = await BroadcastMessage.find(filters)
