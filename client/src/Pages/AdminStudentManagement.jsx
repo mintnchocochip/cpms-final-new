@@ -535,10 +535,8 @@ const toggleStudentExpanded = useCallback(async (regNo) => {
 // Enhanced Download Excel function - Only downloads selected review type
 const downloadExcelWithoutSplit = useCallback(async () => {
   try {
-    // Show loading notification
     showNotification("info", "Preparing Excel", "Fetching schemas and organizing data...");
     
-    // Group students by school and department
     const studentGroups = {};
     filteredStudents.forEach(student => {
       const key = `${student.school}_${student.department}`;
@@ -548,22 +546,16 @@ const downloadExcelWithoutSplit = useCallback(async () => {
       studentGroups[key].push(student);
     });
 
-    // Collect all unique school/department combinations
     const uniqueCombinations = Object.keys(studentGroups);
-    
-    // Fetch schemas for all combinations that we don't already have
     const schemasToFetch = uniqueCombinations.filter(combo => !studentSchemas[combo]);
     
-    // Create a temporary schemas object that includes both existing and new schemas
     let allSchemas = { ...studentSchemas };
     
-    // Fetch missing schemas and store them temporarily
     for (const combo of schemasToFetch) {
       const [school, department] = combo.split('_');
       try {
         const response = await getMarkingSchema(school, department);
         allSchemas[combo] = response.schema;
-        // Also update the state for future use
         setStudentSchemas(prev => ({ ...prev, [combo]: response.schema }));
       } catch (error) {
         console.error('Error fetching schema for ' + combo, error);
@@ -572,141 +564,131 @@ const downloadExcelWithoutSplit = useCallback(async () => {
       }
     }
 
-    // Update progress notification
     showNotification("info", "Processing Data", "Creating Excel with filtered review data...");
 
-    // Create workbook
     const wb = XLSX.utils.book_new();
 
-    // Process each school/department group
     Object.entries(studentGroups).forEach(([groupKey, groupStudents]) => {
       const [school, department] = groupKey.split('_');
-      const schema = allSchemas[groupKey]; // Use the local schemas object
+      const schema = allSchemas[groupKey];
 
-// Prepare data for this group
-const excelData = groupStudents.map(student => {
-  const row = {
-    "Semester (CH2024-25)": "05",
-    "Class Number (CH2024-2505)": "02680",
-    "Mark Mode Code": "PE005",
-    "Register No": student.regNo,
-    "Name": student.name,
-    "School": student.school,
-    "Department": student.department,
-    "Email": student.emailId,
+      const excelData = groupStudents.map(student => {
+        const row = {
+          "Semester (CH2024-25)": "05",
+          "Class Number (CH2024-2505)": "02680",
+          "Mark Mode Code": "PE005",
+          "Register No": student.regNo,
+          "Name": student.name,
+          "School": student.school,
+          "Department": student.department,
+          "Email": student.emailId,
+          "PAT_Detected": student.PAT ? "Yes" : "No"
+        };
 
-    "PAT_Detected": student.PAT ? "Yes" : "No"
-  };
+        // Process reviews
+        if (student.reviews && selectedReviewFilter !== "all") {
+          const reviewData = student.reviews[selectedReviewFilter];
+          if (reviewData) {
+            const reviewSchema = schema?.reviews?.find(r => r.reviewName === selectedReviewFilter);
+            const reviewDisplayName = reviewSchema?.displayName || selectedReviewFilter;
 
-  // Only add the selected review type data (total marks, not component-wise)
-  if (student.reviews && selectedReviewFilter !== "all") {
-    const reviewData = student.reviews[selectedReviewFilter];
-    if (reviewData) {
-      // Get the review schema for display names
-      const reviewSchema = schema?.reviews?.find(r => r.reviewName === selectedReviewFilter);
-      const reviewDisplayName = reviewSchema?.displayName || selectedReviewFilter;
-
-      // Calculate total marks for this review
-      let totalMarks = 0;
-      let patAdjustedMarks = 0; // ✅ NEW: Track PAT-adjusted marks
-      
-      if (reviewData.marks && typeof reviewData.marks === 'object') {
-        Object.values(reviewData.marks).forEach(mark => {
-          const numericMark = parseFloat(mark) || 0;
-          totalMarks += numericMark;
-          
-          // ✅ NEW: Handle PAT special values (-1 or "PAT")
-          if (mark === -1 || mark === "PAT") {
-            patAdjustedMarks += 0; // PAT marks count as 0 for totals
-          } else {
-            patAdjustedMarks += numericMark;
-          }
-        });
-      }
-
-      // ✅ UPDATED: Add both total and PAT-adjusted marks
-      row[`${reviewDisplayName}_Total_Marks`] = totalMarks;
-      row[`${reviewDisplayName}_PAT_Adjusted_Marks`] = patAdjustedMarks;
-      
-      // ✅ NEW: Add PAT flag for this review
-      const hasPATMarks = reviewData.marks && Object.values(reviewData.marks).some(mark => 
-        mark === -1 || mark === "PAT"
-      );
-      row[`${reviewDisplayName}_Contains_PAT`] = hasPATMarks ? "Yes" : "No";
-
-      // Add review status info using displayName
-      row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
-      row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
-      
-      if (reviewData.comments) {
-        row[`${reviewDisplayName}_Comments`] = reviewData.comments;
-      }
-    }
-  } else if (selectedReviewFilter === "all") {
-    // If "All Reviews" is selected, include total marks for all reviews
-    if (student.reviews) {
-      Object.entries(student.reviews).forEach(([reviewType, reviewData]) => {
-        const reviewSchema = schema?.reviews?.find(r => r.reviewName === reviewType);
-        const reviewDisplayName = reviewSchema?.displayName || reviewType;
-
-        // Calculate total marks for this review
-        let totalMarks = 0;
-        let patAdjustedMarks = 0; // ✅ NEW: Track PAT-adjusted marks
-        
-        if (reviewData.marks && typeof reviewData.marks === 'object') {
-          Object.values(reviewData.marks).forEach(mark => {
-            const numericMark = parseFloat(mark) || 0;
-            totalMarks += numericMark;
+            // Calculate total marks
+            let totalMarks = 0;
+            let patAdjustedMarks = 0;
             
-            // ✅ NEW: Handle PAT special values (-1 or "PAT")
-            if (mark === -1 || mark === "PAT") {
-              patAdjustedMarks += 0; // PAT marks count as 0 for totals
-            } else {
-              patAdjustedMarks += numericMark;
+            if (reviewData.marks && typeof reviewData.marks === 'object') {
+              Object.values(reviewData.marks).forEach(mark => {
+                const numericMark = parseFloat(mark) || 0;
+                totalMarks += numericMark;
+                
+                if (mark === -1 || mark === "PAT") {
+                  patAdjustedMarks += 0;
+                } else {
+                  patAdjustedMarks += numericMark;
+                }
+              });
             }
+
+            row[`${reviewDisplayName}_Total_Marks`] = totalMarks;
+            row[`${reviewDisplayName}_PAT_Adjusted_Marks`] = patAdjustedMarks;
+            
+            const hasPATMarks = reviewData.marks && Object.values(reviewData.marks).some(mark => 
+              mark === -1 || mark === "PAT"
+            );
+            row[`${reviewDisplayName}_Contains_PAT`] = hasPATMarks ? "Yes" : "No";
+
+            row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
+            row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
+            
+            // ✅ ADD PER-REVIEW PPT APPROVAL STATUS
+            row[`${reviewDisplayName}_PPT_Approved`] = reviewData.pptApproved?.approved ? "Yes" : "No";
+            row[`${reviewDisplayName}_PPT_Locked`] = reviewData.pptApproved?.locked ? "Yes" : "No";
+            
+            if (reviewData.comments) {
+              row[`${reviewDisplayName}_Comments`] = reviewData.comments;
+            }
+          }
+        } else if (selectedReviewFilter === "all") {
+          if (student.reviews) {
+            Object.entries(student.reviews).forEach(([reviewType, reviewData]) => {
+              const reviewSchema = schema?.reviews?.find(r => r.reviewName === reviewType);
+              const reviewDisplayName = reviewSchema?.displayName || reviewType;
+
+              let totalMarks = 0;
+              let patAdjustedMarks = 0;
+              
+              if (reviewData.marks && typeof reviewData.marks === 'object') {
+                Object.values(reviewData.marks).forEach(mark => {
+                  const numericMark = parseFloat(mark) || 0;
+                  totalMarks += numericMark;
+                  
+                  if (mark === -1 || mark === "PAT") {
+                    patAdjustedMarks += 0;
+                  } else {
+                    patAdjustedMarks += numericMark;
+                  }
+                });
+              }
+
+              row[`${reviewDisplayName}_Total_Marks`] = totalMarks;
+              row[`${reviewDisplayName}_PAT_Adjusted_Marks`] = patAdjustedMarks;
+              
+              const hasPATMarks = reviewData.marks && Object.values(reviewData.marks).some(mark => 
+                mark === -1 || mark === "PAT"
+              );
+              row[`${reviewDisplayName}_Contains_PAT`] = hasPATMarks ? "Yes" : "No";
+
+              row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
+              row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
+              
+              // ✅ ADD PER-REVIEW PPT APPROVAL STATUS
+              row[`${reviewDisplayName}_PPT_Approved`] = reviewData.pptApproved?.approved ? "Yes" : "No";
+              row[`${reviewDisplayName}_PPT_Locked`] = reviewData.pptApproved?.locked ? "Yes" : "No";
+              
+              if (reviewData.comments) {
+                row[`${reviewDisplayName}_Comments`] = reviewData.comments;
+              }
+            });
+          }
+        }
+
+        // ✅ REMOVE OVERALL PPT STATUS (or keep it if you want both)
+        // row["PPT_Approved"] = student.pptApproved?.approved ? "Yes" : "No";
+        // row["PPT_Locked"] = student.pptApproved?.locked ? "Yes" : "No";
+
+        // Add deadlines
+        if (student.deadline) {
+          Object.entries(student.deadline).forEach(([type, deadlineData]) => {
+            row[`Deadline_${type}_From`] = deadlineData.from ? new Date(deadlineData.from).toLocaleDateString() : "";
+            row[`Deadline_${type}_To`] = deadlineData.to ? new Date(deadlineData.to).toLocaleDateString() : "";
           });
         }
 
-        // ✅ UPDATED: Add both total and PAT-adjusted marks
-        row[`${reviewDisplayName}_Total_Marks`] = totalMarks;
-        row[`${reviewDisplayName}_PAT_Adjusted_Marks`] = patAdjustedMarks;
-        
-        // ✅ NEW: Add PAT flag for this review
-        const hasPATMarks = reviewData.marks && Object.values(reviewData.marks).some(mark => 
-          mark === -1 || mark === "PAT"
-        );
-        row[`${reviewDisplayName}_Contains_PAT`] = hasPATMarks ? "Yes" : "No";
-
-        row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
-        row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
-        
-        if (reviewData.comments) {
-          row[`${reviewDisplayName}_Comments`] = reviewData.comments;
-        }
+        return row;
       });
-    }
-  }
 
-  // Add PPT approval status
-  row["PPT_Approved"] = student.pptApproved?.approved ? "Yes" : "No";
-  row["PPT_Locked"] = student.pptApproved?.locked ? "Yes" : "No";
-
-  // Add deadlines
-  if (student.deadline) {
-    Object.entries(student.deadline).forEach(([type, deadlineData]) => {
-      row[`Deadline_${type}_From`] = deadlineData.from ? new Date(deadlineData.from).toLocaleDateString() : "";
-      row[`Deadline_${type}_To`] = deadlineData.to ? new Date(deadlineData.to).toLocaleDateString() : "";
-    });
-  }
-
-  return row;
-});
-
-
-      // Create worksheet for this group
       const ws = XLSX.utils.json_to_sheet(excelData);
 
-      // Auto-size columns
       const colWidths = [];
       const headers = Object.keys(excelData[0] || {});
       headers.forEach((header, index) => {
@@ -718,34 +700,28 @@ const excelData = groupStudents.map(student => {
       });
       ws['!cols'] = colWidths;
 
-      // Create sheet name - truncate if too long (Excel limit is 31 chars)
-      let sheetName = `${school}_${department}`.replace(/[?]/g, ''); // Remove invalid characters
+      let sheetName = `${school}_${department}`.replace(/[?]/g, '');
       if (sheetName.length > 31) {
         sheetName = sheetName.substring(0, 28) + "...";
       }
 
-      // Add worksheet to workbook
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     });
 
-    // Generate filename with timestamp and context
     const timestamp = new Date().toISOString().split('T')[0];
     let filename;
     
     if (adminContext.skipped || Object.keys(studentGroups).length > 1) {
-      // All mode or multiple groups - multi-sheet file
       const reviewFilter = selectedReviewFilter === "all" ? "AllReviews" : selectedReviewFilter;
       filename = `StudentManagement_${reviewFilter}_${timestamp}.xlsx`;
       showNotification("success", "Download Complete", `Excel file downloaded: ${filename} (${Object.keys(studentGroups).length} sheets, ${filteredStudents.length} students)`);
     } else {
-      // Single program mode
       const contextStr = `${adminContext.school}_${adminContext.department}`.replace(/[^a-zA-Z0-9]/g, '');
       const reviewFilter = selectedReviewFilter === "all" ? "AllReviews" : selectedReviewFilter;
       filename = `StudentManagement_${contextStr}_${reviewFilter}_${timestamp}.xlsx`;
       showNotification("success", "Download Complete", `Excel file downloaded: ${filename} (${filteredStudents.length} students)`);
     }
 
-    // Save file
     XLSX.writeFile(wb, filename);
 
   } catch (error) {
@@ -753,6 +729,7 @@ const excelData = groupStudents.map(student => {
     showNotification("error", "Download Failed", "Failed to download Excel file. Please try again.");
   }
 }, [filteredStudents, adminContext, showNotification, studentSchemas, getMarkingSchema, setStudentSchemas, selectedReviewFilter]);
+
 // Add two separate download functions after your existing downloadExcel function
 
 
@@ -762,7 +739,6 @@ const downloadExcelWithSplit = useCallback(async () => {
   try {
     showNotification("info", "Preparing Excel", "Fetching schemas and organizing data with component splits...");
     
-    // Group students by school_department (each group has its own schema)
     const studentGroups = {};
     
     filteredStudents.forEach(student => {
@@ -773,7 +749,6 @@ const downloadExcelWithSplit = useCallback(async () => {
       studentGroups[key].push(student);
     });
 
-    // Fetch schemas for all combinations
     const uniqueCombinations = Object.keys(studentGroups);
     const schemasToFetch = uniqueCombinations.filter(combo => !studentSchemas[combo]);
     
@@ -782,7 +757,7 @@ const downloadExcelWithSplit = useCallback(async () => {
     for (const combo of schemasToFetch) {
       const parts = combo.split('_');
       const school = parts[0];
-      const department = parts.slice(1).join('_'); // Handle departments with underscores in name
+      const department = parts.slice(1).join('_');
       try {
         const response = await getMarkingSchema(school, department);
         allSchemas[combo] = response.schema;
@@ -797,16 +772,14 @@ const downloadExcelWithSplit = useCallback(async () => {
     showNotification("info", "Processing Data", "Creating Excel with component-wise split data...");
 
     const wb = XLSX.utils.book_new();
-    let sheetCounter = 1; // For unique sheet names
+    let sheetCounter = 1;
 
-    // Process each school/department group SEPARATELY
     Object.entries(studentGroups).forEach(([groupKey, groupStudents]) => {
       const parts = groupKey.split('_');
       const school = parts[0];
       const department = parts.slice(1).join('_');
-      const schema = allSchemas[groupKey]; // Get THIS department's schema
+      const schema = allSchemas[groupKey];
 
-      // ✅ FIX: Map students using ONLY this department's schema
       const excelData = groupStudents.map(student => {
         const row = {
           "Semester (CH2024-25)": "05",
@@ -820,43 +793,38 @@ const downloadExcelWithSplit = useCallback(async () => {
           "PAT_Detected": student.PAT ? "Yes" : "No"
         };
 
-        // ✅ Process reviews based on THIS department's schema ONLY
         if (student.reviews && schema?.reviews) {
-          // Determine which reviews to process
           const reviewsToProcess = selectedReviewFilter === "all" 
-            ? schema.reviews.map(r => r.reviewName) // Use schema's review list
+            ? schema.reviews.map(r => r.reviewName)
             : schema.reviews.filter(r => r.reviewName === selectedReviewFilter).map(r => r.reviewName);
 
-          // ✅ Process each review defined in THIS schema
           reviewsToProcess.forEach(reviewType => {
             const reviewData = student.reviews[reviewType];
             const reviewSchema = schema.reviews.find(r => r.reviewName === reviewType);
             
-            if (!reviewSchema) return; // Skip if review not in this dept's schema
+            if (!reviewSchema) return;
             
             const reviewDisplayName = reviewSchema.displayName || reviewType;
 
-            // ✅ Add component-wise marks based on THIS review's components in schema
+            // Component-wise marks
             if (reviewSchema.components && reviewSchema.components.length > 0) {
               reviewSchema.components.forEach(component => {
                 const componentDisplayName = component.displayName || component.name;
                 const columnName = `${reviewDisplayName}_${componentDisplayName}`;
                 
-                // Get mark value from student data
                 const markValue = reviewData?.marks?.[component.name];
                 
-                // Handle PAT marks
                 if (markValue === -1 || markValue === "PAT") {
                   row[columnName] = "PAT";
                 } else if (markValue !== undefined && markValue !== null) {
                   row[columnName] = markValue;
                 } else {
-                  row[columnName] = "N/A"; // Student doesn't have this mark yet
+                  row[columnName] = "N/A";
                 }
               });
             }
 
-            // ✅ Add summary columns for this review
+            // Summary columns
             if (reviewData) {
               let totalMarks = 0;
               let patAdjustedMarks = 0;
@@ -884,23 +852,30 @@ const downloadExcelWithSplit = useCallback(async () => {
               row[`${reviewDisplayName}_Status`] = reviewData.locked ? "Locked" : "Unlocked";
               row[`${reviewDisplayName}_Attendance`] = reviewData.attendance?.value ? "Present" : "Absent";
               
+              // ✅ ADD PER-REVIEW PPT APPROVAL STATUS
+              row[`${reviewDisplayName}_PPT_Approved`] = reviewData.pptApproved?.approved ? "Yes" : "No";
+              row[`${reviewDisplayName}_PPT_Locked`] = reviewData.pptApproved?.locked ? "Yes" : "No";
+              
               if (reviewData.comments) {
                 row[`${reviewDisplayName}_Comments`] = reviewData.comments;
               }
             } else {
-              // Student doesn't have this review yet
               row[`${reviewDisplayName}_Total_Marks`] = 0;
               row[`${reviewDisplayName}_PAT_Adjusted_Marks`] = 0;
               row[`${reviewDisplayName}_Contains_PAT`] = "No";
               row[`${reviewDisplayName}_Status`] = "Not Started";
               row[`${reviewDisplayName}_Attendance`] = "N/A";
+              
+              // ✅ ADD PER-REVIEW PPT APPROVAL STATUS (default values)
+              row[`${reviewDisplayName}_PPT_Approved`] = "No";
+              row[`${reviewDisplayName}_PPT_Locked`] = "No";
             }
           });
         }
 
-        // Add PPT approval status
-        row["PPT_Approved"] = student.pptApproved?.approved ? "Yes" : "No";
-        row["PPT_Locked"] = student.pptApproved?.locked ? "Yes" : "No";
+        // ✅ REMOVE OVERALL PPT STATUS (or keep if needed)
+        // row["PPT_Approved"] = student.pptApproved?.approved ? "Yes" : "No";
+        // row["PPT_Locked"] = student.pptApproved?.locked ? "Yes" : "No";
 
         // Add deadlines
         if (student.deadline) {
@@ -913,10 +888,8 @@ const downloadExcelWithSplit = useCallback(async () => {
         return row;
       });
 
-      // Create worksheet for this department
       const ws = XLSX.utils.json_to_sheet(excelData);
 
-      // Auto-size columns
       const colWidths = [];
       const headers = Object.keys(excelData[0] || {});
       headers.forEach((header, index) => {
@@ -928,10 +901,8 @@ const downloadExcelWithSplit = useCallback(async () => {
       });
       ws['!cols'] = colWidths;
 
-      // ✅ Create unique sheet name with counter
       let baseSheetName = `${school}_${department}`.replace(/[:\\/?*\[\]]/g, '');
       
-      // Add counter suffix BEFORE truncating
       const suffix = `_${sheetCounter}`;
       const maxBaseLength = 31 - suffix.length;
       
@@ -941,7 +912,6 @@ const downloadExcelWithSplit = useCallback(async () => {
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     });
 
-    // Generate filename
     const timestamp = new Date().toISOString().split('T')[0];
     let filename;
     
@@ -953,8 +923,7 @@ const downloadExcelWithSplit = useCallback(async () => {
       const contextStr = `${adminContext.school}_${adminContext.department}`.replace(/[^a-zA-Z0-9]/g, '');
       const reviewFilter = selectedReviewFilter === "all" ? "AllReviews" : selectedReviewFilter;
       filename = `StudentManagement_ComponentSplit_${contextStr}_${reviewFilter}_${timestamp}.xlsx`;
-      showNotification("success", "Download Complete", `Excel file downloaded: ${filename}`)
-;
+      showNotification("success", "Download Complete", `Excel file downloaded: ${filename}`);
     }
 
     XLSX.writeFile(wb, filename);
@@ -964,6 +933,7 @@ const downloadExcelWithSplit = useCallback(async () => {
     showNotification("error", "Download Failed", "Failed to download Excel file. Please try again.");
   }
 }, [filteredStudents, adminContext, showNotification, studentSchemas, setStudentSchemas, selectedReviewFilter]);
+
 
 
 
