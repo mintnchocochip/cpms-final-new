@@ -1,0 +1,253 @@
+2025-11-01T16:10:30.385Z - INFO - Loading Excel file: /home/administrator/Desktop/excel-files/Upload/student_mark_assign.xlsx
+2025-11-01T16:10:31.118Z - INFO - 
+🔍 Detected sheet names:
+2025-11-01T16:10:31.118Z - INFO -   1. "SCOPE_MCA_1"
+2025-11-01T16:10:31.118Z - INFO -   2. "SCOPE_BTech_2"
+2025-11-01T16:10:31.119Z - INFO -   3. "SCOPE_M.Tech 2yrs (MCB,MCS)"
+2025-11-01T16:10:31.122Z - INFO - ✅ Loaded sheet 'SCOPE_MCA_1' with 62 students
+2025-11-01T16:10:31.169Z - INFO - ✅ Loaded sheet 'SCOPE_BTech_2' with 1715 students
+2025-11-01T16:10:31.170Z - INFO - ✅ Loaded sheet 'SCOPE_M.Tech 2yrs (MCB,MCS)' with 35 students
+2025-11-01T16:10:31.171Z - INFO - 
+================================================================================
+2025-11-01T16:10:31.171Z - INFO - 📋 Processing Sheet: SCOPE_MCA_1
+2025-11-01T16:10:31.171Z - INFO - 🏫 Base Department: MCA
+2025-11-01T16:10:31.171Z - INFO - 👥 Total Students: 62
+2025-11-01T16:10:31.171Z - INFO - ================================================================================
+2025-11-01T16:10:31.172Z - INFO - 📝 Processing: SOUMYAJIT DAS (24MCA1043) - Dept: MCA
+2025-11-01T16:10:31.172Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:31.172Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:31.172Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:31.173Z - INFO -   ✓ review0: 5 components, Marks: 34, Status: Present
+2025-11-01T16:10:31.173Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1043
+2025-11-01T16:10:31.212Z - ERROR - ❌ Failed to update SOUMYAJIT DAS (24MCA1043): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:31.313Z - INFO - 📝 Processing: YOGENDRA (24MCA1062) - Dept: MCA
+2025-11-01T16:10:31.314Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:31.314Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:31.314Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:31.314Z - INFO -   ✓ review0: 5 components, Marks: 32, Status: Present
+2025-11-01T16:10:31.315Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1062
+2025-11-01T16:10:31.323Z - ERROR - ❌ Failed to update YOGENDRA (24MCA1062): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:31.427Z - INFO - 📝 Processing: GOKULNATH E (24MCA1031) - Dept: MCA
+2025-11-01T16:10:31.428Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:31.428Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:31.428Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:31.429Z - INFO -   ✓ review0: 5 components, Marks: 27, Status: Present
+2025-11-01T16:10:31.429Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1031
+2025-11-01T16:10:31.437Z - ERROR - ❌ Failed to update GOKULNATH E (24MCA1031): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:31.539Z - INFO - 📝 Processing: HARSH GOEL (24MCA1046) - Dept: MCA
+2025-11-01T16:10:31.540Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:31.540Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:31.541Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:31.541Z - INFO -   ✓ review0: 5 components, Marks: 36, Status: Present
+2025-11-01T16:10:31.541Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1046
+2025-11-01T16:10:31.547Z - ERROR - ❌ Failed to update HARSH GOEL (24MCA1046): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:31.648Z - INFO - 📝 Processing: JOEL J CHALAPPURAM (24MCA1061) - Dept: MCA
+2025-11-01T16:10:31.648Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:31.649Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:31.649Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:31.649Z - INFO -   ✓ review0: 5 components, Marks: 0, Status: Absent
+2025-11-01T16:10:31.650Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1061
+2025-11-01T16:10:31.655Z - ERROR - ❌ Failed to update JOEL J CHALAPPURAM (24MCA1061): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:31.756Z - INFO - 📝 Processing: BHINGRADIYA MAN KANUBHAI (24MCA1024) - Dept: MCA
+2025-11-01T16:10:31.757Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:31.757Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:31.757Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:31.757Z - INFO -   ✓ review0: 5 components, Marks: 33, Status: Present
+2025-11-01T16:10:31.757Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1024
+2025-11-01T16:10:31.766Z - ERROR - ❌ Failed to update BHINGRADIYA MAN KANUBHAI (24MCA1024): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:31.866Z - INFO - 📝 Processing: DHRUV TIWARI (24MCA1021) - Dept: MCA
+2025-11-01T16:10:31.868Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:31.869Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:31.869Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:31.869Z - INFO -   ✓ review0: 5 components, Marks: 35, Status: Present
+2025-11-01T16:10:31.869Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1021
+2025-11-01T16:10:31.874Z - ERROR - ❌ Failed to update DHRUV TIWARI (24MCA1021): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:31.975Z - INFO - 📝 Processing: PRIYA GUPTA (24MCA1034) - Dept: MCA
+2025-11-01T16:10:31.976Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:31.976Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:31.976Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:31.976Z - INFO -   ✓ review0: 5 components, Marks: 32, Status: Present
+2025-11-01T16:10:31.976Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1034
+2025-11-01T16:10:31.983Z - ERROR - ❌ Failed to update PRIYA GUPTA (24MCA1034): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:32.085Z - INFO - 📝 Processing: ASHISH KUMAR (24MCA1012) - Dept: MCA
+2025-11-01T16:10:32.085Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:32.085Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:32.086Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:32.086Z - INFO -   ✓ review0: 5 components, Marks: 27, Status: Present
+2025-11-01T16:10:32.086Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1012
+2025-11-01T16:10:32.094Z - ERROR - ❌ Failed to update ASHISH KUMAR (24MCA1012): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:32.195Z - INFO - 📝 Processing: NIKHIL SHARMA (24MCA1004) - Dept: MCA
+2025-11-01T16:10:32.195Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:32.195Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:32.195Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:32.195Z - INFO -   ✓ review0: 5 components, Marks: 33, Status: Present
+2025-11-01T16:10:32.195Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1004
+2025-11-01T16:10:32.202Z - ERROR - ❌ Failed to update NIKHIL SHARMA (24MCA1004): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:32.304Z - INFO - 📝 Processing: GURU GOPAL NAYAK (24MCA1010) - Dept: MCA
+2025-11-01T16:10:32.304Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:32.304Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:32.304Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:32.304Z - INFO -   ✓ review0: 5 components, Marks: 15, Status: Present
+2025-11-01T16:10:32.304Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1010
+2025-11-01T16:10:32.311Z - ERROR - ❌ Failed to update GURU GOPAL NAYAK (24MCA1010): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:32.412Z - INFO - 📝 Processing: SAKSHI ARORA (24MCA1007) - Dept: MCA
+2025-11-01T16:10:32.412Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:32.414Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:32.414Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:32.414Z - INFO -   ✓ review0: 5 components, Marks: 0, Status: Absent
+2025-11-01T16:10:32.414Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1007
+2025-11-01T16:10:32.420Z - ERROR - ❌ Failed to update SAKSHI ARORA (24MCA1007): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:32.522Z - INFO - 📝 Processing: HARI HARRA RAJU S (24MCA1069) - Dept: MCA
+2025-11-01T16:10:32.522Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:32.522Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:32.522Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:32.523Z - INFO -   ✓ review0: 5 components, Marks: 38, Status: Present
+2025-11-01T16:10:32.523Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1069
+2025-11-01T16:10:32.527Z - ERROR - ❌ Failed to update HARI HARRA RAJU S (24MCA1069): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:32.627Z - INFO - 📝 Processing: AANTARIP DEY (24MCA1052) - Dept: MCA
+2025-11-01T16:10:32.628Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:32.628Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:32.628Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:32.628Z - INFO -   ✓ review0: 5 components, Marks: 21, Status: Present
+2025-11-01T16:10:32.628Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1052
+2025-11-01T16:10:32.633Z - ERROR - ❌ Failed to update AANTARIP DEY (24MCA1052): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:32.734Z - INFO - 📝 Processing: AKSA BIJU (24MCA1019) - Dept: MCA
+2025-11-01T16:10:32.734Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:32.734Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:32.734Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:32.734Z - INFO -   ✓ review0: 5 components, Marks: 36, Status: Present
+2025-11-01T16:10:32.735Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1019
+2025-11-01T16:10:32.740Z - ERROR - ❌ Failed to update AKSA BIJU (24MCA1019): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:32.841Z - INFO - 📝 Processing: PIYUSH KUMAR (24MCA1039) - Dept: MCA
+2025-11-01T16:10:32.841Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:32.841Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:32.843Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:32.843Z - INFO -   ✓ review0: 5 components, Marks: 0, Status: Absent
+2025-11-01T16:10:32.843Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1039
+2025-11-01T16:10:32.849Z - ERROR - ❌ Failed to update PIYUSH KUMAR (24MCA1039): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:32.949Z - INFO - 📝 Processing: RITAM BANERJEE (24MCA1029) - Dept: MCA
+2025-11-01T16:10:32.949Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:32.951Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:32.951Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:32.951Z - INFO -   ✓ review0: 5 components, Marks: 32, Status: Present
+2025-11-01T16:10:32.951Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1029
+2025-11-01T16:10:32.958Z - ERROR - ❌ Failed to update RITAM BANERJEE (24MCA1029): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:33.062Z - INFO - 📝 Processing: PRATHAM VARMA (24MCA1060) - Dept: MCA
+2025-11-01T16:10:33.063Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:33.063Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:33.063Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:33.063Z - INFO -   ✓ review0: 5 components, Marks: 37, Status: Present
+2025-11-01T16:10:33.063Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1060
+2025-11-01T16:10:33.068Z - ERROR - ❌ Failed to update PRATHAM VARMA (24MCA1060): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:33.169Z - INFO - 📝 Processing: SIDDHANT SINGHAL (24MCA1041) - Dept: MCA
+2025-11-01T16:10:33.169Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:33.170Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:33.171Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:33.171Z - INFO -   ✓ review0: 5 components, Marks: 29, Status: Present
+2025-11-01T16:10:33.171Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1041
+2025-11-01T16:10:33.177Z - ERROR - ❌ Failed to update SIDDHANT SINGHAL (24MCA1041): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:33.279Z - INFO - 📝 Processing: KRISHNA SINGH RATHORE (24MCA1016) - Dept: MCA
+2025-11-01T16:10:33.279Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:33.279Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:33.279Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:33.280Z - INFO -   ✓ review0: 5 components, Marks: 25, Status: Present
+2025-11-01T16:10:33.280Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1016
+2025-11-01T16:10:33.285Z - ERROR - ❌ Failed to update KRISHNA SINGH RATHORE (24MCA1016): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:33.386Z - INFO - 📝 Processing: SHAIKH SHANUWAZ MOFIZUDDIN (24MCA1047) - Dept: MCA
+2025-11-01T16:10:33.388Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:33.388Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:33.388Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:33.388Z - INFO -   ✓ review0: 5 components, Marks: 31, Status: Present
+2025-11-01T16:10:33.388Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1047
+2025-11-01T16:10:33.394Z - ERROR - ❌ Failed to update SHAIKH SHANUWAZ MOFIZUDDIN (24MCA1047): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:33.495Z - INFO - 📝 Processing: HAMI YASIR (24MCA1020) - Dept: MCA
+2025-11-01T16:10:33.495Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:33.496Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:33.496Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:33.496Z - INFO -   ✓ review0: 5 components, Marks: 37, Status: Present
+2025-11-01T16:10:33.496Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1020
+2025-11-01T16:10:33.501Z - ERROR - ❌ Failed to update HAMI YASIR (24MCA1020): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:33.602Z - INFO - 📝 Processing: LAKSHYA SHARMA (24MCA1022) - Dept: MCA
+2025-11-01T16:10:33.602Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:33.602Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:33.603Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:33.603Z - INFO -   ✓ review0: 5 components, Marks: 31, Status: Present
+2025-11-01T16:10:33.603Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1022
+2025-11-01T16:10:33.609Z - ERROR - ❌ Failed to update LAKSHYA SHARMA (24MCA1022): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:33.710Z - INFO - 📝 Processing: K AVANTHIKA (24MCA1038) - Dept: MCA
+2025-11-01T16:10:33.711Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:33.711Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:33.711Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:33.711Z - INFO -   ✓ review0: 5 components, Marks: 34, Status: Present
+2025-11-01T16:10:33.711Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1038
+2025-11-01T16:10:33.717Z - ERROR - ❌ Failed to update K AVANTHIKA (24MCA1038): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:33.817Z - INFO - 📝 Processing: DHANUSHYA B (24MCA1070) - Dept: MCA
+2025-11-01T16:10:33.818Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:33.818Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:33.819Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:33.819Z - INFO -   ✓ review0: 5 components, Marks: 37, Status: Present
+2025-11-01T16:10:33.820Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1070
+2025-11-01T16:10:33.826Z - ERROR - ❌ Failed to update DHANUSHYA B (24MCA1070): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:33.927Z - INFO - 📝 Processing: KALA RANJANI R R (24MCA1035) - Dept: MCA
+2025-11-01T16:10:33.927Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:33.927Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:33.928Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:33.928Z - INFO -   ✓ review0: 5 components, Marks: 0, Status: Absent
+2025-11-01T16:10:33.928Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1035
+2025-11-01T16:10:33.932Z - ERROR - ❌ Failed to update KALA RANJANI R R (24MCA1035): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:34.032Z - INFO - 📝 Processing: VISHWAS KUMAR (24MCA1001) - Dept: MCA
+2025-11-01T16:10:34.033Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:34.033Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:34.033Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:34.033Z - INFO -   ✓ review0: 5 components, Marks: 0, Status: Absent
+2025-11-01T16:10:34.034Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1001
+2025-11-01T16:10:34.039Z - ERROR - ❌ Failed to update VISHWAS KUMAR (24MCA1001): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:34.140Z - INFO - 📝 Processing: ARSHDEEP SINGH KALSI (24MCA1017) - Dept: MCA
+2025-11-01T16:10:34.140Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:34.140Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:34.140Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:34.140Z - INFO -   ✓ review0: 5 components, Marks: 35, Status: Present
+2025-11-01T16:10:34.141Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1017
+2025-11-01T16:10:34.146Z - ERROR - ❌ Failed to update ARSHDEEP SINGH KALSI (24MCA1017): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:34.247Z - INFO - 📝 Processing: NISHANT PANDEY (24MCA1014) - Dept: MCA
+2025-11-01T16:10:34.247Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:34.247Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:34.247Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:34.247Z - INFO -   ✓ review0: 5 components, Marks: 0, Status: Absent
+2025-11-01T16:10:34.247Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1014
+2025-11-01T16:10:34.253Z - ERROR - ❌ Failed to update NISHANT PANDEY (24MCA1014): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:34.354Z - INFO - 📝 Processing: TISHA K J (24MCA1065) - Dept: MCA
+2025-11-01T16:10:34.355Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:34.355Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:34.355Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:34.355Z - INFO -   ✓ review0: 5 components, Marks: 38, Status: Present
+2025-11-01T16:10:34.355Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1065
+2025-11-01T16:10:34.361Z - ERROR - ❌ Failed to update TISHA K J (24MCA1065): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:34.462Z - INFO - 📝 Processing: MAHALAKSHMI T S (24MCA1040) - Dept: MCA
+2025-11-01T16:10:34.462Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:34.463Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:34.463Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:34.463Z - INFO -   ✓ review0: 5 components, Marks: 32, Status: Present
+2025-11-01T16:10:34.463Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1040
+2025-11-01T16:10:34.469Z - ERROR - ❌ Failed to update MAHALAKSHMI T S (24MCA1040): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:34.570Z - INFO - 📝 Processing: SHAJITH N (24MCA1033) - Dept: MCA
+2025-11-01T16:10:34.571Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:34.572Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:34.572Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:34.573Z - INFO -   ✓ review0: 5 components, Marks: 26, Status: Present
+2025-11-01T16:10:34.573Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1033
+2025-11-01T16:10:34.580Z - ERROR - ❌ Failed to update SHAJITH N (24MCA1033): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:34.680Z - INFO - 📝 Processing: UMANG DOSHI (24MCA1015) - Dept: MCA
+2025-11-01T16:10:34.681Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:34.681Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:34.681Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:34.681Z - INFO -   ✓ review0: 5 components, Marks: 25, Status: Present
+2025-11-01T16:10:34.681Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1015
+2025-11-01T16:10:34.687Z - ERROR - ❌ Failed to update UMANG DOSHI (24MCA1015): HTTP 401: {"message":"Invalid or expired token"}
+2025-11-01T16:10:34.788Z - INFO - 📝 Processing: SHUBHAM VALECHA (24MCA1005) - Dept: MCA
+2025-11-01T16:10:34.788Z - DEBUG - ⏭️  Skipping dummy review: draftReview
+2025-11-01T16:10:34.788Z - DEBUG - ⏭️  Skipping dummy review: guideReview1
+2025-11-01T16:10:34.788Z - DEBUG - ⏭️  Skipping dummy review: guideReview2
+2025-11-01T16:10:34.788Z - INFO -   ✓ review0: 5 components, Marks: 31, Status: Present
+2025-11-01T16:10:34.788Z - INFO - 🌐 PUT http://localhost:5000/api/student/24MCA1005
+2025-11-01T16:10:34.793Z - ERROR - ❌ Failed to update SHUBHAM VALECHA (24MCA1005): HTTP 401: {"message":"Invalid or expired token"}
