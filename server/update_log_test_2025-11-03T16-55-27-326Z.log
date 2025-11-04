@@ -1,0 +1,57 @@
+2025-11-03T16:55:27.327Z - INFO - Loading Excel file: /home/administrator/Desktop/excel-files/StudentManagement_Review1_4Components.xlsx
+2025-11-03T16:55:28.535Z - INFO - Loaded sheet 'SCOPE_BTech_2' with 1715 students
+2025-11-03T16:55:28.536Z - INFO - 
+======================================================================
+2025-11-03T16:55:28.536Z - INFO - Processing sheet: SCOPE_BTech_2
+2025-11-03T16:55:28.536Z - INFO - Total students in sheet: 1715
+2025-11-03T16:55:28.537Z - INFO - Students to process (TEST mode): 1
+2025-11-03T16:55:28.537Z - INFO - ======================================================================
+2025-11-03T16:55:28.537Z - INFO - 
+--- Student 1/1 ---
+2025-11-03T16:55:28.537Z - INFO - 
+Processing: SUNEETH S (22BAI1158)
+2025-11-03T16:55:28.537Z - INFO -   PAT Detected: NO
+2025-11-03T16:55:28.538Z - INFO -   Components with marks: 4/4
+2025-11-03T16:55:28.538Z - INFO -   Total marks: 13.5
+2025-11-03T16:55:28.538Z - INFO -     - Knowledge on Research Domain/Problem sta: 4.5
+2025-11-03T16:55:28.538Z - INFO -     - Literature Review (15 Latest Papers – Mi: 3
+2025-11-03T16:55:28.538Z - INFO -     - Design of the proposed methodology: 3.5
+2025-11-03T16:55:28.539Z - INFO -     - Implementation: 2.5
+2025-11-03T16:55:28.539Z - INFO -   Attendance: Present (raw: "present")
+2025-11-03T16:55:28.539Z - INFO -   PPT Approved: YES (raw: "yes")
+2025-11-03T16:55:28.539Z - INFO -   Comments: Need to implement suggested improvements
+2025-11-03T16:55:28.540Z - INFO - Sending PUT http://localhost:5000/api/student/22BAI1158
+2025-11-03T16:55:28.540Z - INFO - Payload: {
+  "marksUpdate": [
+    {
+      "reviewName": "panelReview1",
+      "marks": {
+        "Knowledge on Research Domain/Problem statement": 4.5,
+        "Literature Review (15 Latest Papers – Minimum - from Reputed Journals/ Conferences)": 3,
+        "Design of the proposed methodology": 3.5,
+        "Implementation": 2.5
+      },
+      "comments": "Need to implement suggested improvements",
+      "attendance": {
+        "value": true,
+        "locked": false
+      },
+      "locked": false,
+      "pptApproved": true
+    }
+  ],
+  "PAT": false
+}
+2025-11-03T16:55:28.636Z - INFO - Response: 200 - {"success":true,"message":"Student details updated successfully.","student":{"pptApproved":{"approve
+2025-11-03T16:55:28.636Z - INFO - ✅ SUCCESS: Updated SUNEETH S (22BAI1158)
+2025-11-03T16:55:28.737Z - INFO - 
+Sheet processing complete: 1/1 successful
+2025-11-03T16:55:28.737Z - INFO - 
+======================================================================
+2025-11-03T16:55:28.737Z - INFO - ALL SHEETS PROCESSED
+2025-11-03T16:55:28.738Z - INFO - Total students: 1
+2025-11-03T16:55:28.738Z - INFO - Successful: 1
+2025-11-03T16:55:28.738Z - INFO - Failed: 0
+2025-11-03T16:55:28.738Z - INFO - ======================================================================
+2025-11-03T16:55:28.739Z - INFO - 
+📄 Full report saved: update_report_test_2025-11-03T16-55-28-739Z.json

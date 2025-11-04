@@ -240,8 +240,8 @@ export const updateStudentDetails = async (req, res) => {
     const { regNo } = req.params;
     const updateFields = req.body;
 
-  logger.info('update_student_called', safeMeta({ regNo, user: req.user?.id }));
-  logger.debug('update_student_payload', safeMeta({ regNo, updateFieldsKeys: Object.keys(updateFields || {}) }));
+    logger.info('update_student_called', safeMeta({ regNo, user: req.user?.id }));
+    logger.debug('update_student_payload', safeMeta({ regNo, updateFieldsKeys: Object.keys(updateFields || {}) }));
 
     // Allowed fields for direct update
     const allowedFields = [
@@ -249,7 +249,7 @@ export const updateStudentDetails = async (req, res) => {
       "emailId",
       "school",
       "department",
-      "pptApproved",
+      "pptApproved", // root level pptApproved (object with approved, locked)
       "deadline",
       "PAT",
       "requiresContribution",
@@ -292,12 +292,12 @@ export const updateStudentDetails = async (req, res) => {
         });
       }
 
-  logger.info('update_contribution_type', safeMeta({ regNo, contributionType: updateFields.contributionType }));
+      logger.info('update_contribution_type', safeMeta({ regNo, contributionType: updateFields.contributionType }));
     }
 
     // ✅ NEW: Logic validation - if requiresContribution is false, contributionType should be 'none'
     if (updateFields.requiresContribution === false && updateFields.contributionType && updateFields.contributionType !== 'none') {
-  logger.warn('contribution_type_mismatch_forced', safeMeta({ regNo, forcedTo: 'none', provided: updateFields.contributionType }));
+      logger.warn('contribution_type_mismatch_forced', safeMeta({ regNo, forcedTo: 'none', provided: updateFields.contributionType }));
       updates.contributionType = 'none';
     }
 
@@ -331,20 +331,19 @@ export const updateStudentDetails = async (req, res) => {
 
       // ✅ NEW: Optionally inherit contribution settings from new schema if not explicitly provided
       if (updateFields.requiresContribution === undefined && updateFields.contributionType === undefined) {
-  logger.info('inheriting_contribution_settings', safeMeta({ regNo, fromSchema: { requiresContribution: markingSchema.requiresContribution, contributionType: markingSchema.contributionType } }));
+        logger.info('inheriting_contribution_settings', safeMeta({ regNo, fromSchema: { requiresContribution: markingSchema.requiresContribution, contributionType: markingSchema.contributionType } }));
         updates.requiresContribution = markingSchema.requiresContribution || false;
         updates.contributionType = markingSchema.contributionType || 'none';
       }
     }
 
-    // Handle marks, comments, and attendance updates
+    // Handle marks, comments, attendance, locked updates, and also pptApproved inside reviews
     let marksUpdateOps = {};
     if (Array.isArray(updateFields.marksUpdate)) {
       logger.info('processing_marks_updates', safeMeta({ regNo, updatesCount: updateFields.marksUpdate?.length || 0 }));
 
       for (const reviewUpdate of updateFields.marksUpdate) {
-        const { reviewName, marks, comments, attendance, locked } =
-          reviewUpdate;
+        const { reviewName, marks, comments, attendance, locked, pptApproved } = reviewUpdate;
 
         if (!reviewName) {
           return res.status(400).json({
@@ -353,7 +352,7 @@ export const updateStudentDetails = async (req, res) => {
           });
         }
 
-  logger.info('updating_review', safeMeta({ regNo, reviewName }));
+        logger.info('updating_review', safeMeta({ regNo, reviewName }));
 
         // Add marks updates
         if (marks && typeof marks === "object") {
@@ -365,8 +364,7 @@ export const updateStudentDetails = async (req, res) => {
                 message: `Mark value for ${componentName} must be a number`,
               });
             }
-            marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] =
-              markValue;
+            marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] = markValue;
           }
         }
 
@@ -391,8 +389,7 @@ export const updateStudentDetails = async (req, res) => {
             logger.warn('invalid_attendance_type', safeMeta({ regNo, reviewName, attendance }));
             return res.status(400).json({
               success: false,
-              message:
-                "Attendance must be an object with a boolean 'value' property",
+              message: "Attendance must be an object with a boolean 'value' property",
             });
           }
           marksUpdateOps[`reviews.${reviewName}.attendance`] = attendance;
@@ -408,13 +405,27 @@ export const updateStudentDetails = async (req, res) => {
           }
           marksUpdateOps[`reviews.${reviewName}.locked`] = locked;
         }
+
+        // Add pptApproved if present (inside review)
+        if (pptApproved !== undefined) {
+          if (
+            typeof pptApproved !== "object" ||
+            typeof pptApproved.approved !== "boolean" ||
+            typeof pptApproved.locked !== "boolean"
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "pptApproved inside review must be an object with boolean 'approved' and 'locked' properties",
+            });
+          }
+          marksUpdateOps[`reviews.${reviewName}.pptApproved`] = pptApproved;
+        }
       }
     } else if (updateFields.marksUpdate) {
       // For backward compatibility (single review update)
-    logger.info('processing_single_review_update', safeMeta({ regNo }));
+      logger.info('processing_single_review_update', safeMeta({ regNo }));
 
-      const { reviewName, marks, comments, attendance, locked } =
-        updateFields.marksUpdate;
+      const { reviewName, marks, comments, attendance, locked, pptApproved } = updateFields.marksUpdate;
 
       if (!reviewName) {
         return res.status(400).json({
@@ -423,7 +434,7 @@ export const updateStudentDetails = async (req, res) => {
         });
       }
 
-  logger.info('updating_single_review', safeMeta({ regNo, reviewName }));
+      logger.info('updating_single_review', safeMeta({ regNo, reviewName }));
 
       // Add marks updates
       if (marks && typeof marks === "object") {
@@ -434,8 +445,7 @@ export const updateStudentDetails = async (req, res) => {
               message: `Mark value for ${componentName} must be a number`,
             });
           }
-          marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] =
-            markValue;
+          marksUpdateOps[`reviews.${reviewName}.marks.${componentName}`] = markValue;
         }
       }
 
@@ -456,9 +466,8 @@ export const updateStudentDetails = async (req, res) => {
         ) {
           return res.status(400).json({
             success: false,
-            message:
-              "Attendance must be an object with a boolean 'value' property",
-        });
+            message: "Attendance must be an object with a boolean 'value' property",
+          });
         }
         marksUpdateOps[`reviews.${reviewName}.attendance`] = attendance;
       }
@@ -471,6 +480,21 @@ export const updateStudentDetails = async (req, res) => {
           });
         }
         marksUpdateOps[`reviews.${reviewName}.locked`] = locked;
+      }
+
+      // Add pptApproved if present (inside review)
+      if (pptApproved !== undefined) {
+        if (
+          typeof pptApproved !== "object" ||
+          typeof pptApproved.approved !== "boolean" ||
+          typeof pptApproved.locked !== "boolean"
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "pptApproved inside review must be an object with boolean 'approved' and 'locked' properties",
+          });
+        }
+        marksUpdateOps[`reviews.${reviewName}.pptApproved`] = pptApproved;
       }
     }
 
@@ -514,6 +538,7 @@ export const updateStudentDetails = async (req, res) => {
           comments: ru.comments || null,
           attendance: ru.attendance || null,
           locked: ru.locked !== undefined ? ru.locked : null,
+          pptApproved: ru.pptApproved || null,
         });
       }
     } else if (updateFields.marksUpdate) {
@@ -524,6 +549,7 @@ export const updateStudentDetails = async (req, res) => {
         comments: ru.comments || null,
         attendance: ru.attendance || null,
         locked: ru.locked !== undefined ? ru.locked : null,
+        pptApproved: ru.pptApproved || null,
       });
     }
 
@@ -555,7 +581,7 @@ export const updateStudentDetails = async (req, res) => {
       });
     }
 
-  logger.info('student_updated_success', safeMeta({ regNo, studentId: updatedStudent._id, updatedFields: Object.keys(updateOps), requiresContribution: updatedStudent.requiresContribution, contributionType: updatedStudent.contributionType, user: req.user?.id }));
+    logger.info('student_updated_success', safeMeta({ regNo, studentId: updatedStudent._id, updatedFields: Object.keys(updateOps), requiresContribution: updatedStudent.requiresContribution, contributionType: updatedStudent.contributionType, user: req.user?.id }));
 
     return res.status(200).json({
       success: true,

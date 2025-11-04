@@ -749,6 +749,7 @@ export async function createProjectsBulk(req, res) {
                 comments: "",
                 attendance: { value: false, locked: false },
                 locked: false,
+                pptApproved: { approved: false, locked: false },
               };
 
               reviewsObj[reviewKey] = reviewData;

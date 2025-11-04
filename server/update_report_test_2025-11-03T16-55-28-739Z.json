@@ -1,0 +1,27 @@
+{
+  "timestamp": "2025-11-03T16:55:28.739Z",
+  "mode": "TEST",
+  "review_processed": "Review 1 (panelReview1) only - 4 Components",
+  "components": [
+    "Knowledge on Research Domain/Problem statement",
+    "Literature Review (15 Latest Papers – Minimum - from Reputed Journals/ Conferences)",
+    "Design of the proposed methodology",
+    "Implementation"
+  ],
+  "summary": {
+    "total_students_processed": 1,
+    "total_successful": 1,
+    "total_failed": 0,
+    "success_rate": "100.00%"
+  },
+  "successful_updates": [
+    {
+      "sheet": "SCOPE_BTech_2",
+      "reg_no": "22BAI1158",
+      "name": "SUNEETH S",
+      "review": "panelReview1",
+      "isDryRun": false
+    }
+  ],
+  "failed_updates": []
+}

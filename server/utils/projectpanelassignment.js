@@ -11,12 +11,11 @@ import Faculty from "../models/facultySchema.js";
 dotenv.config();
 
 const EXCEL_PATH =
-  "E:/Desktop/CPMS/cpms-final/server/utils/project panel assignment mca.xlsx";
+  "/home/administrator/Desktop/excel-files/Upload/MIS_MIA_PANEL.xlsx";
 const API_BASE_URL =
-  process.env.API_BASE_URL || "http://localhost:3000/api/admin";
+  process.env.API_BASE_URL || "http://localhost:5000/api/admin";
 const AUTH_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4Y2QwMGY4MjdmNzI5NDhjMzQzNjY4MSIsImVtYWlsSWQiOiJhZG1pbkB2aXQuYWMuaW4iLCJlbXBsb3llZUlkIjoiQURNSU4wMDEiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTgyNzQxMzcsImV4cCI6MTc1ODM2MDUzN30.E6aPp6wRrZby8IfVE1HKY7lW_hFoUkcXZZtF3ZoD_LE";
-
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4Zjg5N2JlMjJiN2QwODQ3NDRmNjU0OCIsImVtYWlsSWQiOiJhZG1pbkB2aXQuYWMuaW4iLCJlbXBsb3llZUlkIjoiQURNSU4wMDEiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NjIxNzk0OTksImV4cCI6MTc2MjI2NTg5OX0.8E756qY0VRLeWuxrpfb4-gXeyz_jAa_8Lhbsp7Rs8bM"
 async function main() {
   await connectDB();
 
