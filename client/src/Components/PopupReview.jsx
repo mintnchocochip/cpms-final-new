@@ -32,13 +32,13 @@ const PopupReview = ({
   const [hasAttendance, setHasAttendance] = useState(true);
   const [sub, setSub] = useState("Locked");
   const [patStates, setPatStates] = useState({});
-  // ✅ NEW: State for contribution requirement and values
   const [requiresContribution, setRequiresContribution] = useState(false);
-  const [contributions, setContributions] = useState({}); // { memberId: percentage }
-  
-  // ✅ NEW: States for PPT approval success
+  const [contributions, setContributions] = useState({});
   const [pptSubmitted, setPptSubmitted] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  
+  // ✅ NEW: State to track if comments were once submitted
+  const [commentsOnceSubmitted, setCommentsOnceSubmitted] = useState(false);
 
   const [deadlineInfo, setDeadlineInfo] = useState({
     hasDeadline: false,
@@ -57,7 +57,12 @@ const PopupReview = ({
   const isDeadlineLocked =
     (deadlineInfo.isBeforeStart || deadlineInfo.isAfterEnd) &&
     requestStatus !== "approved";
-  const finalFormLocked = isFormLocked || isDeadlineLocked;
+  
+  // ✅ NEW: Comments-based lock - blocks form if comments were submitted once, unless edit request approved
+  const isCommentsLocked = commentsOnceSubmitted && requestStatus !== "approved";
+  
+  // ✅ UPDATED: Final lock combines all lock conditions
+  const finalFormLocked = isFormLocked || isDeadlineLocked || isCommentsLocked;
 
   const calculateDeadlineStatus = (reviewConfig) => {
     if (!reviewConfig?.deadline) {
@@ -191,7 +196,6 @@ const PopupReview = ({
           console.log("📊 [PopupReview] Processed components:", components);
         }
 
-        // ✅ NEW: Set requiresContribution from schema
         setRequiresContribution(reviewConfig?.requiresContribution || false);
         console.log(
           `📋 [PopupReview] requiresContribution:`,
@@ -253,8 +257,10 @@ const PopupReview = ({
     const initialComments = {};
     const initialAttendance = {};
     const initialPatStates = {};
-    // ✅ NEW: Initialize contribution states
     const initialContributions = {};
+    
+    // ✅ NEW: Check if any member has comments submitted
+    let hasSubmittedComments = false;
 
     teamMembers.forEach((member) => {
       console.log(`📋 [PopupReview] Processing member: ${member.name}`);
@@ -270,6 +276,11 @@ const PopupReview = ({
         `📋 [PopupReview] Review data for ${member.name}:`,
         reviewData
       );
+      
+      // ✅ NEW: Check if this member has submitted comments
+      if (reviewData?.comments && reviewData.comments.trim() !== "") {
+        hasSubmittedComments = true;
+      }
 
       if (!showOnlyPPTApproval) {
         const componentMarks = {};
@@ -292,9 +303,8 @@ const PopupReview = ({
             reviewData?.attendance?.value ?? false;
         }
 
-        // ✅ NEW: Initialize contribution percentage
         initialContributions[member._id] =
-          reviewData?.contribution || "0"; // Default to "0" if not set
+          reviewData?.contribution || "0";
         console.log(
           `📊 [PopupReview] Contribution for ${member.name}:`,
           initialContributions[member._id]
@@ -308,6 +318,10 @@ const PopupReview = ({
       );
       initialPatStates[member._id] = patStatus;
     });
+    
+    // ✅ NEW: Set comments submission state
+    setCommentsOnceSubmitted(hasSubmittedComments);
+    console.log(`🔒 [PopupReview] Comments once submitted: ${hasSubmittedComments}`);
 
     console.log("📊 [PopupReview] Setting initial form data:");
     console.log("- Marks:", initialMarks);
@@ -331,7 +345,6 @@ const PopupReview = ({
       const allCommentsFilled = teamMembers.every(
         (member) => initialComments[member._id]?.trim() !== ""
       );
-      // ✅ NEW: Check if contributions are set when required
       const allContributionsFilled = !requiresContribution
         ? true
         : teamMembers.every(
@@ -382,7 +395,6 @@ const PopupReview = ({
       );
       setTeamPptApproved(pptAlreadyApproved);
       
-      // ✅ NEW: Set submitted state if PPT already approved
       if (pptAlreadyApproved && showOnlyPPTApproval) {
         setPptSubmitted(true);
         setShowSuccessPopup(true);
@@ -452,7 +464,6 @@ const PopupReview = ({
     const allCommentsFilled = teamMembers.every(
       (member) => comments[member._id]?.trim() !== ""
     );
-    // ✅ NEW: Check contributions for submission readiness
     const allContributionsFilled = !requiresContribution
       ? true
       : teamMembers.every(
@@ -483,7 +494,6 @@ const PopupReview = ({
     setSub(allCommentsFilled && allContributionsFilled ? "Unlocked" : "Locked");
   };
 
-  // ✅ NEW: Handle contribution percentage change
   const handleContributionChange = (memberId, value) => {
     if (finalFormLocked || showOnlyPPTApproval) return;
 
@@ -541,7 +551,6 @@ const PopupReview = ({
         const memberMarks = marks[member._id] || {};
         const submissionData = {
           comments: comments[member._id] || "",
-          // ✅ NEW: Include contribution if required
           ...(requiresContribution && {
             contribution: contributions[member._id] || "0",
           }),
@@ -588,7 +597,6 @@ const PopupReview = ({
         : null;
       console.log("📽️ [PopupReview] PPT-only submission:", teamPptObj);
       
-      // ✅ NEW: Show success popup and disable controls
       if (teamPptApproved) {
         setPptSubmitted(true);
         setShowSuccessPopup(true);
@@ -761,7 +769,6 @@ const PopupReview = ({
           </div>
         )}
 
-        {/* ✅ NEW: Success Popup Overlay */}
         {showSuccessPopup && showOnlyPPTApproval && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-[60] backdrop-blur-sm">
             <div className="bg-gradient-to-br from-green-50 to-emerald-100 border-4 border-green-500 rounded-3xl shadow-2xl p-10 max-w-md w-full mx-4 transform transition-all">
@@ -814,7 +821,6 @@ const PopupReview = ({
                     PPT Required
                   </span>
                 )}
-                {/* ✅ NEW: Contribution Required Tag */}
                 {requiresContribution && (
                   <span className="bg-green-400/30 px-3 py-1 rounded-full">
                     Contribution Required
@@ -840,6 +846,12 @@ const PopupReview = ({
                     🔓 Extension Approved
                   </span>
                 )}
+                {/* ✅ NEW: Show locked status badge */}
+                {isCommentsLocked && (
+                  <span className="bg-red-400/30 px-3 py-1 rounded-full">
+                    🔒 Locked by Submission
+                  </span>
+                )}
                 {deadlineInfo.isBeforeStart && (
                   <span className="bg-orange-400/30 px-3 py-1 rounded-full">
                     🕒 Not Yet Open
@@ -848,11 +860,6 @@ const PopupReview = ({
                 {deadlineInfo.isAfterEnd && (
                   <span className="bg-red-400/30 px-3 py-1 rounded-full">
                     ⏰ Deadline Passed
-                  </span>
-                )}
-                {finalFormLocked && (
-                  <span className="bg-red-400/30 px-3 py-1 rounded-full">
-                    🔒 Locked
                   </span>
                 )}
               </div>
@@ -868,6 +875,38 @@ const PopupReview = ({
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+          {/* ✅ NEW: Comments Locked Banner (Similar to Deadline Banner) */}
+          {!showOnlyPPTApproval && isCommentsLocked && (
+            <div className="mb-6 p-4 rounded-xl border-2 bg-yellow-50 border-yellow-200">
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-lg text-yellow-800">
+                    🔒 Review Locked - Already Submitted
+                  </h3>
+                  <div className="mt-2 space-y-1 text-sm">
+                    <p className="text-yellow-700">
+                      This review has been <strong>submitted</strong> and all marking areas, attendance controls, and PAT detection are now <strong>locked</strong>.
+                    </p>
+                    <p className="text-yellow-700">
+                      To make changes, please request an edit using the button below.
+                    </p>
+                  </div>
+
+                  {requestStatus === "approved" && (
+                    <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded">
+                      <p className="text-green-800 font-medium text-sm">
+                        🔓 Edit Request Approved - You can now modify this review
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {!showOnlyPPTApproval && deadlineInfo.hasDeadline && (
             <div
               className={`mb-6 p-4 rounded-xl border-2 ${
@@ -904,7 +943,6 @@ const PopupReview = ({
                       ? "⌛ Review Deadline Has Passed"
                       : "✅ Review Is Currently Open"}
                   </h3>
-
                   <div className="mt-2 space-y-1 text-sm">
                     {deadlineInfo.fromDate && (
                       <p
@@ -993,7 +1031,6 @@ const PopupReview = ({
             </div>
           )}
 
-          {/* Team PPT Approval and Contribution Section */}
           {(requiresPPT || requiresContribution) && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
               <div className="flex items-center justify-between mb-3">
@@ -1026,7 +1063,7 @@ const PopupReview = ({
                               : ""
                           }`}
                         >
-                          <option value="" >
+                          <option value="">
                             Select Contribution
                           </option>
                           <option value="Book_Chapter_Contribution">Book Chapter Contribution</option>
@@ -1132,7 +1169,7 @@ const PopupReview = ({
                                 handlePatToggle(member._id, e.target.checked)
                               }
                               disabled={finalFormLocked}
-                              className="w-4 h-4 text-red-600 bg-red-50 border-red-300 rounded focus:ring-2 focus:ring-red-500"
+                              className="w-4 h-4 text-red-600 bg-red-50 border-red-300 rounded focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                             <span className="text-sm font-medium text-red-700">
                               PAT Detected
@@ -1247,79 +1284,102 @@ const PopupReview = ({
           )}
         </div>
 
-        <div className="bg-white border-t border-gray-200 px-6 py-4 flex justify-between items-center rounded-b-2xl">
-          <div className="flex space-x-3">
-            {requestEditVisible && !requestPending && !showOnlyPPTApproval && (
-              <button
-                onClick={onRequestEdit}
-                className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors"
-              >
-                Request Edit
-              </button>
-            )}
-            {requestPending && (
-              <span className="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg text-sm">
-                Request Pending...
-              </span>
-            )}
-          </div>
+        {/* Footer */}
+        {/* Footer */}
+<div className="bg-white border-t border-gray-200 px-6 py-4 flex justify-between items-center rounded-b-2xl">
+  <div className="flex space-x-3">
+    {/* ✅ UPDATED: Show Request Edit button whenever comments are locked */}
+    {isCommentsLocked && !showOnlyPPTApproval && (
+      <button
+        onClick={onRequestEdit}
+        disabled={requestPending}
+        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          requestPending
+            ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+            : "bg-yellow-500 hover:bg-yellow-600 text-white hover:shadow-lg"
+        }`}
+      >
+        {requestPending ? "🕐 Request Pending..." : "🔑 Request Edit"}
+      </button>
+    )}
 
-          <div className="flex space-x-3">
-            <button
-              onClick={onClose}
-              className="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={
-                finalFormLocked ||
-                (sub === "Locked" && !showOnlyPPTApproval) ||
-                (showOnlyPPTApproval && !requiresPPT) ||
-                pptSubmitted
-              }
-              className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                finalFormLocked ||
-                (sub === "Locked" && !showOnlyPPTApproval) ||
-                (showOnlyPPTApproval && !requiresPPT) ||
-                pptSubmitted
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : panelMode && bestProject
-                  ? "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
-            >
-              {deadlineInfo.isBeforeStart &&
-              requestStatus !== "approved" &&
-              !showOnlyPPTApproval
-                ? "⏳ Not Yet Open"
-                : deadlineInfo.isAfterEnd &&
-                  requestStatus !== "approved" &&
-                  !showOnlyPPTApproval
-                ? "⌛ Deadline Passed"
-                : requestStatus === "approved" &&
-                  (deadlineInfo.isBeforeStart || deadlineInfo.isAfterEnd) &&
-                  !showOnlyPPTApproval
-                ? `Submit ${panelMode ? "Panel " : ""}Review (Extended)`
-                : finalFormLocked && !showOnlyPPTApproval
-                ? "Locked"
-                : sub === "Locked" && !showOnlyPPTApproval
-                ? "Comments/Contributions Required"
-                : showOnlyPPTApproval && !requiresPPT
-                ? "No PPT Required by Schema"
-                : showOnlyPPTApproval && requiresPPT && pptSubmitted
-                ? "✅ PPT Approved"
-                : showOnlyPPTApproval && requiresPPT
-                ? "📽️ Submit PPT Approval"
-                : panelMode && bestProject
-                ? "⭐ Submit Best Project Review"
-                : requiresPPT
-                ? `📽️ Submit ${panelMode ? "Panel " : ""}Review + PPT`
-                : `Submit ${panelMode ? "Panel " : ""}Review`}
-            </button>
-          </div>
-        </div>
+    {/* ✅ Alternative: If you want separate button for deadline-based locks */}
+    {isDeadlineLocked && !isCommentsLocked && !showOnlyPPTApproval && (
+      <button
+        onClick={onRequestEdit}
+        disabled={requestPending}
+        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          requestPending
+            ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+            : "bg-yellow-500 hover:bg-yellow-600 text-white hover:shadow-lg"
+        }`}
+      >
+        {requestPending ? "🕐 Request Pending..." : "🔑 Request Edit"}
+      </button>
+    )}
+  </div>
+
+  <div className="flex space-x-3">
+    <button
+      onClick={onClose}
+      className="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+    >
+      Cancel
+    </button>
+    <button
+      onClick={handleSubmit}
+      disabled={
+        finalFormLocked ||
+        (sub === "Locked" && !showOnlyPPTApproval) ||
+        (showOnlyPPTApproval && !requiresPPT) ||
+        pptSubmitted
+      }
+      className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+        finalFormLocked ||
+        (sub === "Locked" && !showOnlyPPTApproval) ||
+        (showOnlyPPTApproval && !requiresPPT) ||
+        pptSubmitted
+          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+          : panelMode && bestProject
+          ? "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white"
+          : "bg-blue-600 hover:bg-blue-700 text-white"
+      }`}
+    >
+      {deadlineInfo.isBeforeStart &&
+      requestStatus !== "approved" &&
+      !showOnlyPPTApproval
+        ? "⏳ Not Yet Open"
+        : deadlineInfo.isAfterEnd &&
+          requestStatus !== "approved" &&
+          !showOnlyPPTApproval
+        ? "⌛ Deadline Passed"
+        : isCommentsLocked &&
+          requestStatus !== "approved" &&
+          !showOnlyPPTApproval
+        ? "🔒 Locked - Request Edit to Unlock"
+        : requestStatus === "approved" &&
+          (deadlineInfo.isBeforeStart || deadlineInfo.isAfterEnd || isCommentsLocked) &&
+          !showOnlyPPTApproval
+        ? `Submit ${panelMode ? "Panel " : ""}Review (Extended)`
+        : finalFormLocked && !showOnlyPPTApproval
+        ? "Locked"
+        : sub === "Locked" && !showOnlyPPTApproval
+        ? "Comments/Contributions Required"
+        : showOnlyPPTApproval && !requiresPPT
+        ? "No PPT Required by Schema"
+        : showOnlyPPTApproval && requiresPPT && pptSubmitted
+        ? "✅ PPT Approved"
+        : showOnlyPPTApproval && requiresPPT
+        ? "📽️ Submit PPT Approval"
+        : panelMode && bestProject
+        ? "⭐ Submit Best Project Review"
+        : requiresPPT
+        ? `📽️ Submit ${panelMode ? "Panel " : ""}Review + PPT`
+        : `Submit ${panelMode ? "Panel " : ""}Review`}
+    </button>
+  </div>
+</div>
+
       </div>
     </div>
   );
