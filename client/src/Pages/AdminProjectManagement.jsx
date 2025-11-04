@@ -34,9 +34,17 @@ import {
   Plus,
   Star,
   Lock,
+  FileCheck,
+  FileX,
+  UserCheck,
+  UserX,
+  TrendingUp,
+  CheckSquare,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+
+// ==================== UTILITY FUNCTIONS ====================
 
 const extractReviewEntries = (reviews) => {
   if (!reviews) return [];
@@ -107,6 +115,77 @@ const getStudentReviewRecord = (student, reviewName) => {
   return null;
 };
 
+// ==================== NEW UTILITY FUNCTIONS ====================
+
+// Check if faculty has marked a student for a specific review
+const isFacultyMarked = (student, reviewName, schemaCache, project) => {
+  if (!student || !reviewName) return false;
+  
+  const reviewRecord = getStudentReviewRecord(student, reviewName);
+  if (!reviewRecord) return false;
+
+  // Get schema to check components
+  const schemaKey = deriveSchemaKeyForProject(project);
+  const schema = schemaKey ? schemaCache.get(schemaKey) : null;
+  
+  if (!schema || !schema.reviews) return false;
+  
+  const schemaReview = schema.reviews.find(r => r.reviewName === reviewName);
+  if (!schemaReview || !schemaReview.components) return false;
+
+  // Check if any component has non-zero marks or comments
+  const hasMarks = schemaReview.components.some(component => {
+    const mark = reviewRecord.marks?.[component.name];
+    const comment = reviewRecord.comments?.[component.name];
+    
+    return (mark && mark > 0) || (comment && comment.trim() !== "");
+  });
+
+  return hasMarks;
+};
+
+// Check if student has PPT approved for specific review
+const hasReviewPPTApproved = (student, reviewName) => {
+  const reviewRecord = getStudentReviewRecord(student, reviewName);
+  return reviewRecord?.pptApproved?.approved === true;
+};
+
+// Check if student has marks but no PPT approval for review
+const hasMarksWithoutPPT = (student, reviewName, schemaCache, project) => {
+  const isMarked = isFacultyMarked(student, reviewName, schemaCache, project);
+  const pptApproved = hasReviewPPTApproved(student, reviewName);
+  
+  return isMarked && !pptApproved;
+};
+
+// Check if student has marks with PPT approval for review
+const hasMarksWithPPT = (student, reviewName, schemaCache, project) => {
+  const isMarked = isFacultyMarked(student, reviewName, schemaCache, project);
+  const pptApproved = hasReviewPPTApproved(student, reviewName);
+  
+  return isMarked && pptApproved;
+};
+
+// Get all unique review names from schema
+const getAllReviewNames = (schemaCache) => {
+  const reviewNames = new Set();
+  
+  for (const schema of schemaCache.values()) {
+    if (schema?.reviews && Array.isArray(schema.reviews)) {
+      schema.reviews.forEach(review => {
+        if (review.reviewName) {
+          reviewNames.add({
+            key: review.reviewName,
+            label: review.displayName || toTitleCase(review.reviewName)
+          });
+        }
+      });
+    }
+  }
+  
+  return Array.from(reviewNames);
+};
+
 const computeProjectReviewPptMeta = (project, schemaCache) => {
   if (!project) return [];
 
@@ -136,7 +215,7 @@ const computeProjectReviewPptMeta = (project, schemaCache) => {
     return metadata;
   }
 
-  // Fallback to student review data when schema is unavailable
+  // Fallback to student review data
   if (Array.isArray(project.students)) {
     project.students.forEach((student) => {
       getReviewEntriesWithKeys(student.reviews).forEach(([reviewName, reviewData]) => {
@@ -176,50 +255,12 @@ const projectHasPresentStudent = (project) => {
   return project.students.some(studentHasPresentAttendance);
 };
 
-
-const AdminProjectManagement = () => {
-  const navigate = useNavigate();
-  // Hardcoded department options for edit modal
-const DEPARTMENT_OPTIONS = [
-  'BTech', 'MIS(Mtech Integrated)','MIA(Mtech Integrated)','MCA','MCA 2nd Year','MCS','MCB','MAI(Machine Learning)'
-,'MAI(Data Science)','MCS'];
-
-  
-  // Core state
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [adminContext, setAdminContext] = useState(null);
-  const [schemaCache, setSchemaCache] = useState(() => new Map());
-  
-  // Filter states
-  const [selectedSchool, setSelectedSchool] = useState("");
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [bestProjectFilter, setBestProjectFilter] = useState("");
-  const [attendanceFilter, setAttendanceFilter] = useState("");
-  
-  // UI states
-  const [expandedProjects, setExpandedProjects] = useState(new Set());
-  const [showFilters, setShowFilters] = useState(false);
-  
-  // Edit modal states
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingProjectData, setEditingProjectData] = useState(null);
-  
-  const [notification, setNotification] = useState({
-    isVisible: false,
-    type: "",
-    title: "",
-    message: "",
-  });
-
 const exportToBulkTemplate = (projects) => {
   if (!projects || projects.length === 0) {
     alert("No projects data available to export.");
     return;
   }
 
-  // Excel columns matching your desired format + panel column as a single string
   const columns = [
     'Project Name',
     'Guide Faculty Employee ID', 
@@ -236,25 +277,21 @@ const exportToBulkTemplate = (projects) => {
     'Student Name 3',
     'Student RegNo 3',
     'Student Email 3',
-    'Panel' // Single string, e.g. 50392 Dr. Syed Ibrahim S P & 52343 Dr. Dinakaran M
+    'Panel'
   ];
 
   const rows = projects.map(project => {
-    // Get guide faculty employee ID
     const guideEmployeeId = project.guideFaculty?.employeeId || 
                            project.guide?.employeeId || 
                            '';
 
-    // Get project specialization/domain
     const specialization = project.specialization || 
                           project.domain || 
                           project.guideFaculty?.specialization?.[0] || 
                           '';
 
-    // Prepare student data (up to 3 students horizontally)
     const students = project.students || [];
 
-    // Panel example: 50392 Dr. Syed Ibrahim S P & 52343 Dr. Dinakaran M
     const panel = project.panel || {};
     let panelString = '';
     if (Array.isArray(panel.members) && panel.members.length > 0) {
@@ -268,7 +305,7 @@ const exportToBulkTemplate = (projects) => {
       'Project Name': project.name || '',
       'Guide Faculty Employee ID': guideEmployeeId,
       'School': project.school || '',
-      'Department': project.department || '', // allow to be empty
+      'Department': project.department || '',
       'Specialization': specialization,
       'Type': project.type || '',
       'Student Name 1': students[0]?.name || '',
@@ -280,7 +317,7 @@ const exportToBulkTemplate = (projects) => {
       'Student Name 3': students[2]?.name || '',
       'Student RegNo 3': students[2]?.regNo || '',
       'Student Email 3': students[2]?.emailId || students[2]?.email || '',
-      'Panel': panelString // the key new field!
+      'Panel': panelString
     };
 
     return row;
@@ -295,14 +332,55 @@ const exportToBulkTemplate = (projects) => {
   const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([wbout], { type: "application/octet-stream" });
   
-  const fileName = `Projects_Bulk_Template_PanelStrings_${new Date().toISOString().slice(0,10)}.xlsx`;
+  const fileName = `Projects_Bulk_Template_${new Date().toISOString().slice(0,10)}.xlsx`;
   saveAs(blob, fileName);
 };
 
+// ==================== MAIN COMPONENT ====================
 
+const AdminProjectManagement = () => {
+  const navigate = useNavigate();
+  
+  const DEPARTMENT_OPTIONS = [
+    'BTech', 'MIS(Mtech Integrated)','MIA(Mtech Integrated)','MCA','MCA 2nd Year','MCS','MCB','MAI(Machine Learning)'
+  ,'MAI(Data Science)','MCS'];
 
+  // Core state
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [adminContext, setAdminContext] = useState(null);
+  const [schemaCache, setSchemaCache] = useState(() => new Map());
+  
+  // Filter states
+  const [selectedSchool, setSelectedSchool] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [bestProjectFilter, setBestProjectFilter] = useState("");
+  const [attendanceFilter, setAttendanceFilter] = useState("");
+  
+  // ==================== NEW FILTER STATES ====================
+  const [selectedReviewFilter, setSelectedReviewFilter] = useState("");
+  const [pptApprovalFilter, setPPTApprovalFilter] = useState(""); // all, approved, not-approved
+  const [markingStatusFilter, setMarkingStatusFilter] = useState(""); // all, marked-with-ppt, marked-without-ppt, not-marked
+  
+  // UI states
+  const [expandedProjects, setExpandedProjects] = useState(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  
+  // Edit modal states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingProjectData, setEditingProjectData] = useState(null);
+  
+  const [notification, setNotification] = useState({
+    isVisible: false,
+    type: "",
+    title: "",
+    message: "",
+  });
 
-  // Show notification function
+  // ==================== NOTIFICATION FUNCTIONS ====================
+
   const showNotification = useCallback((type, title, message, duration = 4000) => {
     setNotification({
       isVisible: true,
@@ -316,12 +394,12 @@ const exportToBulkTemplate = (projects) => {
     }, duration);
   }, []);
 
-  // Hide notification function
   const hideNotification = useCallback(() => {
     setNotification(prev => ({ ...prev, isVisible: false }));
   }, []);
 
-  // Check for admin context
+  // ==================== ADMIN CONTEXT CHECK ====================
+
   useEffect(() => {
     const savedAdminContext = sessionStorage.getItem("adminContext");
     if (!savedAdminContext) {
@@ -344,6 +422,8 @@ const exportToBulkTemplate = (projects) => {
       navigate("/admin/school-selection");
     }
   }, [navigate]);
+
+  // ==================== SCHEMA CACHING ====================
 
   const primeSchemaCache = useCallback(async (projectList) => {
     if (!projectList || projectList.length === 0) {
@@ -384,110 +464,109 @@ const exportToBulkTemplate = (projects) => {
     setSchemaCache(new Map(schemaEntries));
   }, []);
 
-  // Fetch projects data
-// Fetch projects data
-const fetchProjects = useCallback(async () => {
-  if (!adminContext) return;
-  
-  try {
-    setLoading(true);
+  // ==================== FETCH PROJECTS ====================
+
+  const fetchProjects = useCallback(async () => {
+    if (!adminContext) return;
     
-    const params = new URLSearchParams();
-    
-    // Add filters based on context only (no auto-filtering on selections)
-    if (!adminContext.skipped) {
-      if (adminContext.school) params.append('school', adminContext.school);
-      if (adminContext.department) params.append('department', adminContext.department);
-    }
-    
-    const response = await getAllProjects(params);
-    
-    if (response?.data?.data) {
-      const projectData = response.data.data;
-      setProjects(projectData);
-      await primeSchemaCache(projectData);
-      showNotification("success", "Data Loaded", `Successfully loaded ${projectData.length} projects`);
-    } else {
+    try {
+      setLoading(true);
+      
+      const params = new URLSearchParams();
+      
+      if (!adminContext.skipped) {
+        if (adminContext.school) params.append('school', adminContext.school);
+        if (adminContext.department) params.append('department', adminContext.department);
+      }
+      
+      const response = await getAllProjects(params);
+      
+      if (response?.data?.data) {
+        const projectData = response.data.data;
+        setProjects(projectData);
+        await primeSchemaCache(projectData);
+        showNotification("success", "Data Loaded", `Successfully loaded ${projectData.length} projects`);
+      } else {
+        setProjects([]);
+        setSchemaCache(new Map());
+        showNotification("error", "No Data", "No projects found matching the criteria");
+      }
+      
+    } catch (error) {
+      console.error("Error fetching projects:", error);
       setProjects([]);
       setSchemaCache(new Map());
-      showNotification("error", "No Data", "No projects found matching the criteria");
+      showNotification("error", "Fetch Failed", "Failed to load project data. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    
-  } catch (error) {
-    console.error("Error fetching projects:", error);
-    setProjects([]);
-    setSchemaCache(new Map());
-    showNotification("error", "Fetch Failed", "Failed to load project data. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-}, [adminContext, primeSchemaCache, showNotification]); // Removed selectedSchool, selectedDepartment dependencies
+  }, [adminContext, primeSchemaCache, showNotification]);
 
+  useEffect(() => {
+    if (adminContext) {
+      fetchProjects();
+    }
+  }, [adminContext, fetchProjects]);
 
-useEffect(() => {
-  if (adminContext) {
-    fetchProjects();
-  }
-}, [adminContext, fetchProjects]); // Removed selectedSchool, selectedDepartment
+  // ==================== APPLY FILTERS ====================
 
-// Apply filters manually
-const applyFilters = useCallback(async () => {
-  if (!adminContext) return;
-  
-  try {
-    setLoading(true);
+  const applyFilters = useCallback(async () => {
+    if (!adminContext) return;
     
-    const params = new URLSearchParams();
-    
-    // Add filters based on context
-    if (!adminContext.skipped) {
-      if (adminContext.school) params.append('school', adminContext.school);
-      if (adminContext.department) params.append('department', adminContext.department);
-    }
-    
-    // Add manual filter selections only when applying
-    if (selectedSchool && selectedSchool !== adminContext.school) {
-      params.set('school', selectedSchool);
-    }
-    if (selectedDepartment && selectedDepartment !== adminContext.department) {
-      params.set('department', selectedDepartment);
-    }
-    
-    const response = await getAllProjects(params);
-    
-    if (response?.data?.data) {
-      const projectData = response.data.data;
-      setProjects(projectData);
-      await primeSchemaCache(projectData);
-      showNotification(
-        "success",
-        "Filters Applied",
-        `Successfully loaded ${projectData.length} projects with filters`
-      );
-    } else {
+    try {
+      setLoading(true);
+      
+      const params = new URLSearchParams();
+      
+      if (!adminContext.skipped) {
+        if (adminContext.school) params.append('school', adminContext.school);
+        if (adminContext.department) params.append('department', adminContext.department);
+      }
+      
+      if (selectedSchool && selectedSchool !== adminContext.school) {
+        params.set('school', selectedSchool);
+      }
+      if (selectedDepartment && selectedDepartment !== adminContext.department) {
+        params.set('department', selectedDepartment);
+      }
+      
+      const response = await getAllProjects(params);
+      
+      if (response?.data?.data) {
+        const projectData = response.data.data;
+        setProjects(projectData);
+        await primeSchemaCache(projectData);
+        showNotification(
+          "success",
+          "Filters Applied",
+          `Successfully loaded ${projectData.length} projects with filters`
+        );
+      } else {
+        setProjects([]);
+        setSchemaCache(new Map());
+        showNotification("error", "No Data", "No projects found matching the criteria");
+      }
+      
+    } catch (error) {
+      console.error("Error applying filters:", error);
       setProjects([]);
       setSchemaCache(new Map());
-      showNotification("error", "No Data", "No projects found matching the criteria");
+      showNotification("error", "Filter Failed", "Failed to apply filters. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    
-  } catch (error) {
-    console.error("Error applying filters:", error);
-    setProjects([]);
-    setSchemaCache(new Map());
-    showNotification("error", "Filter Failed", "Failed to apply filters. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-}, [adminContext, primeSchemaCache, selectedSchool, selectedDepartment, showNotification]);
+  }, [adminContext, primeSchemaCache, selectedSchool, selectedDepartment, showNotification]);
 
-  // Handle context change - redirect to school selection
+  // ==================== CONTEXT CHANGE ====================
+
   const handleChangeSchoolDepartment = useCallback(() => {
     sessionStorage.removeItem("adminContext");
     sessionStorage.setItem('adminReturnPath', '/admin/project-management');
     navigate("/admin/school-selection");
   }, [navigate]);
 
-  // Get unique schools and departments from projects
+  // ==================== GET AVAILABLE OPTIONS ====================
+
   const availableSchools = useMemo(() => {
     const schools = [...new Set(projects.map(p => p.school).filter(Boolean))];
     return schools.sort();
@@ -498,7 +577,11 @@ const applyFilters = useCallback(async () => {
     return deps.sort();
   }, [projects]);
 
-  // Type options for the select element
+  // Get available reviews from schema
+  const availableReviews = useMemo(() => {
+    return getAllReviewNames(schemaCache);
+  }, [schemaCache]);
+
   const typeOptions = ['Software', 'Hardware'];
 
   const projectReviewMetaMap = useMemo(() => {
@@ -510,7 +593,8 @@ const applyFilters = useCallback(async () => {
     return map;
   }, [projects, schemaCache]);
 
-  // Helper function to normalize type for backend
+  // ==================== TYPE NORMALIZATION ====================
+
   const normalizeType = (type) => {
     if (!type) return '';
     const displayMap = {
@@ -520,7 +604,6 @@ const applyFilters = useCallback(async () => {
     return displayMap[type] || type.toLowerCase().trim();
   };
 
-  // Helper function to display type for frontend
   const displayType = (type) => {
     if (!type) return '';
     const backendMap = {
@@ -530,7 +613,8 @@ const applyFilters = useCallback(async () => {
     return backendMap[type.toLowerCase()] || type;
   };
 
-  // Filter projects based on search and filters
+  // ==================== FILTER PROJECTS (UPDATED) ====================
+
   const filteredProjects = useMemo(() => {
     let filtered = [...projects];
 
@@ -568,16 +652,60 @@ const applyFilters = useCallback(async () => {
       }
     }
 
+    // Attendance filter
     if (attendanceFilter === "no-present") {
       filtered = filtered.filter(project => !projectHasPresentStudent(project));
     } else if (attendanceFilter === "has-present") {
       filtered = filtered.filter(project => projectHasPresentStudent(project));
     }
 
-    return filtered;
-  }, [projects, searchQuery, selectedSchool, selectedDepartment, bestProjectFilter, attendanceFilter]);
+    // ==================== NEW FILTERS ====================
 
-  // Statistics
+    // Review-specific filters
+    if (selectedReviewFilter) {
+      // PPT Approval filter for specific review
+      if (pptApprovalFilter === "approved") {
+        filtered = filtered.filter(project => 
+          project.students?.some(student => 
+            hasReviewPPTApproved(student, selectedReviewFilter)
+          )
+        );
+      } else if (pptApprovalFilter === "not-approved") {
+        filtered = filtered.filter(project => 
+          project.students?.some(student => 
+            !hasReviewPPTApproved(student, selectedReviewFilter)
+          )
+        );
+      }
+
+      // Marking status filter for specific review
+      if (markingStatusFilter === "marked-with-ppt") {
+        filtered = filtered.filter(project => 
+          project.students?.some(student => 
+            hasMarksWithPPT(student, selectedReviewFilter, schemaCache, project)
+          )
+        );
+      } else if (markingStatusFilter === "marked-without-ppt") {
+        filtered = filtered.filter(project => 
+          project.students?.some(student => 
+            hasMarksWithoutPPT(student, selectedReviewFilter, schemaCache, project)
+          )
+        );
+      } else if (markingStatusFilter === "not-marked") {
+        filtered = filtered.filter(project => 
+          project.students?.some(student => 
+            !isFacultyMarked(student, selectedReviewFilter, schemaCache, project)
+          )
+        );
+      }
+    }
+
+    return filtered;
+  }, [projects, searchQuery, selectedSchool, selectedDepartment, bestProjectFilter, attendanceFilter, 
+      selectedReviewFilter, pptApprovalFilter, markingStatusFilter, schemaCache]);
+
+  // ==================== STATISTICS (UPDATED) ====================
+
   const stats = useMemo(() => {
     const totalProjects = filteredProjects.length;
     const totalStudents = filteredProjects.reduce((sum, project) => sum + (project.students?.length || 0), 0);
@@ -586,17 +714,40 @@ const applyFilters = useCallback(async () => {
     const bestProjects = filteredProjects.filter(p => p.bestProject).length;
     const projectsWithoutPresentStudents = filteredProjects.filter(project => !projectHasPresentStudent(project)).length;
     
+    // New stats for marking status
+    let markedWithPPT = 0;
+    let markedWithoutPPT = 0;
+    let notMarked = 0;
+    
+    if (selectedReviewFilter) {
+      filteredProjects.forEach(project => {
+        project.students?.forEach(student => {
+          if (hasMarksWithPPT(student, selectedReviewFilter, schemaCache, project)) {
+            markedWithPPT++;
+          } else if (hasMarksWithoutPPT(student, selectedReviewFilter, schemaCache, project)) {
+            markedWithoutPPT++;
+          } else if (!isFacultyMarked(student, selectedReviewFilter, schemaCache, project)) {
+            notMarked++;
+          }
+        });
+      });
+    }
+
     return {
       totalProjects,
       totalStudents,
       projectsWithPanels,
       projectsWithGuides,
       bestProjects,
-      projectsWithoutPresentStudents
+      projectsWithoutPresentStudents,
+      markedWithPPT,
+      markedWithoutPPT,
+      notMarked
     };
-  }, [filteredProjects]);
+  }, [filteredProjects, selectedReviewFilter, schemaCache]);
 
-  // Toggle project expansion
+  // ==================== TOGGLE PROJECT EXPANSION ====================
+
   const toggleProjectExpanded = useCallback((projectId) => {
     setExpandedProjects(prev => {
       const newSet = new Set(prev);
@@ -609,7 +760,8 @@ const applyFilters = useCallback(async () => {
     });
   }, []);
 
-  // Handle delete project
+  // ==================== DELETE PROJECT ====================
+
   const handleDeleteProject = useCallback(async (projectId) => {
     if (!window.confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
       return;
@@ -625,14 +777,14 @@ const applyFilters = useCallback(async () => {
     }
   }, [fetchProjects, showNotification]);
 
-  // Edit project handler to show modal
+  // ==================== EDIT PROJECT ====================
+
   const handleEditProject = useCallback((project) => {
     if (!project || !project._id) {
       showNotification("error", "Invalid Project", "Project data is invalid or missing ID");
       return;
     }
     
-    // Ensure type is in display format for the modal
     setEditingProjectData({
       ...project,
       type: displayType(project.type)
@@ -640,7 +792,6 @@ const applyFilters = useCallback(async () => {
     setShowEditModal(true);
   }, [showNotification]);
 
-  // Save edited project function
   const handleSaveProject = useCallback(async (editedProject) => {
     if (!editedProject || !editedProject._id) {
       showNotification("error", "Invalid Project", "Project data is invalid or missing ID");
@@ -650,14 +801,13 @@ const applyFilters = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Prepare update payload with normalized type
       const updatePayload = {
         projectUpdates: {
           name: editedProject.name,
           school: editedProject.school,
           department: editedProject.department,
           specialization: editedProject.specialization,
-          type: normalizeType(editedProject.type) // Normalize for backend
+          type: normalizeType(editedProject.type)
         },
         studentUpdates: (editedProject.students || []).map(student => ({
           studentId: student._id,
@@ -678,7 +828,6 @@ const applyFilters = useCallback(async () => {
           `Successfully updated "${editedProject.name}"`
         );
         
-        // Close modal and refresh data
         setShowEditModal(false);
         setEditingProjectData(null);
         await fetchProjects();
@@ -699,16 +848,15 @@ const applyFilters = useCallback(async () => {
     }
   }, [updateProject, fetchProjects, showNotification]);
 
-  // Cancel edit function
   const handleCancelEdit = useCallback(() => {
     setEditingProjectData(null);
     setShowEditModal(false);
   }, []);
 
-  // Enhanced Download Excel function
+  // ==================== ENHANCED DOWNLOAD EXCEL ====================
+
   const downloadExcel = useCallback(() => {
     try {
-      // Prepare detailed data for Excel
       const excelData = filteredProjects.map(project => {
         const row = {
           'Project Name': project.name || '',
@@ -716,7 +864,7 @@ const applyFilters = useCallback(async () => {
           'Department': project.department || '',
           'Specialization': project.specialization || '',
           'Type': displayType(project.type) || '',
-          'Best Project': project.bestProject ? '🏆 YES' : 'No', // ✅ NEW: Best project column
+          'Best Project': project.bestProject ? '🏆 YES' : 'No',
           'Guide Faculty': project.guideFaculty?.name || '',
           'Guide Employee ID': project.guideFaculty?.employeeId || '',
           'Guide Email': project.guideFaculty?.emailId || '',
@@ -726,19 +874,32 @@ const applyFilters = useCallback(async () => {
           'Attendance Status': projectHasPresentStudent(project) ? 'Has Present Student' : 'No Present Students',
         };
 
-        // Add panel details if available
         if (project.panel && project.panel.members) {
           row['Panel Members'] = project.panel.members.map(m => m.name).join('; ');
+        }
+
+        // Add review-specific marking status if filter is active
+        if (selectedReviewFilter) {
+          const reviewLabel = availableReviews.find(r => r.key === selectedReviewFilter)?.label || selectedReviewFilter;
+          
+          project.students?.forEach((student, idx) => {
+            const marked = isFacultyMarked(student, selectedReviewFilter, schemaCache, project);
+            const pptApproved = hasReviewPPTApproved(student, selectedReviewFilter);
+            
+            let status = 'Not Marked';
+            if (marked && pptApproved) status = 'Marked with PPT';
+            else if (marked && !pptApproved) status = 'Marked without PPT';
+            
+            row[`${student.name} - ${reviewLabel} Status`] = status;
+          });
         }
 
         return row;
       });
 
-      // Create workbook and worksheet
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(excelData);
 
-      // Auto-size columns
       const colWidths = [];
       const headers = Object.keys(excelData[0] || {});
       headers.forEach((header, index) => {
@@ -750,17 +911,14 @@ const applyFilters = useCallback(async () => {
       });
       ws['!cols'] = colWidths;
 
-      // Add worksheet to workbook
       XLSX.utils.book_append_sheet(wb, ws, "Project_Management_Export");
 
-      // Generate filename with timestamp and context
       const timestamp = new Date().toISOString().split('T')[0];
       const contextStr = adminContext.skipped 
         ? 'All_Schools_Departments' 
         : `${adminContext.school}_${adminContext.department}`.replace(/\s+/g, '_');
       const filename = `Project_Management_${contextStr}_${timestamp}.xlsx`;
 
-      // Save file
       XLSX.writeFile(wb, filename);
       
       showNotification("success", "Download Complete", `Excel file downloaded: ${filename} (${filteredProjects.length} projects)`);
@@ -768,7 +926,9 @@ const applyFilters = useCallback(async () => {
       console.error("Excel download error:", error);
       showNotification("error", "Download Failed", "Failed to download Excel file. Please try again.");
     }
-  }, [filteredProjects, adminContext, showNotification, displayType]);
+  }, [filteredProjects, adminContext, showNotification, displayType, selectedReviewFilter, availableReviews, schemaCache]);
+
+  // ==================== LOADING STATE ====================
 
   if (loading) {
     return (
@@ -790,12 +950,14 @@ const applyFilters = useCallback(async () => {
     );
   }
 
+  // ==================== MAIN RENDER ====================
+
   return (
     <>
       <Navbar />
       <div className="pt-16 sm:pt-20 pl-4 sm:pl-24 min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
         
-        {/* Page Header with Context */}
+        {/* Page Header */}
         <div className="mb-6 sm:mb-8 mx-4 sm:mx-8 bg-white rounded-2xl shadow-lg overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-4 sm:px-8 py-4 sm:py-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -909,6 +1071,7 @@ const applyFilters = useCallback(async () => {
               </div>
             </div>
 
+            {/* No Present Students */}
             <div className="bg-gradient-to-br from-rose-500 to-rose-600 rounded-2xl p-4 sm:p-6 text-white shadow-lg transform hover:scale-105 transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
@@ -923,6 +1086,41 @@ const applyFilters = useCallback(async () => {
               </div>
             </div>
           </div>
+
+          {/* ==================== NEW: Review-Specific Stats ==================== */}
+          {selectedReviewFilter && (
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-4 text-white shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-green-100 text-xs font-medium">Marked with PPT</p>
+                    <p className="text-2xl font-bold mt-1">{stats.markedWithPPT}</p>
+                  </div>
+                  <FileCheck className="h-6 w-6" />
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-4 text-white shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-amber-100 text-xs font-medium">Marked without PPT</p>
+                    <p className="text-2xl font-bold mt-1">{stats.markedWithoutPPT}</p>
+                  </div>
+                  <FileX className="h-6 w-6" />
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-500 to-slate-600 rounded-2xl p-4 text-white shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-100 text-xs font-medium">Not Marked</p>
+                    <p className="text-2xl font-bold mt-1">{stats.notMarked}</p>
+                  </div>
+                  <UserX className="h-6 w-6" />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Search and Filters Panel */}
@@ -941,41 +1139,42 @@ const applyFilters = useCallback(async () => {
                   className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium text-sm sm:text-base w-full sm:w-auto"
                 >
                   <Grid3X3 className="h-4 w-4" />
-                  <span>Advanced Filters</span>
+                  <span>Basic Filters</span>
                   {showFilters ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </button>
-       {/* ✅ UPDATED: Export Buttons Section */}
-<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-8 gap-4">
- 
-  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 space-x-0 sm:space-x-4 w-full sm:w-auto">
-  
-    
-    {/* ✅ UPDATED: Enhanced Export Buttons */}
-    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-      <button
-        onClick={downloadExcel}
-        disabled={filteredProjects.length === 0}
-        className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
-        title={`Export ${filteredProjects.length} projects as detailed Excel report`}
-      >
-        <Download className="h-4 w-4" />
-        <span>Export Excel ({filteredProjects.length})</span>
-      </button>
 
-      {/* ✅ NEW: Bulk Template Export Button */}
-      <button
-        onClick={() => exportToBulkTemplate(filteredProjects)}
-        disabled={filteredProjects.length === 0}
-        className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
-        title={`Export ${filteredProjects.length} projects in bulk template format with all student details and panel data`}
-      >
-        <FileSpreadsheet className="h-4 w-4" />
-        <span>Bulk Template ({filteredProjects.length})</span>
-      </button>
-    </div>
-  </div>
-</div>
+                {/* NEW: Advanced Filters Toggle */}
+                <button
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors font-medium text-sm sm:text-base w-full sm:w-auto"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  <span>Review Filters</span>
+                  {showAdvancedFilters ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
 
+                {/* Export Buttons */}
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={downloadExcel}
+                    disabled={filteredProjects.length === 0}
+                    className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
+                    title={`Export ${filteredProjects.length} projects as detailed Excel report`}
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Export Excel ({filteredProjects.length})</span>
+                  </button>
+
+                  <button
+                    onClick={() => exportToBulkTemplate(filteredProjects)}
+                    disabled={filteredProjects.length === 0}
+                    className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg font-medium disabled:from-slate-400 disabled:to-slate-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
+                    title={`Export ${filteredProjects.length} projects in bulk template format`}
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    <span>Bulk Template ({filteredProjects.length})</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1001,64 +1200,153 @@ const applyFilters = useCallback(async () => {
               )}
             </div>
 
-{/* Advanced Filters */}
-{showFilters && (
-  <div className="border-t border-slate-200 pt-4 sm:pt-6">
-    <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-4 sm:mb-6">
-      
-      <div>
-        <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Best Project Filter</label>
-        <select
-          value={bestProjectFilter}
-          onChange={(e) => setBestProjectFilter(e.target.value)}
-          className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all text-sm sm:text-base"
-        >
-          <option value="">All Projects</option>
-          <option value="best">🏆 Best Projects Only</option>
-          <option value="normal">Regular Projects Only</option>
-        </select>
-      </div>
+            {/* Basic Filters */}
+            {showFilters && (
+              <div className="border-t border-slate-200 pt-4 sm:pt-6 mb-4">
+                <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-4 sm:mb-6">
+                  
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Best Project Filter</label>
+                    <select
+                      value={bestProjectFilter}
+                      onChange={(e) => setBestProjectFilter(e.target.value)}
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all text-sm sm:text-base"
+                    >
+                      <option value="">All Projects</option>
+                      <option value="best">🏆 Best Projects Only</option>
+                      <option value="normal">Regular Projects Only</option>
+                    </select>
+                  </div>
 
-      <div>
-        <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Attendance Filter</label>
-        <select
-          value={attendanceFilter}
-          onChange={(e) => setAttendanceFilter(e.target.value)}
-          className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all text-sm sm:text-base"
-        >
-          <option value="">All Attendance States</option>
-          <option value="no-present">🚨 No Students Marked Present</option>
-          <option value="has-present">✅ At Least One Student Present</option>
-        </select>
-      </div>
-    </div>
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">Attendance Filter</label>
+                    <select
+                      value={attendanceFilter}
+                      onChange={(e) => setAttendanceFilter(e.target.value)}
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all text-sm sm:text-base"
+                    >
+                      <option value="">All Attendance States</option>
+                      <option value="no-present">🚨 No Students Marked Present</option>
+                      <option value="has-present">✅ At Least One Student Present</option>
+                    </select>
+                  </div>
+                </div>
 
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 space-x-0 sm:space-x-4">
-      <button
-        onClick={() => {
-          setSearchQuery("");
-          setSelectedSchool("");
-          setSelectedDepartment("");
-          setBestProjectFilter("");
-          setAttendanceFilter("");
-        }}
-        className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200 text-sm sm:text-base w-full sm:w-auto"
-      >
-        <RefreshCw className="h-4 w-4" />
-        <span>Clear All Filters</span>
-      </button>
-      
-      <button
-        onClick={applyFilters}
-        className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-medium transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
-      >
-        <Filter className="h-4 w-4" />
-        <span>Apply Filters</span>
-      </button>
-    </div>
-  </div>
-)}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 space-x-0 sm:space-x-4">
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSelectedSchool("");
+                      setSelectedDepartment("");
+                      setBestProjectFilter("");
+                      setAttendanceFilter("");
+                      setSelectedReviewFilter("");
+                      setPPTApprovalFilter("");
+                      setMarkingStatusFilter("");
+                    }}
+                    className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium transition-all duration-200 text-sm sm:text-base w-full sm:w-auto"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Clear All Filters</span>
+                  </button>
+                  
+                  <button
+                    onClick={applyFilters}
+                    className="flex items-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-medium transition-all duration-200 shadow-lg text-sm sm:text-base w-full sm:w-auto"
+                  >
+                    <Filter className="h-4 w-4" />
+                    <span>Apply Filters</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
+            {/* ==================== NEW: Advanced Review Filters ==================== */}
+            {showAdvancedFilters && (
+              <div className="border-t border-slate-200 pt-4 sm:pt-6">
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
+                  <div className="flex items-start space-x-2">
+                    <CheckSquare className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold text-indigo-900 mb-1">Review-Specific Filters</h4>
+                      <p className="text-sm text-indigo-700">Filter projects based on PPT approval and marking status for specific reviews.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-4">
+                  {/* Select Review */}
+                  <div>
+                    <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                      Select Review
+                    </label>
+                    <select
+                      value={selectedReviewFilter}
+                      onChange={(e) => {
+                        setSelectedReviewFilter(e.target.value);
+                        // Reset dependent filters
+                        if (!e.target.value) {
+                          setPPTApprovalFilter("");
+                          setMarkingStatusFilter("");
+                        }
+                      }}
+                      className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm sm:text-base"
+                    >
+                      <option value="">-- Select a Review --</option>
+                      {availableReviews.map(review => (
+                        <option key={review.key} value={review.key}>
+                          {review.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* PPT Approval Status */}
+                  {selectedReviewFilter && (
+                    <>
+                      <div>
+                        <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                          PPT Approval Status
+                        </label>
+                        <select
+                          value={pptApprovalFilter}
+                          onChange={(e) => setPPTApprovalFilter(e.target.value)}
+                          className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all text-sm sm:text-base"
+                        >
+                          <option value="">All PPT States</option>
+                          <option value="approved">✅ PPT Approved</option>
+                          <option value="not-approved">⏳ PPT Not Approved</option>
+                        </select>
+                      </div>
+
+                      {/* Marking Status */}
+                      <div>
+                        <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
+                          Marking Status
+                        </label>
+                        <select
+                          value={markingStatusFilter}
+                          onChange={(e) => setMarkingStatusFilter(e.target.value)}
+                          className="w-full p-2 sm:p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm sm:text-base"
+                        >
+                          <option value="">All Marking States</option>
+                          <option value="marked-with-ppt">✅ Marked with PPT Approval</option>
+                          <option value="marked-without-ppt">⚠️ Marked without PPT Approval</option>
+                          <option value="not-marked">❌ Not Marked (Faculty Didn't Mark)</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {selectedReviewFilter && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                    <strong>Note:</strong> Filtering for "{availableReviews.find(r => r.key === selectedReviewFilter)?.label}" review. 
+                    Projects with at least one student matching the criteria will be shown.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1147,24 +1435,23 @@ const applyFilters = useCallback(async () => {
                           </div>
                           
                           <div className="flex items-center space-x-3 mt-3 sm:mt-0">
-                            {/* Best Project Badge */}
                             {project.bestProject && (
                               <span className="bg-yellow-100 text-yellow-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold flex items-center space-x-1">
                                 <Star className="h-3 w-3 sm:h-4 sm:w-4 fill-current" />
-                                <span>🏆 BEST PROJECT</span>
+                                <span>🏆 BEST</span>
                               </span>
                             )}
                             
                             {project.panel && (
                               <span className="bg-emerald-100 text-emerald-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
                                 <Award className="h-3 w-3 sm:h-4 sm:w-4" />
-                                <span>Panel Assigned</span>
+                                <span>Panel</span>
                               </span>
                             )}
                             {!hasPresentStudent && (
                               <span className="bg-rose-100 text-rose-700 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex items-center space-x-1">
                                 <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />
-                                <span>No Attendance Marked</span>
+                                <span>No Attendance</span>
                               </span>
                             )}
                             <button
@@ -1220,19 +1507,16 @@ const applyFilters = useCallback(async () => {
                                       <span className="text-xs sm:text-sm font-semibold text-slate-700">Type:</span>
                                       <p className="text-slate-600">{displayType(project.type) || 'Not specified'}</p>
                                     </div>
-                                    {/* Best Project Status in Details */}
                                     <div>
                                       <span className="text-xs sm:text-sm font-semibold text-slate-700">Best Project:</span>
                                       <div className="flex items-center space-x-2 mt-1">
                                         {project.bestProject ? (
                                           <>
                                             <Star className="h-4 w-4 text-yellow-600 fill-current" />
-                                            <span className="text-yellow-600 font-bold">🏆 YES - Marked as Best Project</span>
+                                            <span className="text-yellow-600 font-bold">🏆 YES</span>
                                           </>
                                         ) : (
-                                          <>
-                                            <span className="text-slate-500">No</span>
-                                          </>
+                                          <span className="text-slate-500">No</span>
                                         )}
                                       </div>
                                     </div>
@@ -1304,12 +1588,17 @@ const applyFilters = useCallback(async () => {
                                     const pptStatuses = projectReviewMeta.map((meta) => {
                                       const reviewRecord = getStudentReviewRecord(student, meta.key);
                                       const pptData = reviewRecord?.pptApproved;
+                                      
+                                      // Check marking status
+                                      const marked = isFacultyMarked(student, meta.key, schemaCache, project);
+                                      
                                       return {
                                         key: meta.key,
                                         label: meta.label,
                                         facultyType: meta.facultyType,
                                         approved: pptData?.approved === true,
                                         locked: pptData?.locked === true,
+                                        marked: marked,
                                       };
                                     });
 
@@ -1348,16 +1637,47 @@ const applyFilters = useCallback(async () => {
                                             <p className="text-slate-600">{studentReviewCount} completed</p>
                                           </div>
                                           <div>
-                                            <span className="text-xs sm:text-sm font-semibold text-slate-700">PPT Approval:</span>
+                                            <span className="text-xs sm:text-sm font-semibold text-slate-700">PPT & Marking Status:</span>
                                             {hasReviewLevelStatuses ? (
                                               <>
                                                 <div className="mt-2 space-y-2">
                                                   {pptStatuses.map((status) => {
-                                                    const StatusIcon = status.approved ? CheckCircle : Clock;
+                                                    let StatusIcon = Clock;
+                                                    let statusColor = "text-amber-600";
+                                                    let statusText = "Pending";
+                                                    let bgColor = "bg-amber-50";
+                                                    let borderColor = "border-amber-200";
+                                                    
+                                                    if (status.marked && status.approved) {
+                                                      StatusIcon = CheckCircle;
+                                                      statusColor = "text-emerald-600";
+                                                      statusText = "Marked ✓ PPT ✓";
+                                                      bgColor = "bg-emerald-50";
+                                                      borderColor = "border-emerald-200";
+                                                    } else if (status.marked && !status.approved) {
+                                                      StatusIcon = AlertTriangle;
+                                                      statusColor = "text-orange-600";
+                                                      statusText = "Marked ✓ PPT ✗";
+                                                      bgColor = "bg-orange-50";
+                                                      borderColor = "border-orange-200";
+                                                    } else if (!status.marked && status.approved) {
+                                                      StatusIcon = FileCheck;
+                                                      statusColor = "text-blue-600";
+                                                      statusText = "PPT ✓ Not Marked";
+                                                      bgColor = "bg-blue-50";
+                                                      borderColor = "border-blue-200";
+                                                    } else {
+                                                      StatusIcon = FileX;
+                                                      statusColor = "text-slate-600";
+                                                      statusText = "Not Marked";
+                                                      bgColor = "bg-slate-50";
+                                                      borderColor = "border-slate-200";
+                                                    }
+                                                    
                                                     return (
                                                       <div
                                                         key={`${student._id}_${status.key}`}
-                                                        className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm"
+                                                        className={`flex items-center justify-between rounded-lg border ${borderColor} ${bgColor} px-3 py-2 shadow-sm`}
                                                       >
                                                         <div className="flex items-center gap-2">
                                                           <span className="font-semibold text-xs sm:text-sm text-slate-700">
@@ -1369,29 +1689,14 @@ const applyFilters = useCallback(async () => {
                                                             </span>
                                                           )}
                                                         </div>
-                                                        <div
-                                                          className={`flex items-center gap-1 text-xs sm:text-sm font-semibold ${
-                                                            status.approved ? "text-emerald-600" : "text-amber-600"
-                                                          }`}
-                                                        >
+                                                        <div className={`flex items-center gap-1 text-xs sm:text-sm font-semibold ${statusColor}`}>
                                                           <StatusIcon className="h-3.5 w-3.5" />
-                                                          <span>{status.approved ? "Approved" : "Pending"}</span>
+                                                          <span>{statusText}</span>
                                                           {status.locked && <Lock className="h-3 w-3 text-slate-500" />}
                                                         </div>
                                                       </div>
                                                     );
                                                   })}
-                                                </div>
-                                                <div className="mt-2">
-                                                  <span
-                                                    className={`text-xs sm:text-sm font-semibold ${
-                                                      allApproved ? "text-emerald-600" : "text-amber-600"
-                                                    }`}
-                                                  >
-                                                    {allApproved
-                                                      ? "All required PPTs approved"
-                                                      : `${pendingCount} review${pendingCount === 1 ? "" : "s"} pending approval`}
-                                                  </span>
                                                 </div>
                                               </>
                                             ) : (
@@ -1438,11 +1743,10 @@ const applyFilters = useCallback(async () => {
           </div>
         </div>
 
-        {/* Edit Project Modal */}
+        {/* Edit Project Modal (unchanged from original) */}
         {showEditModal && editingProjectData && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
             <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-              {/* Modal Header */}
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center space-x-3">
                   <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-3 rounded-xl">
@@ -1462,7 +1766,6 @@ const applyFilters = useCallback(async () => {
               </div>
 
               <div className="space-y-6">
-                {/* Project Name */}
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">
                     Project Name
@@ -1480,7 +1783,6 @@ const applyFilters = useCallback(async () => {
                   />
                 </div>
 
-                {/* School */}
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">
                     School
@@ -1501,30 +1803,26 @@ const applyFilters = useCallback(async () => {
                   </select>
                 </div>
 
-               
-          {/* Department */}
-<div>
-  <label className="block text-sm font-semibold text-slate-700 mb-3">
-    Department
-  </label>
-  <select
-    value={editingProjectData.department || ''}
-    onChange={(e) => setEditingProjectData(prev => ({
-      ...prev,
-      department: e.target.value
-    }))}
-    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700"
-    disabled={loading}
-  >
-    <option value="">Select Department</option>
-    {DEPARTMENT_OPTIONS.map(dept => (
-      <option key={dept} value={dept}>{dept}</option>
-    ))}
-  </select>
-</div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">
+                    Department
+                  </label>
+                  <select
+                    value={editingProjectData.department || ''}
+                    onChange={(e) => setEditingProjectData(prev => ({
+                      ...prev,
+                      department: e.target.value
+                    }))}
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200 text-slate-700"
+                    disabled={loading}
+                  >
+                    <option value="">Select Department</option>
+                    {DEPARTMENT_OPTIONS.map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                </div>
 
-
-                {/* Specialization */}
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">
                     Specialization
@@ -1542,7 +1840,6 @@ const applyFilters = useCallback(async () => {
                   />
                 </div>
 
-                {/* Type */}
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">
                     Type
@@ -1563,7 +1860,6 @@ const applyFilters = useCallback(async () => {
                   </select>
                 </div>
 
-                {/* Students Info (Read-only display) */}
                 {editingProjectData.students && editingProjectData.students.length > 0 && (
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-3">
@@ -1586,7 +1882,6 @@ const applyFilters = useCallback(async () => {
                 )}
               </div>
 
-              {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 mt-8 pt-6 border-t border-slate-200">
                 <button
                   onClick={() => handleSaveProject(editingProjectData)}
@@ -1618,7 +1913,7 @@ const applyFilters = useCallback(async () => {
           </div>
         )}
 
-        {/* Enhanced Notification */}
+        {/* Notification (unchanged from original) */}
         {notification.isVisible && (
           <div className="fixed top-20 sm:top-24 right-4 sm:right-8 z-50 max-w-xs sm:max-w-md w-full">
             <div className={`transform transition-all duration-500 ease-out ${
