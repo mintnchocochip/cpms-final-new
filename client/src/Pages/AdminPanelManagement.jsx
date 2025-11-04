@@ -65,6 +65,14 @@ const normalizeMarksCollection = (marks) => {
   return {};
 };
 
+const valueToArray = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+  return [value];
+};
+
 const reviewHasPositiveMarks = (review) => {
   if (!review || typeof review !== "object") return false;
 
@@ -218,6 +226,9 @@ const AdminPanelManagement = () => {
   const [panels, setPanels] = useState([]);
   const [schemaCache, setSchemaCache] = useState(() => new Map());
   const [panelReviewOptions, setPanelReviewOptions] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+  const [selectedDepartment, setSelectedDepartment] = useState("all");
+  const [departmentReviewMap, setDepartmentReviewMap] = useState(() => new Map());
   const [selectedReview, setSelectedReview] = useState("all");
   const [modalTeam, setModalTeam] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState({
@@ -276,10 +287,10 @@ const AdminPanelManagement = () => {
     
     try {
       setLoading(true);
-      const { school, department, skipped } = adminContext;
+      const { school: adminSchool, department: adminDepartment, skipped } = adminContext;
 
-      const apiSchool = skipped ? null : school;
-      const apiDepartment = skipped ? null : department;
+      const apiSchool = skipped ? null : adminSchool;
+      const apiDepartment = skipped ? null : adminDepartment;
 
       const projectParams = new URLSearchParams();
       if (apiSchool) projectParams.append("school", apiSchool);
@@ -351,6 +362,44 @@ const AdminPanelManagement = () => {
 
       console.log('✅ Formatted panels with employee IDs:', formattedPanels);
 
+      const departmentSet = new Set();
+      formattedPanels.forEach((panel) => {
+        valueToArray(panel.department).forEach((dept) => dept && departmentSet.add(dept));
+        (panel.teams || []).forEach((team) => {
+          valueToArray(team.full?.department || team.full?.specialization).forEach((dept) => {
+            if (dept) {
+              departmentSet.add(dept);
+            }
+          });
+        });
+      });
+
+      const computedDepartmentOptions = Array.from(departmentSet)
+        .filter((dept) => {
+          if (!dept) return false;
+          const normalized = String(dept).trim();
+          if (!normalized) return false;
+          return normalized.toLowerCase() !== "unknown";
+        })
+        .map((dept) => String(dept).trim())
+        .filter((dept, index, self) => dept && self.indexOf(dept) === index)
+        .sort((a, b) => a.localeCompare(b))
+        .map((dept) => ({ value: dept, label: dept }));
+
+      setDepartmentOptions(computedDepartmentOptions);
+      setSelectedDepartment((prev) => {
+        if (prev !== "all" && computedDepartmentOptions.some((option) => option.value === prev)) {
+          return prev;
+        }
+        if (!skipped && adminDepartment && computedDepartmentOptions.some((option) => option.value === adminDepartment)) {
+          return adminDepartment;
+        }
+        if (computedDepartmentOptions.length === 1) {
+          return computedDepartmentOptions[0].value;
+        }
+        return "all";
+      });
+
       const schemaKeys = new Set();
       formattedPanels.forEach((panel) => {
         (panel.teams || []).forEach((team) => {
@@ -380,20 +429,43 @@ const AdminPanelManagement = () => {
       setSchemaCache(schemaCacheMap);
 
       const reviewOptionMap = new Map();
-      schemaCacheMap.forEach((schema) => {
-        (schema?.reviews || [])
-          .filter((review) => review.facultyType === "panel")
-          .forEach((review) => {
-            const reviewName = review.reviewName;
-            if (!reviewName) return;
-            if (!reviewOptionMap.has(reviewName)) {
-              reviewOptionMap.set(reviewName, {
-                value: reviewName,
-                label: review.displayName || review.reviewName,
-              });
+      const departmentReviewOptionMap = new Map();
+      schemaCacheMap.forEach((schema, key) => {
+        const [, schemaDepartment] = key.split("|||");
+        const panelReviews = (schema?.reviews || []).filter((review) => review.facultyType === "panel");
+        if (!panelReviews.length) {
+          return;
+        }
+
+        if (schemaDepartment) {
+          if (!departmentReviewOptionMap.has(schemaDepartment)) {
+            departmentReviewOptionMap.set(schemaDepartment, new Map());
+          }
+        }
+
+        panelReviews.forEach((review) => {
+          const reviewName = review.reviewName;
+          if (!reviewName) return;
+
+          const option = {
+            value: reviewName,
+            label: review.displayName || review.reviewName,
+          };
+
+          if (!reviewOptionMap.has(reviewName)) {
+            reviewOptionMap.set(reviewName, option);
+          }
+
+          if (schemaDepartment && departmentReviewOptionMap.has(schemaDepartment)) {
+            const perDeptMap = departmentReviewOptionMap.get(schemaDepartment);
+            if (perDeptMap && !perDeptMap.has(reviewName)) {
+              perDeptMap.set(reviewName, option);
             }
-          });
+          }
+        });
       });
+
+      setDepartmentReviewMap(departmentReviewOptionMap);
 
       const reviewOptions = Array.from(reviewOptionMap.values()).sort((a, b) =>
         a.label.localeCompare(b.label)
@@ -447,6 +519,9 @@ const AdminPanelManagement = () => {
       setUnassignedTeams([]);
       setAllGuideProjects([]);
       setSchemaCache(new Map());
+      setDepartmentOptions([]);
+      setDepartmentReviewMap(new Map());
+      setSelectedDepartment("all");
       setPanelReviewOptions([]);
       setSelectedReview("all");
       showNotification("error", "Fetch Failed", "Failed to load panel data. Please try again.");
@@ -748,8 +823,18 @@ const AdminPanelManagement = () => {
     setShowAutoAssignModal(true);
   }, [isAutoCreating, showNotification]);
 
+  const handleDepartmentSelectionChange = useCallback((event) => {
+    setSelectedDepartment(event.target.value);
+  }, []);
+
   const handleReviewSelectionChange = useCallback((event) => {
     setSelectedReview(event.target.value);
+  }, []);
+
+  const handleResetFilters = useCallback(() => {
+    setSelectedDepartment("all");
+    setSelectedReview("all");
+    setPanelMarkFilter("");
   }, []);
 
   const handleManualAssign = useCallback(async (panelId, projectId) => {
@@ -797,6 +882,30 @@ const AdminPanelManagement = () => {
     [searchQuery]
   );
 
+  const reviewOptionsForFilters = useMemo(() => {
+    if (selectedDepartment === "all") {
+      return panelReviewOptions;
+    }
+
+    const departmentOptionsMap = departmentReviewMap.get(selectedDepartment);
+    if (!departmentOptionsMap) {
+      return [];
+    }
+
+    return Array.from(departmentOptionsMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [selectedDepartment, departmentReviewMap, panelReviewOptions]);
+
+  useEffect(() => {
+    if (selectedReview === "all") {
+      return;
+    }
+
+    const isAvailable = reviewOptionsForFilters.some((option) => option.value === selectedReview);
+    if (!isAvailable) {
+      setSelectedReview("all");
+    }
+  }, [reviewOptionsForFilters, selectedReview]);
+
   const panelsWithMarkStatus = useMemo(() => {
     if (!panels.length) return [];
 
@@ -811,44 +920,108 @@ const AdminPanelManagement = () => {
   }, [panels, schemaCache, selectedReview]);
 
   const filteredPanels = useMemo(() => {
-    return panelsWithMarkStatus.filter((panel) => {
-      const matchesSearch =
-        !searchQuery ||
-        panel.facultyNames.some((name) => filterMatches(name)) ||
-        panel.teams.some((team) =>
-          filterMatches(team.name) ||
-          filterMatches(team.domain) ||
-          filterMatches(team.full?.school) ||
-          filterMatches(team.full?.department) ||
-          filterMatches(team.full?.specialization)
-        ) ||
-        (panel.venue && filterMatches(panel.venue)) ||
-        filterMatches(panel.school) ||
-        filterMatches(panel.department);
+    return panelsWithMarkStatus
+      .map((panel) => {
+        const panelDepartments = valueToArray(panel.department);
 
-      if (!matchesSearch) {
-        return false;
-      }
+        const teamsMatchingFilters = panel.teams.filter((team) => {
+          const teamDepartments = valueToArray(team.full?.department || team.full?.specialization || panelDepartments);
+          const matchesDepartment =
+            selectedDepartment === "all" || teamDepartments.includes(selectedDepartment);
 
-      if (!panelMarkFilter) {
-        return true;
-      }
+          if (!matchesDepartment) {
+            return false;
+          }
 
-      const status = panel.markSummary?.status || "unknown";
-      switch (panelMarkFilter) {
-        case "all":
-          return status === "all";
-        case "partial":
-          return status === "partial";
-        case "none":
-          return status === "none";
-        case "no-projects":
-          return status === "no-projects";
-        default:
+          if (selectedReview !== "all") {
+            const reviewNames = Array.isArray(team.markStatus?.reviewNames)
+              ? team.markStatus.reviewNames
+              : [];
+            return reviewNames.includes(selectedReview);
+          }
+
           return true;
-      }
-    });
-  }, [panelsWithMarkStatus, searchQuery, filterMatches, panelMarkFilter]);
+        });
+
+        const hasDepartmentMatch =
+          selectedDepartment === "all" ||
+          panelDepartments.includes(selectedDepartment) ||
+          teamsMatchingFilters.length > 0;
+
+        if (!hasDepartmentMatch) {
+          return null;
+        }
+
+        const teamsForPanel =
+          selectedDepartment === "all" && selectedReview === "all"
+            ? panel.teams
+            : teamsMatchingFilters;
+
+        const teamsForSearch = teamsForPanel.length ? teamsForPanel : panel.teams;
+
+        const matchesSearch =
+          !searchQuery ||
+          panel.facultyNames.some((name) => filterMatches(name)) ||
+          teamsForSearch.some((team) =>
+            filterMatches(team.name) ||
+            filterMatches(team.domain) ||
+            filterMatches(team.full?.school) ||
+            filterMatches(team.full?.department) ||
+            filterMatches(team.full?.specialization)
+          ) ||
+          (panel.venue && filterMatches(panel.venue)) ||
+          filterMatches(panel.school) ||
+          filterMatches(panel.department);
+
+        if (!matchesSearch) {
+          return null;
+        }
+
+        let markSummary = panel.markSummary;
+        let teamsWithStatus = teamsForPanel;
+
+        if (teamsForPanel !== panel.teams) {
+          const recomputed = computePanelMarkSummary({ ...panel, teams: teamsForPanel }, schemaCache, selectedReview);
+          teamsWithStatus = recomputed.teams;
+          markSummary = recomputed.summary;
+        }
+
+        const status = markSummary?.status || "unknown";
+        if (panelMarkFilter) {
+          switch (panelMarkFilter) {
+            case "all":
+              if (status !== "all") return null;
+              break;
+            case "partial":
+              if (status !== "partial") return null;
+              break;
+            case "none":
+              if (status !== "none") return null;
+              break;
+            case "no-projects":
+              if (status !== "no-projects") return null;
+              break;
+            default:
+              break;
+          }
+        }
+
+        return {
+          ...panel,
+          teams: teamsWithStatus,
+          markSummary,
+        };
+      })
+      .filter(Boolean);
+  }, [
+    panelsWithMarkStatus,
+    selectedDepartment,
+    selectedReview,
+    searchQuery,
+    filterMatches,
+    panelMarkFilter,
+    schemaCache,
+  ]);
 
   const markStatusCounts = useMemo(() => {
     return panelsWithMarkStatus.reduce(
@@ -863,6 +1036,169 @@ const AdminPanelManagement = () => {
       { all: 0, partial: 0, none: 0, noProjects: 0 }
     );
   }, [panelsWithMarkStatus]);
+
+  const handlePanelExcelDownload = useCallback(() => {
+    try {
+      const totalTeams = filteredPanels.reduce(
+        (sum, panel) => sum + (Array.isArray(panel.teams) ? panel.teams.length : 0),
+        0
+      );
+
+      if (totalTeams === 0) {
+        showNotification("error", "No Data", "No teams match the selected filters to export.");
+        return;
+      }
+
+      const statusBuckets = {
+        full: [],
+        partial: [],
+        none: [],
+        noSchema: [],
+      };
+
+      filteredPanels.forEach((panel) => {
+        const panelMembers = panel.facultyNames.join(", ");
+        const panelMemberIds = (panel.facultyEmployeeIds || []).join(", ");
+        const panelDepartmentDisplay = valueToArray(panel.department).join(", ") || "N/A";
+        const panelSchoolDisplay = valueToArray(panel.school).join(", ") || "N/A";
+
+        (panel.teams || []).forEach((team) => {
+          const [teamSchool, teamDepartment] = resolveSchoolDepartment(team.full, panel);
+          const studentNames = (team.full?.students || []).map((student) => student?.name || student?.regNo || "N/A");
+          const schemaKey = schemaKeyFor(teamSchool, teamDepartment);
+          const schema = schemaKey ? schemaCache.get(schemaKey) : null;
+          const panelReviews = (schema?.reviews || []).filter((review) => review.facultyType === "panel");
+          const reviewsForReport =
+            selectedReview === "all"
+              ? panelReviews
+              : panelReviews.filter((review) => review.reviewName === selectedReview);
+
+          const pendingEntries = [];
+          if (reviewsForReport.length > 0) {
+            (team.full?.students || []).forEach((student) => {
+              const studentReviews = normalizeReviewCollection(student.reviews);
+              const missingReviews = reviewsForReport
+                .filter((review) => !reviewHasPositiveMarks(studentReviews[review.reviewName]))
+                .map((review) => review.displayName || review.reviewName);
+
+              if (missingReviews.length > 0) {
+                pendingEntries.push(`${student.name || student.regNo}: ${missingReviews.join(", ")}`);
+              }
+            });
+          }
+
+          let pendingSummary = "All Completed";
+          if (!schema || reviewsForReport.length === 0) {
+            pendingSummary = "No panel review configured";
+          } else if (pendingEntries.length > 0) {
+            pendingSummary = pendingEntries.join(" | ");
+          }
+
+          const row = {
+            "Panel ID": panel.panelId,
+            "Panel Members": panelMembers || "N/A",
+            "Panel Member IDs": panelMemberIds || "N/A",
+            Department: teamDepartment || panelDepartmentDisplay,
+            School: teamSchool || panelSchoolDisplay,
+            "Team Name": team.name,
+            "Project Domain": team.full?.domain || team.domain || "N/A",
+            "Student Names": studentNames.join(" | ") || "N/A",
+            "Review(s)": reviewsForReport.length
+              ? reviewsForReport.map((review) => review.displayName || review.reviewName).join(", ")
+              : "No Review Configured",
+            "Mark Status":
+              team.markStatus?.status === "full"
+                ? "Fully Marked"
+                : team.markStatus?.status === "partial"
+                ? "Partially Marked"
+                : team.markStatus?.status === "none"
+                ? "Not Marked"
+                : team.markStatus?.status === "no-schema"
+                ? "Schema Missing"
+                : "Unknown",
+            "Students Count": team.full?.students?.length || 0,
+            "Students Fully Marked": team.markStatus?.studentsFullyMarked ?? 0,
+            "Students With Marks": team.markStatus?.studentsWithMarks ?? 0,
+            "Pending Students / Reviews": pendingSummary,
+          };
+
+          if (!schema || reviewsForReport.length === 0 || team.markStatus?.status === "no-schema") {
+            statusBuckets.noSchema.push(row);
+            return;
+          }
+
+          switch (team.markStatus?.status) {
+            case "full":
+              statusBuckets.full.push(row);
+              break;
+            case "partial":
+              statusBuckets.partial.push(row);
+              break;
+            case "none":
+            default:
+              statusBuckets.none.push(row);
+              break;
+          }
+        });
+      });
+
+      const totalRows =
+        statusBuckets.full.length +
+        statusBuckets.partial.length +
+        statusBuckets.none.length +
+        statusBuckets.noSchema.length;
+
+      if (totalRows === 0) {
+        showNotification("error", "No Data", "No teams match the selected filters to export.");
+        return;
+      }
+
+      const workbook = XLSX.utils.book_new();
+
+      const summaryRows = [
+        { Metric: "Department Filter", Value: selectedDepartment === "all" ? "All Departments" : selectedDepartment },
+        { Metric: "Review Filter", Value: selectedReview === "all" ? "All Reviews" : selectedReview },
+        { Metric: "Panels Included", Value: filteredPanels.length },
+        { Metric: "Fully Marked Teams", Value: statusBuckets.full.length },
+        { Metric: "Partially Marked Teams", Value: statusBuckets.partial.length },
+        { Metric: "Not Marked Teams", Value: statusBuckets.none.length },
+        { Metric: "Missing Schema Teams", Value: statusBuckets.noSchema.length },
+      ];
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), "Summary");
+
+      const appendSheet = (rows, label) => {
+        if (!rows.length) return;
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const safeLabel = label.length > 31 ? label.slice(0, 31) : label;
+        XLSX.utils.book_append_sheet(workbook, worksheet, safeLabel);
+      };
+
+      appendSheet(statusBuckets.full, "Fully Marked Teams");
+      appendSheet(statusBuckets.partial, "Partially Marked Teams");
+      appendSheet(statusBuckets.none, "Not Marked Teams");
+      appendSheet(statusBuckets.noSchema, "Missing Schema");
+
+      const sanitizeSegment = (segment) => segment.replace(/[^a-zA-Z0-9]+/g, "_");
+      const departmentSegment = selectedDepartment === "all" ? "AllDepts" : sanitizeSegment(selectedDepartment);
+      const reviewSegment = selectedReview === "all" ? "AllReviews" : sanitizeSegment(selectedReview);
+      const dateSegment = new Date().toISOString().split("T")[0];
+
+      const fileName = `Panel_Status_${departmentSegment}_${reviewSegment}_${dateSegment}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      showNotification("success", "Download Ready", "Panel status Excel downloaded.");
+    } catch (error) {
+      console.error("Panel Excel download error:", error);
+      showNotification("error", "Download Failed", "Failed to generate Excel file. Please try again.");
+    }
+  }, [filteredPanels, selectedDepartment, selectedReview, schemaCache, showNotification]);
+
+  const filtersActive =
+    selectedDepartment !== "all" || selectedReview !== "all" || panelMarkFilter !== "";
+
+  const canExportPanels = useMemo(
+    () => filteredPanels.some((panel) => Array.isArray(panel.teams) && panel.teams.length > 0),
+    [filteredPanels]
+  );
 
   if (loading) {
     return (
@@ -982,14 +1318,27 @@ const AdminPanelManagement = () => {
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Panel Creation & Management</h2>
               </div>
-              <div className="flex items-center space-x-4 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => fetchData()}
                   disabled={loading}
-                  className="flex items-center space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium w-full sm:w-auto justify-center sm:justify-start"
+                  className="flex items-center space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors font-medium w-full sm:w-auto justify-center sm:justify-start disabled:cursor-not-allowed"
                 >
                   <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                   <span>Refresh</span>
+                </button>
+                <button
+                  onClick={handlePanelExcelDownload}
+                  disabled={!canExportPanels}
+                  className={`flex items-center space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-medium transition-all w-full sm:w-auto justify-center sm:justify-start shadow-sm ${
+                    canExportPanels
+                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      : 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                  }`}
+                  title={canExportPanels ? 'Download panel status Excel for the current filters' : 'No matching teams to export'}
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Export Panel Excel</span>
                 </button>
               </div>
             </div>
@@ -1016,7 +1365,43 @@ const AdminPanelManagement = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div>
+                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">
+                  Department
+                </label>
+                <select
+                  value={selectedDepartment}
+                  onChange={handleDepartmentSelectionChange}
+                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base"
+                >
+                  <option value="all">All Departments</option>
+                  {departmentOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">
+                  Panel Review
+                </label>
+                <select
+                  value={selectedReview}
+                  onChange={handleReviewSelectionChange}
+                  disabled={reviewOptionsForFilters.length === 0}
+                  title={reviewOptionsForFilters.length === 0 ? "No panel reviews available for this selection" : "Filter by review"}
+                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm sm:text-base disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <option value="all">All Reviews</option>
+                  {reviewOptionsForFilters.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">
                   Panel Mark Status
@@ -1033,36 +1418,17 @@ const AdminPanelManagement = () => {
                   <option value="no-projects">📂 No Projects Assigned</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">
-                  Panel Review
-                </label>
-                <select
-                  value={selectedReview}
-                  onChange={handleReviewSelectionChange}
-                  disabled={panelReviewOptions.length === 0}
-                  title={panelReviewOptions.length === 0 ? "No panel reviews available" : "Filter by review"}
-                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm sm:text-base disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                  <option value="all">All Reviews</option>
-                  {panelReviewOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <div className="flex items-end">
                 <button
-                  onClick={() => setPanelMarkFilter("")}
-                  disabled={!panelMarkFilter}
+                  onClick={handleResetFilters}
+                  disabled={!filtersActive}
                   className={`w-full sm:w-auto px-4 py-2 rounded-xl font-semibold text-sm sm:text-base transition-all ${
-                    panelMarkFilter
-                      ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                      : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                    filtersActive
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      : 'bg-slate-200 text-slate-500 cursor-not-allowed'
                   }`}
                 >
-                  Clear Mark Filter
+                  Reset Filters
                 </button>
               </div>
             </div>
