@@ -11,7 +11,7 @@ import Faculty from "../models/facultySchema.js";
 dotenv.config();
 
 const EXCEL_PATH =
-  "/home/administrator/Desktop/excel-files/Upload/PanelAssignALL_CORRECTED (1).xlsx";
+  "/home/administrator/Desktop/excel-files/Upload/M.Tech 2yrs (1st years) project panel assignment.xlsx";
 const API_BASE_URL =
   process.env.API_BASE_URL || "http://localhost:5000/api/admin";
 const AUTH_TOKEN =
