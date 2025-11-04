@@ -1,14 +1,8 @@
 export const schoolOptions = ['SCOPE', 'SENSE', 'SELECT', 'SMEC', 'SCE', 'VITSOL'];
 
 export const departmentOptions = [
-  'BTech', 
-  'MTech (Integrated)', 
-  'MCA', 
-  'MSc', 
-  'BBA', 
-  'MBA', 
-  'BDes',
-  'MDes'
+  'BTech', 'M.Tech Integrated (MIS)', 'M.Tech Integrated (MIA)', 'MCA 1st Year', 
+      'MCA', 'M.Tech 2yr (MCS,MCB,MAI)','M.Tech 2yrs (1st years)'
 ];
 
 export const specializationOptionsDisplay = [
